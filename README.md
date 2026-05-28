@@ -1,127 +1,109 @@
-The Powder Toy - April 2026
-==========================
+# The Electric-Magnet Toy
 
-Get the latest version [from the Powder Toy website](https://powdertoy.co.uk/Download.html). We're also on [Steam](https://store.steampowered.com/app/1148350/The_Powder_Toy/).
+*A classical electromagnetism mod for [The Powder Toy](https://powdertoy.co.uk)*
 
-To use online features such as saving, you need to [register an account](https://powdertoy.co.uk/Register.html).
-You can also visit [the official TPT forum](https://powdertoy.co.uk/Discussions/Categories/Index.html).
+---
 
-Have you ever wanted to blow something up? Or maybe you always dreamt of operating an atomic power plant? Do you have a will to develop your own CPU? The Powder Toy lets you to do all of these, and even more!
+## Overview
 
-The Powder Toy is a free physics sandbox game, which simulates air pressure and velocity, heat, gravity and a countless number of interactions between different substances! The game provides you with various building materials, liquids, gases and electronic components which can be used to construct complex machines, guns, bombs, realistic terrains and almost anything else. You can then mine them and watch cool explosions, add intricate wirings, play with little stickmen or operate your machine. You can browse and play thousands of different saves made by the community or upload your own – we welcome your creations!
+This mod adds a complete **classical electromagnetism simulation** to The Powder Toy: magnetic fields, electric fields, magnetizable materials, chargeable conductors, Lorentz force, and dielectrophoresis. Both fields are computed via FFT-based Poisson solvers in real time, with visual overlays and sidebar controls.
 
-There is a Lua API – you can automate your work or even make plugins for the game. The Powder Toy is free and the source code is distributed under the GNU General Public License, so you can modify the game yourself or help with development.
+---
 
-Build instructions
-===========================================================================
+## New Elements
 
-See the _Powder Toy Development Help_ section [on the main page of the wiki](https://powdertoy.co.uk/Wiki/W/Main_Page.html).
+### Magnetic (3 new elements)
+| Element | Menu | Description |
+|---|---|---|
+| **MAGN** | `SC_SPECIAL` | Permanent magnet. `tmp` = polarity/strength (positive=N/red, negative=S/blue). |
+| **ELMG** | `SC_POWERED` | Electromagnet. SPRK to activate (PSCN=on, NSCN=off). Field strength ∝ temperature. |
+| **MGPN** | `SC_NUCLEAR` | Magnetic monopole. `tmp` = polarity. Same polarity repels, opposites attract. |
 
-Special Thanks
-===========================================================================
+### Electric (2 new elements)
+| Element | Menu | Description |
+|---|---|---|
+| **POSC** | `SC_POWERED` | Electrode plate. Temp > 0°C = positive (yellow), < 0°C = negative (blue). Single element replaces old POSC/NEGC. |
+| **FIXC** | `SC_SPECIAL` | Fixed charge. Like MAGN for E-field. `tmp` = charge strength and polarity. |
 
-* Stanislaw K Skowronek - Designed the original Powder Toy
-* Simon Robertshaw - Wrote the website, current server owner
-* Skresanov Savely
-* Pilihp64
-* Catelite
-* Victoria Hoyle
-* Nathan Cousins
-* jacksonmj
-* Felix Wallin
-* Lieuwe Mosch
-* Anthony Boot
-* Me4502
-* MaksProg
-* jacob1
-* mniip
-* LBPHacker
+### Tools (4 new brushes)
+| Tool | Color | Effect |
+|---|---|---|
+| **PMAG** | Red | Paint positive (N) magnetic field source. |
+| **NMAG** | Blue | Paint negative (S) magnetic field source. |
+| **PELC** | Gold | Paint positive electric field source. |
+| **NELC** | Blue | Paint negative electric field source. |
 
-Libraries and other assets used
-===========================================================================
+---
 
-* [bzip2](http://www.bzip.org/)
-* [FFTW](http://fftw.org/)
-* [JsonCpp](https://github.com/open-source-parsers/jsoncpp)
-* [libcurl](https://curl.se/libcurl/)
-* [libpng](http://www.libpng.org/pub/png/libpng.html)
-* [Lua](https://www.lua.org/)
-* [LuaJIT](https://luajit.org/)
-* [Mallangche](https://github.com/JammPark/Mallangche)
-* [mbedtls](https://www.trustedfirmware.org/projects/mbed-tls/)
-* [SDL](https://libsdl.org/)
+## Key Features
 
-Instructions
-===========================================================================
+### 🧲 Magnetization & Induction
+- **13 conductors** detect changing magnetic flux and spark (dB/dt induction): METL, GOLD, TUNG, PTNM, IRON, BMTL, TTAN, TESC, INWR, INST, MERC, BRMT, BREC.
+- **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields.
 
-Click on the elements with the mouse and draw in the field, like in MS Paint. The rest of the game is learning what happens next.
+### ⚡ Electrification & Charge
+- **24 conductors** accept charge by contact with POSC, FIXC, ELEC (electrons), or PROT (protons). Charge stored in `tmp4` (or `tmp3` for LITH).
+- **Charge diffusion**: DEUT-style random trade between any `PROP_CONDUCTS` neighbors. A charged wire charges the whole circuit.
+- Charged solids produce their own electric field (eSrc contribution).
 
-Controls
-===========================================================================
+### 🔁 Electro-Magnetic Coupling
+- **Lorentz force**: Charged moving particles deflect in magnetic fields. `dθ = Bz × q × 0.05 / mass`. Pure rotation preserves kinetic energy.
+- **ELEC/PROT standard**: All Coulomb forces use coefficient 0.5, matching the native ELEC/PROT behavior exactly.
 
-| Key                     | Action                                                          |
-| ----------------------- | --------------------------------------------------------------- |
-| TAB                     | Switch between circle/square/triangle brush                     |
-| Space                   | Pause                                                           |
-| Q / Esc                 | Quit                                                            |
-| Z                       | Zoom                                                            |
-| S                       | Save stamp (use with Ctrl when STK2 is out)                     |
-| L                       | Load last saved stamp                                           |
-| K                       | Stamp library                                                   |
-| 0-9                     | Set view mode                                                   |
-| P / F2                  | Save screenshot as .png                                         |
-| E                       | Bring up element search                                         |
-| F                       | Pause and step to next frame                                    |
-| G                       | Increase grid size                                              |
-| Shift + G               | Decrease grid size                                              |
-| H                       | Show/Hide HUD                                                   |
-| Ctrl + H / F1           | Show intro text                                                 |
-| D / F3                  | Debug mode (use with Ctrl when STK2 is out)                     |
-| I                       | Invert Pressure and Velocity map                                |
-| W                       | Cycle gravity modes (use with Ctrl when STK2 is out)            |
-| Y                       | Cycle air modes                                                 |
-| Ctrl + E                | Cycle edge modes                                                |
-| B                       | Enter decoration editor menu                                    |
-| Ctrl + B                | Toggle decorations on/off                                       |
-| N                       | Toggle Newtonian Gravity on/off                                 |
-| U                       | Toggle ambient heat on/off                                      |
-| Ctrl + I                | Install powder toy, for loading saves/stamps by double clicking |
-| Backtick                | Toggle console                                                  |
-| =                       | Reset pressure and velocity map                                 |
-| Ctrl + =                | Reset Electricity                                               |
-| \[                      | Decrease brush size                                             |
-| \]                      | Increase brush size                                             |
-| Alt + \[                | Decrease brush size by 1                                        |
-| Alt + \]                | Increase brush size by 1                                        |
-| Ctrl + C/V/X            | Copy/Paste/Cut                                                  |
-| Ctrl + Z                | Undo                                                            |
-| Ctrl + Y                | Redo                                                            |
-| Ctrl + Cursor drag      | Rectangle                                                       |
-| Shift + Cursor drag     | Line                                                            |
-| Middle click            | Sample element                                                  |
-| Alt + Left click        | Sample element                                                  |
-| Mouse scroll            | Change brush size                                               |
-| Ctrl + Mouse scroll     | Change vertical brush size                                      |
-| Shift + Mouse scroll    | Change horizontal brush size                                    |
-| Shift + R               | Horizontal mirror for selected area when pasting stamps         |
-| Ctrl + Shift + R        | Vertical mirror for selected area when pasting stamps           |
-| R                       | Rotate selected area counterclockwise when pasting stamps       |
-| F11                     | Toggle fullscreen                                               |
+### 💧 Dielectrophoresis
+- Uncharged conductors are pulled toward stronger |E| regions (polarization force).
+- Polar liquids (WATR, SLTW) respond strongly — water bends toward charged objects.
+- Force automatically scales with particle mass via `Gravity` property: light particles move faster.
 
-Command Line
----------------------------------------------------------------------------
+### 📊 Visual Overlays
+- **B-field display** (E button): Red=N, Blue=S, gradient dot trails.
+- **E-field display** (E button): Yellow=positive, Cyan=negative, gradient dot trails.
+- **Debug HUD** (H key): Shows `GX/GY` (gravity), `Bz` (magnetic), `EX/EY` (electric vector) at mouse position.
 
-| Command               | Description                                      | Example                                     |
-| --------------------- | ------------------------------------------------ | --------------------------------------------|
-| `scale:SIZE`          | Change window scale factor                       | `scale:2`                                   |
-| `kiosk`               | Fullscreen mode                                  |                                             |
-| `proxy:SERVER[:PORT]` | Proxy server to use                              | `proxy:wwwcache.lancs.ac.uk:8080`           |
-| `open FILE`           | Opens the file as a stamp or game save           |                                             |
-| `ddir DIRECTORY`      | Directory used for saving stamps and preferences |                                             |
-| `ptsave:SAVEID`       | Open online save, used by ptsave: URLs           | `ptsave:2198`                               |
-| `disable-network`     | Disables internet connections                    |                                             |
-| `disable-bluescreen`  | Disable bluescreen handler                       |                                             |
-| `redirect`            | Redirects output to stdout.txt / stderr.txt      |                                             |
-| `console`             | Redirects output to a new console on Windows     |                                             |
-| `cafile:CAFILE`       | Set certificate bundle path                      | `cafile:/etc/ssl/certs/ca-certificates.crt` |
-| `capath:CAPATH`       | Set certificate directory path                   | `capath:/etc/ssl/certs`                     |
+---
+
+## Controls
+
+| Key | Action |
+|---|---|
+| **M** | Toggle magnetism simulation |
+| **B** | Toggle magnetic field display |
+| **E** | Toggle electric field display |
+| **Y** | Toggle electricity simulation |
+| **H** | Toggle debug HUD |
+
+---
+
+## Technical Notes
+
+- **FFT Solvers**: `MagFFT` and `ElecFFT` use `fftw3f` with 3× zero-padded grids. Poisson equation `∇²φ = -source` solved in frequency domain with `1/(k²+1)` kernel.
+- **Force Separation**: Charged particles (`tmp4 ≠ 0`) → pure Coulomb. Uncharged → pure dielectrophoresis. No mixing.
+- **Solids Don't Move**: Walls accept charge and produce fields but never receive motion forces.
+- **Gravity Weighting**: `F_effective = F_raw / (Gravity + 0.05)`. Light particles (WATR: 0.10 → 6.7×) respond much faster than heavy ones (MERC: 0.30 → 2.9×).
+
+---
+
+## Build
+
+```bash
+meson setup build-debug --buildtype=debug
+ninja -C build-debug
+
+# Portable static exe:
+meson setup build-static -Dstatic=prebuilt
+ninja -C build-static
+```
+
+Requires: `fftw3f`, meson + ninja, MSVC or GCC.
+
+---
+
+## Author
+
+**netherpro** — *"Classical electromagnetism, fully simulated inside a falling-sand game."*
+
+---
+
+## License
+
+Derivative work of [The Powder Toy](https://github.com/The-Powder-Toy/The-Powder-Toy), licensed under GPLv3. This mod inherits the same license.
