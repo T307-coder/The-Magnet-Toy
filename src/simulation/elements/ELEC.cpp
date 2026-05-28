@@ -142,6 +142,44 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 		}
 	}
+	// Magnetic Lorentz force: F = q(v x B), ELEC is negative charge
+	if (sim->magnetismEnabled)
+	{
+		int cx = x / CELL;
+		int cy = y / CELL;
+		if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+		{
+			float Bz = sim->bField[cy][cx];
+			if (Bz != 0.0f)
+			{
+				float dtheta = -Bz * 0.05f;
+				float c = cosf(dtheta);
+				float s = sinf(dtheta);
+				float vx = parts[i].vx * c - parts[i].vy * s;
+				float vy = parts[i].vx * s + parts[i].vy * c;
+				parts[i].vx = vx;
+				parts[i].vy = vy;
+			}
+		}
+	}
+	// Electric field: ELEC (negative) contributes to eSrc, feels F = q*E = q*(-grad V)
+	if (sim->electricityEnabled)
+	{
+		int cx = x / CELL;
+		int cy = y / CELL;
+		if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+		{
+			sim->eSrc[cy][cx] += -1.0f;
+			if (cx > 0 && cy > 0 && cx < XCELLS - 1 && cy < YCELLS - 1)
+			{
+				float dEx = sim->eField[cy][cx + 1] - sim->eField[cy][cx - 1];
+				float dEy = sim->eField[cy + 1][cx] - sim->eField[cy - 1][cx];
+				// F = q*E = q*(-grad V) = -q*grad V. ELEC q=-1: F = +grad V
+				parts[i].vx += dEx * 0.5f;
+				parts[i].vy += dEy * 0.5f;
+			}
+		}
+	}
 	return 0;
 }
 

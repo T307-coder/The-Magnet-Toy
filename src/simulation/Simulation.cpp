@@ -21,6 +21,7 @@
 #include <numbers>
 #include <set>
 #include <stack>
+#include <fftw3.h>
 
 namespace
 {
@@ -40,6 +41,240 @@ namespace
 
 		void UpdateParticles(int start, int end) final override;
 	};
+}
+
+// Magnetic FFT Poisson solver for B-field computation
+struct Simulation::MagFFT
+{
+	fftwf_plan planForward = nullptr;
+	fftwf_plan planInverse = nullptr;
+	fftwf_complex *data = nullptr;
+	fftwf_complex *kernel = nullptr;
+	float *srcReal = nullptr;
+	float *outReal = nullptr;
+	int paddedW = 0, paddedH = 0;
+	size_t totalSize = 0;
+
+	~MagFFT()
+	{
+		if (planForward) fftwf_destroy_plan(planForward);
+		if (planInverse) fftwf_destroy_plan(planInverse);
+		if (data) fftwf_free(data);
+		if (kernel) fftwf_free(kernel);
+		if (srcReal) fftwf_free(srcReal);
+		if (outReal) fftwf_free(outReal);
+	}
+
+	void Init(int w, int h)
+	{
+		paddedW = 3 * w;
+		paddedH = 3 * h;
+		totalSize = size_t(paddedW) * paddedH;
+		data = fftwf_alloc_complex(totalSize);
+		kernel = fftwf_alloc_complex(totalSize);
+		srcReal = fftwf_alloc_real(totalSize);
+		outReal = fftwf_alloc_real(totalSize);
+
+		auto *kernelReal = fftwf_alloc_real(totalSize);
+		for (int j = 0; j < paddedH; j++)
+			for (int i = 0; i < paddedW; i++)
+			{
+				auto dx = float(std::min(i, paddedW - i));
+				auto dy = float(std::min(j, paddedH - j));
+				auto r2 = dx * dx + dy * dy;
+				kernelReal[j * paddedW + i] = 1.0f / (r2 + 1.0f);
+			}
+		planForward = fftwf_plan_dft_r2c_2d(paddedH, paddedW, kernelReal, kernel, FFTW_ESTIMATE);
+		fftwf_execute(planForward);
+		fftwf_free(kernelReal);
+
+		auto *tmpReal = fftwf_alloc_real(totalSize);
+		planForward = fftwf_plan_dft_r2c_2d(paddedH, paddedW, tmpReal, data, FFTW_ESTIMATE);
+		planInverse = fftwf_plan_dft_c2r_2d(paddedH, paddedW, data, tmpReal, FFTW_ESTIMATE);
+		fftwf_free(tmpReal);
+	}
+
+	void Solve(float *src, float *result, int w, int h)
+	{
+		std::fill_n(srcReal, totalSize, 0.0f);
+		for (int j = 0; j < h; j++)
+			for (int i = 0; i < w; i++)
+				srcReal[(j + h) * paddedW + (i + w)] = src[j * w + i];
+
+		fftwf_execute_dft_r2c(planForward, srcReal, data);
+
+		auto N = float(totalSize);
+		for (size_t k = 0; k < totalSize; k++)
+		{
+			auto a = data[k][0], b = data[k][1];
+			auto c = kernel[k][0], d = kernel[k][1];
+			data[k][0] = (a * c - b * d) / N;
+			data[k][1] = (a * d + b * c) / N;
+		}
+
+		fftwf_execute_dft_c2r(planInverse, data, outReal);
+
+		for (int j = 0; j < h; j++)
+			for (int i = 0; i < w; i++)
+				result[j * w + i] = outReal[(j + h) * paddedW + (i + w)];
+	}
+};
+
+void Simulation::InitMagFFT()
+{
+	if (!magFFT)
+		magFFT = std::make_unique<MagFFT>();
+	magFFT->Init(XCELLS, YCELLS);
+}
+
+void Simulation::ComputeBField()
+{
+	if (!magFFT || !magnetismEnabled)
+		return;
+
+	// Flatten magSrc into 1D array
+	std::vector<float> src(XCELLS * YCELLS);
+	for (int j = 0; j < YCELLS; j++)
+		for (int i = 0; i < XCELLS; i++)
+			src[j * XCELLS + i] = magSrc[j][i];
+
+	std::vector<float> result(XCELLS * YCELLS);
+	magFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+
+	// Copy result to bField, scale appropriately
+	for (int j = 0; j < YCELLS; j++)
+		for (int i = 0; i < XCELLS; i++)
+			bField[j][i] = result[j * XCELLS + i];
+}
+
+void Simulation::EnableMagnetism(bool enable)
+{
+	if (!enable && magFFT)
+	{
+		magFFT.reset();
+		memset(bField, 0, sizeof(bField));
+		memset(magSrc, 0, sizeof(magSrc));
+		prevBFieldValid = false;
+	}
+	if (enable && !magFFT)
+		InitMagFFT();
+	magnetismEnabled = enable;
+}
+
+// Electric FFT Poisson solver for E-field computation (identical to MagFFT)
+struct Simulation::ElecFFT
+{
+	fftwf_plan planForward = nullptr;
+	fftwf_plan planInverse = nullptr;
+	fftwf_complex *data = nullptr;
+	fftwf_complex *kernel = nullptr;
+	float *srcReal = nullptr;
+	float *outReal = nullptr;
+	int paddedW = 0, paddedH = 0;
+	size_t totalSize = 0;
+
+	~ElecFFT()
+	{
+		if (planForward) fftwf_destroy_plan(planForward);
+		if (planInverse) fftwf_destroy_plan(planInverse);
+		if (data) fftwf_free(data);
+		if (kernel) fftwf_free(kernel);
+		if (srcReal) fftwf_free(srcReal);
+		if (outReal) fftwf_free(outReal);
+	}
+
+	void Init(int w, int h)
+	{
+		paddedW = 3 * w;
+		paddedH = 3 * h;
+		totalSize = size_t(paddedW) * paddedH;
+		data = fftwf_alloc_complex(totalSize);
+		kernel = fftwf_alloc_complex(totalSize);
+		srcReal = fftwf_alloc_real(totalSize);
+		outReal = fftwf_alloc_real(totalSize);
+
+		auto *kernelReal = fftwf_alloc_real(totalSize);
+		for (int j = 0; j < paddedH; j++)
+			for (int i = 0; i < paddedW; i++)
+			{
+				auto dx = float(std::min(i, paddedW - i));
+				auto dy = float(std::min(j, paddedH - j));
+				auto r2 = dx * dx + dy * dy;
+				kernelReal[j * paddedW + i] = 1.0f / (r2 + 1.0f);
+			}
+		planForward = fftwf_plan_dft_r2c_2d(paddedH, paddedW, kernelReal, kernel, FFTW_ESTIMATE);
+		fftwf_execute(planForward);
+		fftwf_free(kernelReal);
+
+		auto *tmpReal = fftwf_alloc_real(totalSize);
+		planForward = fftwf_plan_dft_r2c_2d(paddedH, paddedW, tmpReal, data, FFTW_ESTIMATE);
+		planInverse = fftwf_plan_dft_c2r_2d(paddedH, paddedW, data, tmpReal, FFTW_ESTIMATE);
+		fftwf_free(tmpReal);
+	}
+
+	void Solve(float *src, float *result, int w, int h)
+	{
+		std::fill_n(srcReal, totalSize, 0.0f);
+		for (int j = 0; j < h; j++)
+			for (int i = 0; i < w; i++)
+				srcReal[(j + h) * paddedW + (i + w)] = src[j * w + i];
+
+		fftwf_execute_dft_r2c(planForward, srcReal, data);
+
+		auto N = float(totalSize);
+		for (size_t k = 0; k < totalSize; k++)
+		{
+			auto a = data[k][0], b = data[k][1];
+			auto c = kernel[k][0], d = kernel[k][1];
+			data[k][0] = (a * c - b * d) / N;
+			data[k][1] = (a * d + b * c) / N;
+		}
+
+		fftwf_execute_dft_c2r(planInverse, data, outReal);
+
+		for (int j = 0; j < h; j++)
+			for (int i = 0; i < w; i++)
+				result[j * w + i] = outReal[(j + h) * paddedW + (i + w)];
+	}
+};
+
+void Simulation::InitElecFFT()
+{
+	if (!elecFFT)
+		elecFFT = std::make_unique<ElecFFT>();
+	elecFFT->Init(XCELLS, YCELLS);
+}
+
+void Simulation::ComputeEField()
+{
+	if (!elecFFT || !electricityEnabled)
+		return;
+
+	std::vector<float> src(XCELLS * YCELLS);
+	for (int j = 0; j < YCELLS; j++)
+		for (int i = 0; i < XCELLS; i++)
+			src[j * XCELLS + i] = eSrc[j][i];
+
+	std::vector<float> result(XCELLS * YCELLS);
+	elecFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+
+	for (int j = 0; j < YCELLS; j++)
+		for (int i = 0; i < XCELLS; i++)
+			eField[j][i] = result[j * XCELLS + i];
+}
+
+void Simulation::EnableElectricity(bool enable)
+{
+	if (!enable && elecFFT)
+	{
+		elecFFT.reset();
+		memset(eField, 0, sizeof(eField));
+		memset(eSrc, 0, sizeof(eSrc));
+		prevEFieldValid = false;
+	}
+	if (enable && !elecFFT)
+		InitElecFFT();
+	electricityEnabled = enable;
 }
 
 static float remainder_p(float x, float y)
@@ -1071,6 +1306,14 @@ void Simulation::clear_sim(void)
 		air->Clear();
 		air->ClearAirH();
 	}
+	memset(bField, 0, sizeof(bField));
+	memset(magSrc, 0, sizeof(magSrc));
+	memset(prevBField, 0, sizeof(prevBField));
+	prevBFieldValid = false;
+	memset(eField, 0, sizeof(eField));
+	memset(eSrc, 0, sizeof(eSrc));
+	memset(prevEField, 0, sizeof(prevEField));
+	prevEFieldValid = false;
 	SetEdgeMode(edgeMode);
 }
 
@@ -1133,6 +1376,10 @@ int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr) const
 				result = (parts[ID(r)].life > 5)? 2 : 0;
 			break;
 		case PT_GPMP:
+			if (pt == PT_PHOT)
+				result = (parts[ID(r)].life < 10) ? 2 : 0;
+			break;
+		case PT_ELMG:
 			if (pt == PT_PHOT)
 				result = (parts[ID(r)].life < 10) ? 2 : 0;
 			break;
@@ -1348,6 +1595,14 @@ int Simulation::try_move(int i, int x, int y, int nx, int ny)
 				{
 					//@ PHOT + GPMP -> GRVT + GPMP
 					part_change_type(i, x, y, PT_GRVT);
+					parts[i].tmp = int(parts[ID(r)].temp - 273.15f);
+				}
+				break;
+			case PT_ELMG:
+				if (parts[ID(r)].life == 0)
+				{
+					//@ PHOT + ELMG -> MGPN + ELMG
+					part_change_type(i, x, y, PT_MGPN);
 					parts[i].tmp = int(parts[ID(r)].temp - 273.15f);
 				}
 				break;
@@ -3752,6 +4007,24 @@ void Simulation::BeforeSim(bool willUpdate)
 			gravIn.mass[p] = 0.f;
 		}
 
+		// Magnetic field: save previous frame, compute new
+		if (magnetismEnabled)
+		{
+			memcpy(prevBField, bField, sizeof(bField));
+			prevBFieldValid = true;
+			ComputeBField();
+			memset(magSrc, 0, sizeof(magSrc));
+		}
+
+		// Electric field: save previous frame, compute new
+		if (electricityEnabled)
+		{
+			memcpy(prevEField, eField, sizeof(eField));
+			prevEFieldValid = true;
+			ComputeEField();
+			memset(eSrc, 0, sizeof(eSrc));
+		}
+
 		if(emp_decor>0)
 			emp_decor -= emp_decor/25+2;
 		if(emp_decor < 0)
@@ -3956,6 +4229,9 @@ Simulation::Simulation()
 	clear_sim();
 
 	UpdateGravityMask();
+
+	InitMagFFT();
+	InitElecFFT();
 }
 
 void Simulation::DispatchNewtonianGravity()

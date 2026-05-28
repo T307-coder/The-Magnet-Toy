@@ -126,6 +126,8 @@ public:
 	void SetDecoration(bool decorationState);
 	void SetDecoration();
 	void ShowGravityGrid();
+	void ShowMagneticField();
+	void ToggleMagnetism();
 	void SetHudEnable(bool hudState);
 	bool GetHudEnable();
 	void SetBrushEnable(bool brushState);

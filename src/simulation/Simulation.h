@@ -92,6 +92,8 @@ struct RenderableSimulation
 
 	int currentTick = 0;
 	int emp_decor = 0;
+	bool magnetismEnabled = true;
+	bool electricityEnabled = true;
 
 	playerst player;
 	playerst player2;
@@ -101,6 +103,14 @@ struct RenderableSimulation
 	float vy[YCELLS][XCELLS];
 	float pv[YCELLS][XCELLS];
 	float hv[YCELLS][XCELLS];
+	float bField[YCELLS][XCELLS];
+	float magSrc[YCELLS][XCELLS];
+	float prevBField[YCELLS][XCELLS];
+	bool prevBFieldValid = false;
+	float eField[YCELLS][XCELLS];
+	float eSrc[YCELLS][XCELLS];
+	float prevEField[YCELLS][XCELLS];
+	bool prevEFieldValid = false;
 
 	unsigned char bmap[YCELLS][XCELLS];
 	unsigned char emap[YCELLS][XCELLS];
@@ -134,6 +144,16 @@ public:
 	int etrd_life0_count = 0;
 	int lightningRecreate = 0;
 	bool gravWallChanged = false;
+	
+	struct MagFFT;
+	std::unique_ptr<MagFFT> magFFT;
+	void InitMagFFT();
+	void ComputeBField();
+
+	struct ElecFFT;
+	std::unique_ptr<ElecFFT> elecFFT;
+	void InitElecFFT();
+	void ComputeEField();
 
 	Particle portalp[CHANNELS][8][80];
 	int wireless[CHANNELS][2];
@@ -269,6 +289,8 @@ public:
 	virtual ~Simulation();
 
 	void EnableNewtonianGravity(bool enable);
+	void EnableMagnetism(bool enable);
+	void EnableElectricity(bool enable);
 
 	FrameTime *frameTime = nullptr;
 

@@ -58,6 +58,8 @@ class Renderer : private RendererSettings, public RasterDrawMethods<Renderer>
 	void draw_grav_zones();
 	void draw_air();
 	void draw_grav();
+	void draw_magnetic();
+	void draw_electric();
 	void draw_other();
 
 	void AdjustHdispLimit();

@@ -245,7 +245,7 @@ static int update(UPDATE_FUNC_ARGS)
 							}
 					}
 					continue;
-				case PT_PUMP: case PT_GPMP: case PT_HSWC: case PT_PBCN:
+				case PT_PUMP: case PT_GPMP: case PT_HSWC: case PT_PBCN: case PT_ELMG: case PT_POSC:
 					if (parts[i].life<4)// PROP_PTOGGLE, Maybe? We seem to use 2 different methods for handling actived elements, this one seems better. Yes, use this one for new elements, PCLN is different for compatibility with existing saves
 					{
 						if (sender==PT_PSCN) parts[ID(r)].life = 10;
@@ -405,6 +405,17 @@ static int update(UPDATE_FUNC_ARGS)
 					sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
 				}
 			}
+		}
+	}
+	// Current magnetic effect: SPRK flow creates B-field (Biot-Savart simplified)
+	if (sim->magnetismEnabled && parts[i].life > 0)
+	{
+		int cx = x / CELL, cy = y / CELL;
+		if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+		{
+			// Current direction ~ propagation direction, use alternating sign based on position
+			float sign = ((x + y) & 2) ? 1.0f : -1.0f;
+			sim->magSrc[cy][cx] += sign * 0.5f;
 		}
 	}
 	return 0;

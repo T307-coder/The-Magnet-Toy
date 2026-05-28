@@ -37,6 +37,22 @@ void DrawGravOption::perform()
 
 
 
+DrawMagneticOption::DrawMagneticOption(GameModel * m):
+QuickOption("M", "Draw magnetic field", m, Toggle)
+{
+
+}
+bool DrawMagneticOption::GetToggle()
+{
+	return m->GetMagneticField();
+}
+void DrawMagneticOption::perform()
+{
+	m->ShowMagneticField(!m->GetMagneticField());
+}
+
+
+
 DecorationsOption::DecorationsOption(GameModel * m):
 QuickOption("D", "Draw decorations \bg(ctrl+b)", m, Toggle)
 {
@@ -65,6 +81,54 @@ bool NGravityOption::GetToggle()
 void NGravityOption::perform()
 {
 	m->SetNewtonianGravity(!m->GetNewtonianGrvity());
+}
+
+
+
+MagnetismEnableOption::MagnetismEnableOption(GameModel * m):
+QuickOption("B", "Magnetism simulation \uE001", m, Toggle)
+{
+
+}
+bool MagnetismEnableOption::GetToggle()
+{
+	return m->GetMagnetismEnabled();
+}
+void MagnetismEnableOption::perform()
+{
+	m->SetMagnetismEnabled(!m->GetMagnetismEnabled());
+}
+
+
+
+DrawElectricOption::DrawElectricOption(GameModel * m):
+QuickOption("E", "Draw electric field", m, Toggle)
+{
+
+}
+bool DrawElectricOption::GetToggle()
+{
+	return m->GetElectricField();
+}
+void DrawElectricOption::perform()
+{
+	m->ShowElectricField(!m->GetElectricField());
+}
+
+
+
+ElectricityEnableOption::ElectricityEnableOption(GameModel * m):
+QuickOption("Y", "Electricity simulation", m, Toggle)
+{
+
+}
+bool ElectricityEnableOption::GetToggle()
+{
+	return m->GetElectricityEnabled();
+}
+void ElectricityEnableOption::perform()
+{
+	m->SetElectricityEnabled(!m->GetElectricityEnabled());
 }
 
 

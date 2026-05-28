@@ -375,11 +375,13 @@ void GameView::NotifyQuickOptionsChanged(GameModel * sender)
 		delete quickOptionButtons[i];
 	}
 
-	int currentY = 1;
+	int idx = 0;
 	std::vector<QuickOption*> optionList = sender->GetQuickOptions();
 	for(auto *option : optionList)
 	{
-		ui::Button * tempButton = new ui::Button(ui::Point(WINDOWW-16, currentY), ui::Point(15, 15), option->GetIcon(), option->GetDescription());
+		int xPos = (idx >= 6) ? WINDOWW - 30 : WINDOWW - 15;
+		int yPos = (idx >= 6) ? (idx - 6) * 16 + 1 : idx * 16 + 1;
+		ui::Button * tempButton = new ui::Button(ui::Point(xPos, yPos), ui::Point(15, 15), option->GetIcon(), option->GetDescription());
 		//tempButton->Appearance.Margin = ui::Border(0, 2, 3, 2);
 		tempButton->SetTogglable(true);
 		tempButton->SetActionCallback({ [option] {
@@ -389,7 +391,7 @@ void GameView::NotifyQuickOptionsChanged(GameModel * sender)
 		AddComponent(tempButton);
 
 		quickOptionButtons.push_back(tempButton);
-		currentY += 16;
+		idx++;
 	}
 }
 
@@ -1479,7 +1481,9 @@ void GameView::OnKeyPress(int key, int scan, bool repeat, bool shift, bool ctrl,
 		break;
 	case SDL_SCANCODE_G:
 		if (ctrl)
+		{
 			c->ShowGravityGrid();
+		}
 		else if(shift)
 			c->AdjustGridSize(-1);
 		else
@@ -1495,12 +1499,9 @@ void GameView::OnKeyPress(int key, int scan, bool repeat, bool shift, bool ctrl,
 		ui::Engine::Ref().SetFullscreen(!ui::Engine::Ref().GetFullscreen());
 		break;
 	case SDL_SCANCODE_H:
-		if(ctrl)
+		if (ctrl)
 		{
-			if(!introText)
-				introText = 8047;
-			else
-				introText = 0;
+			c->ShowMagneticField();
 		}
 		else
 			showHud = !showHud;
@@ -1543,6 +1544,9 @@ void GameView::OnKeyPress(int key, int scan, bool repeat, bool shift, bool ctrl,
 		break;
 	case SDL_SCANCODE_N:
 		c->ToggleNewtonianGravity();
+		break;
+	case SDL_SCANCODE_M:
+		c->ToggleMagnetism();
 		break;
 	case SDL_SCANCODE_EQUALS:
 		if(ctrl)
@@ -2526,6 +2530,13 @@ void GameView::OnDraw()
 			               std::abs(sample.GravityVelocityY);
 			if (gravtot)
 				sampleInfo << ", GX: " << sample.GravityVelocityX << " GY: " << sample.GravityVelocityY;
+
+			if (sample.MagneticField != 0.0f)
+				sampleInfo << ", Bz: " << sample.MagneticField;
+
+			auto electot = std::abs(sample.ElectricFieldX) + std::abs(sample.ElectricFieldY);
+			if (electot)
+				sampleInfo << ", EX: " << sample.ElectricFieldX << " EY: " << sample.ElectricFieldY;
 
 			if (c->GetAHeatEnable())
 			{

@@ -15,6 +15,9 @@ struct SimulationSample
 	int WallType = 0;
 	float GravityVelocityX = 0;
 	float GravityVelocityY = 0;
+	float MagneticField = 0;
+	float ElectricFieldX = 0;
+	float ElectricFieldY = 0;
 
 	int NumParts = 0;
 	bool isMouseInSim = true;

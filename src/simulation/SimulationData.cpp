@@ -196,6 +196,7 @@ void SimulationData::init_can_move()
 		{
 			can_move[PT_PROT][destinationType] = 2;
 			can_move[PT_GRVT][destinationType] = 2;
+			can_move[PT_MGPN][destinationType] = 2;
 		}
 	}
 
@@ -213,6 +214,7 @@ void SimulationData::init_can_move()
 	can_move[PT_ELEC][PT_GLOW] = 2;
 	can_move[PT_PHOT][PT_LCRY] = 3; //varies according to LCRY life
 	can_move[PT_PHOT][PT_GPMP] = 3;
+	can_move[PT_PHOT][PT_ELMG] = 3;
 
 	can_move[PT_PHOT][PT_BIZR] = 2;
 	can_move[PT_ELEC][PT_BIZR] = 2;

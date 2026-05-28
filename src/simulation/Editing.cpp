@@ -149,6 +149,17 @@ SimulationSample Simulation::GetSample(int x, int y)
 			sample.GravityVelocityX = gravOut.forceX[Vec2{ x, y } / CELL];
 			sample.GravityVelocityY = gravOut.forceY[Vec2{ x, y } / CELL];
 		}
+
+		int cx = x / CELL, cy = y / CELL;
+		if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+		{
+			sample.MagneticField = bField[cy][cx];
+			if (cx > 0 && cx < XCELLS-1 && cy > 0 && cy < YCELLS-1)
+			{
+				sample.ElectricFieldX = (eField[cy][cx+1] - eField[cy][cx-1]) * 0.5f;
+				sample.ElectricFieldY = (eField[cy+1][cx] - eField[cy-1][cx]) * 0.5f;
+			}
+		}
 	}
 	else
 		sample.isMouseInSim = false;

@@ -10,6 +10,10 @@ simulation_tool_names = [
 	'AMBM',
 	'AMBP',
 	'WIND',
+	'PMAG',
+	'NMAG',
+	'PELC',
+	'NELC',
 ]
 
 simulation_tool_src = []

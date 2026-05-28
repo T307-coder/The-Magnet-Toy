@@ -866,6 +866,11 @@ void GameController::ResetAHeat()
 	gameModel->ResetAHeat();
 }
 
+void GameController::ToggleMagnetism()
+{
+	gameModel->SetMagnetismEnabled(!gameModel->GetMagnetismEnabled());
+}
+
 void GameController::ToggleNewtonianGravity()
 {
 	gameModel->SetNewtonianGravity(!gameModel->GetNewtonianGrvity());
@@ -1026,6 +1031,12 @@ void GameController::SetDecoration()
 void GameController::ShowGravityGrid()
 {
 	gameModel->ShowGravityGrid(!gameModel->GetGravityGrid());
+	gameModel->UpdateQuickOptions();
+}
+
+void GameController::ShowMagneticField()
+{
+	gameModel->ShowMagneticField(!gameModel->GetMagneticField());
 	gameModel->UpdateQuickOptions();
 }
 

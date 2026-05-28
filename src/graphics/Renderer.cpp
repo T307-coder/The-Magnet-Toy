@@ -36,6 +36,8 @@ void Renderer::RenderSimulation()
 	render_fire();
 	draw_other();
 	draw_grav_zones();
+	draw_magnetic();
+	draw_electric();
 	DrawSigns();
 
 	if (displayMode & DISPLAY_WARP)
@@ -850,6 +852,58 @@ void Renderer::render_parts()
 					fire_b[ny/CELL][nx/CELL] = (firea*fireb + (255-firea)*fire_b[ny/CELL][nx/CELL]) >> 8;
 				}
 			}
+		}
+	}
+}
+
+void Renderer::draw_magnetic()
+{
+	if (!magneticFieldEnabled)
+		return;
+	for (auto p : CELLS.OriginRect())
+	{
+		if (p.X <= 0 || p.Y <= 0 || p.X >= XCELLS - 1 || p.Y >= YCELLS - 1)
+			continue;
+		float B = sim->bField[p.Y][p.X];
+		float gx = (sim->bField[p.Y][p.X + 1] - sim->bField[p.Y][p.X - 1]) * 0.5f;
+		float gy = (sim->bField[p.Y + 1][p.X] - sim->bField[p.Y - 1][p.X]) * 0.5f;
+		auto agx = std::abs(gx);
+		auto agy = std::abs(gy);
+		if (agx <= 0.001f && agy <= 0.001f)
+			continue;
+		auto np = Vec2{ float(p.X * CELL), float(p.Y * CELL) };
+		auto dist = agx + agy;
+		RGB col = (B > 0) ? 0xFF4040_rgb : 0x4040FF_rgb;
+		for (auto i = 0; i < 4; ++i)
+		{
+			np -= Vec2{ gx * 0.5f, gy * 0.5f };
+			AddPixel({ int(np.X + 0.5f), int(np.Y + 0.5f) }, col.WithAlpha(int(dist * 20.0f)));
+		}
+	}
+}
+
+void Renderer::draw_electric()
+{
+	if (!electricFieldEnabled)
+		return;
+	for (auto p : CELLS.OriginRect())
+	{
+		if (p.X <= 0 || p.Y <= 0 || p.X >= XCELLS - 1 || p.Y >= YCELLS - 1)
+			continue;
+		float E = sim->eField[p.Y][p.X];
+		float gx = (sim->eField[p.Y][p.X + 1] - sim->eField[p.Y][p.X - 1]) * 0.5f;
+		float gy = (sim->eField[p.Y + 1][p.X] - sim->eField[p.Y - 1][p.X]) * 0.5f;
+		auto agx = std::abs(gx);
+		auto agy = std::abs(gy);
+		if (agx <= 0.001f && agy <= 0.001f)
+			continue;
+		auto np = Vec2{ float(p.X * CELL), float(p.Y * CELL) };
+		auto dist = agx + agy;
+		RGB col = (E > 0) ? 0xFFFF40_rgb : 0x40FFFF_rgb;
+		for (auto i = 0; i < 4; ++i)
+		{
+			np -= Vec2{ gx * 0.5f, gy * 0.5f };
+			AddPixel({ int(np.X + 0.5f), int(np.Y + 0.5f) }, col.WithAlpha(int(dist * 20.0f)));
 		}
 	}
 }

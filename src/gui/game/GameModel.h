@@ -267,6 +267,14 @@ public:
 	bool GetNewtonianGrvity();
 	void ShowGravityGrid(bool showGrid);
 	bool GetGravityGrid();
+	void ShowMagneticField(bool show);
+	bool GetMagneticField();
+	void ShowElectricField(bool show);
+	bool GetElectricField();
+	void SetMagnetismEnabled(bool enable);
+	bool GetMagnetismEnabled();
+	void SetElectricityEnabled(bool enable);
+	bool GetElectricityEnabled();
 	void ClearSimulation();
 	std::vector<Menu*> GetMenuList();
 	std::vector<QuickOption*> GetQuickOptions();

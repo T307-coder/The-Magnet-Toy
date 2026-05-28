@@ -110,6 +110,7 @@ GameModel::GameModel(GameView *newView):
 	rendererSettings.colorMode = prefs.Get("Renderer.ColourMode", UINT32_C(0));
 
 	rendererSettings.gravityFieldEnabled = prefs.Get("Renderer.GravityField", false);
+	rendererSettings.magneticFieldEnabled = prefs.Get("Renderer.MagneticField", false);
 	rendererSettings.decorationLevel = prefs.Get("Renderer.Decorations", true) ? RendererSettings::decorationEnabled : RendererSettings::decorationDisabled;
 	threadedRendering = prefs.Get("Renderer.SeparateThread", true);
 
@@ -224,6 +225,7 @@ GameModel::~GameModel()
 		prefs.Set("Renderer.DisplayMode", rendererSettings.displayMode);
 		prefs.Set("Renderer.RenderMode", rendererSettings.renderMode);
 		prefs.Set("Renderer.GravityField", rendererSettings.gravityFieldEnabled);
+		prefs.Set("Renderer.MagneticField", rendererSettings.magneticFieldEnabled);
 		prefs.Set("Renderer.Decorations", GetDecoration());
 		prefs.Set("Renderer.DebugMode", rendererSettings.debugLines); //These two should always be equivalent, even though they are different things
 		prefs.Set("Simulation.NewtonianGravity", bool(sim->grav));
@@ -264,6 +266,11 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new NGravityOption(this));
 	quickOptions.push_back(new AHeatOption(this));
 	quickOptions.push_back(new ConsoleShowOption(this, controller));
+	// New magnet mod options — second row
+	quickOptions.push_back(new DrawMagneticOption(this));
+	quickOptions.push_back(new MagnetismEnableOption(this));
+	quickOptions.push_back(new DrawElectricOption(this));
+	quickOptions.push_back(new ElectricityEnableOption(this));
 
 	notifyQuickOptionsChanged();
 	UpdateQuickOptions();
@@ -1196,6 +1203,64 @@ void GameModel::ShowGravityGrid(bool showGrid)
 bool GameModel::GetGravityGrid()
 {
 	return rendererSettings.gravityFieldEnabled;
+}
+
+void GameModel::ShowMagneticField(bool show)
+{
+	rendererSettings.magneticFieldEnabled = show;
+	if (show)
+		SetInfoTip("Magnetic Field: On");
+	else
+		SetInfoTip("Magnetic Field: Off");
+}
+
+bool GameModel::GetMagneticField()
+{
+	return rendererSettings.magneticFieldEnabled;
+}
+
+void GameModel::SetMagnetismEnabled(bool enable)
+{
+	sim->EnableMagnetism(enable);
+	if (enable)
+		SetInfoTip("Magnetism Simulation: On");
+	else
+		SetInfoTip("Magnetism Simulation: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetMagnetismEnabled()
+{
+	return sim->magnetismEnabled;
+}
+
+void GameModel::ShowElectricField(bool show)
+{
+	rendererSettings.electricFieldEnabled = show;
+	if (show)
+		SetInfoTip("Electric Field: On");
+	else
+		SetInfoTip("Electric Field: Off");
+}
+
+bool GameModel::GetElectricField()
+{
+	return rendererSettings.electricFieldEnabled;
+}
+
+void GameModel::SetElectricityEnabled(bool enable)
+{
+	sim->EnableElectricity(enable);
+	if (enable)
+		SetInfoTip("Electricity Simulation: On");
+	else
+		SetInfoTip("Electricity Simulation: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetElectricityEnabled()
+{
+	return sim->electricityEnabled;
 }
 
 void GameModel::FrameStep(int frames)

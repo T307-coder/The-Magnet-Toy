@@ -3,7 +3,7 @@
 #include <common/Vec2.h>
 
 constexpr int MENUSIZE = 40;
-constexpr int BARSIZE  = 17;
+constexpr int BARSIZE  = 32;
 
 constexpr float M_GRAV = 6.67300e-1f;
 

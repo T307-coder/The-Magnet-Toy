@@ -195,6 +195,11 @@ simulation_elem_names = [
 	'RSSS',
 	'BASE',
 	'SEED',
+	'MAGN',
+	'MGPN',
+	'ELMG',
+	'POSC',
+	'FIXC',
 ]
 
 simulation_elem_src = []

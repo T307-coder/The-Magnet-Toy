@@ -142,6 +142,18 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 		}
 	}
+	// Dielectrophoresis: weakly conductive, pulled toward |E|
+	{
+		int cx = x/CELL, cy = y/CELL;
+		if (sim->electricityEnabled && cx>0 && cy>0 && cx<XCELLS-1 && cy<YCELLS-1)
+		{
+			float dAbsEx = fabsf(sim->eField[cy][cx+1]) - fabsf(sim->eField[cy][cx-1]);
+			float dAbsEy = fabsf(sim->eField[cy+1][cx]) - fabsf(sim->eField[cy-1][cx]);
+			float massFactor = 1.0f / (SimulationData::CRef().elements[parts[i].type].Gravity + 0.05f);
+			parts[i].vx += dAbsEx * 2.0f * massFactor;
+			parts[i].vy += dAbsEy * 2.0f * massFactor;
+		}
+	}
 	return 0;
 }
 

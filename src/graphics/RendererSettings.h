@@ -27,6 +27,8 @@ struct RendererSettings
 	std::optional<FindingElement> findingElement;
 	bool gravityZonesEnabled = false;
 	bool gravityFieldEnabled = false;
+	bool magneticFieldEnabled = false;
+	bool electricFieldEnabled = false;
 	enum DecorationLevel
 	{
 		decorationDisabled,
