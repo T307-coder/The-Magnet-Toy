@@ -94,5 +94,5 @@ BUILD IT YOURSELF
 Requires: fftw3f, meson, ninja, MSVC or GCC.
 
 
-To the TPT dev team: it turns out realistic electromagnetism IS doable
+It turns out realistic electromagnetism IS doable
 in The Powder Toy. And it's anything but boring.
