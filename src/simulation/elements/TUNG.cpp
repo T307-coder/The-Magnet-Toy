@@ -1,4 +1,5 @@
 #include "simulation/ElementCommon.h"
+#include "simulation/MagnetismCommon.h"
 #include "simulation/ElectricityCommon.h"
 #include "simulation/Air.h"
 
@@ -122,7 +123,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (sim->prevBFieldValid)
 		{
 			float dBdt = fabsf(Bnow - Bprev);
-			if (dBdt > 0.5f && sim->rng.chance(1, 4))
+			if (dBdt > 0.5f && sim->rng.chance(1, 4) && !magnetism_hasNearbySPRK(sim, x, y, 4))
 			{
 				sim->part_change_type(i, x, y, PT_SPRK);
 				parts[i].ctype = PT_TUNG;
