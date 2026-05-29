@@ -885,35 +885,113 @@ void CopiableSimulation::EnableGPUFFT(bool enable)
 }
 
 // ============================================================================
-// AsyncFieldSolver: runs B/E-field FFT on a persistent worker thread
+// AsyncFieldSolver: B-field and E-field FFT each on its own worker thread
 // Pattern: same as DispatchNewtonianGravity — Exchange() swaps in/out buffers
-// Main thread: copies magSrc/eSrc to workBuf, calls Exchange(), gets results back
-// Worker thread: computes FFT on workBuf → resultBuf, waits for next Exchange()
-// 1-frame pipeline latency (matching gravity), main thread never blocks on FFT
+// Two persistent threads run B-FFT and E-FFT in parallel, never blocking main.
+// 1-frame pipeline latency (matching gravity).
 // ============================================================================
 struct CopiableSimulation::AsyncFieldSolver
 {
 	static constexpr int N = XCELLS * YCELLS;
 
-	// Worker thread
-	std::thread worker;
-	std::mutex mx;
-	std::condition_variable cv;
-	bool hasWork = false;
-	bool shouldStop = false;
-	bool firstFrame = true; // first Exchange() returns zero results
+	// Per-field worker state (one for B, one for E)
+	struct FieldWorker
+	{
+		std::thread thread;
+		std::mutex mx;
+		std::condition_variable cv;
+		bool hasWork = false;
+		bool shouldStop = false;
+		bool firstFrame = true;
 
-	// Work buffers: main thread writes sources here, worker reads
-	std::vector<float> magSrcBuf;
-	std::vector<float> eSrcBuf;
+		std::vector<float> srcBuf;
+		std::vector<float> resultBuf;
+		std::unique_ptr<CopiableSimulation::MagFFT> magFFT;  // for B
+		std::unique_ptr<CopiableSimulation::ElecFFT> elecFFT; // for E
+		bool isElectric = false; // true → use elecFFT, false → use magFFT
 
-	// Result buffers: worker writes here, main thread reads
-	std::vector<float> bFieldResult;
-	std::vector<float> eFieldResult;
+		void Run()
+		{
+			while (true)
+			{
+				{
+					std::unique_lock lk(mx);
+					cv.wait(lk, [this]() { return hasWork || shouldStop; });
+					if (shouldStop) return;
+					hasWork = false;
+				}
 
-	// Worker thread's own FFT objects (independent copy, no mutex needed)
-	std::unique_ptr<CopiableSimulation::MagFFT> workerMagFFT;
-	std::unique_ptr<CopiableSimulation::ElecFFT> workerElecFFT;
+				std::vector<float> result(N);
+				if (isElectric && elecFFT)
+					elecFFT->Solve(srcBuf.data(), result.data(), XCELLS, YCELLS);
+				else if (!isElectric && magFFT)
+					magFFT->Solve(srcBuf.data(), result.data(), XCELLS, YCELLS);
+				resultBuf = std::move(result);
+			}
+		}
+
+		void Start(bool electric)
+		{
+			isElectric = electric;
+			srcBuf.resize(N, 0.0f);
+			resultBuf.resize(N, 0.0f);
+			if (electric)
+			{
+				elecFFT = std::make_unique<CopiableSimulation::ElecFFT>();
+				elecFFT->Init(XCELLS, YCELLS);
+			}
+			else
+			{
+				magFFT = std::make_unique<CopiableSimulation::MagFFT>();
+				magFFT->Init(XCELLS, YCELLS);
+			}
+			shouldStop = false;
+			firstFrame = true;
+			thread = std::thread([this]() { Run(); });
+		}
+
+		void Stop()
+		{
+			if (thread.joinable())
+			{
+				{
+					std::lock_guard lk(mx);
+					shouldStop = true;
+					hasWork = true;
+				}
+				cv.notify_one();
+				thread.join();
+			}
+		}
+
+		// Exchange: copy source in, get result out, signal worker (non-blocking)
+		void Exchange(const float *srcFlat, float *dstOut)
+		{
+			{
+				std::unique_lock lk(mx);
+				cv.wait(lk, [this]() { return !hasWork || shouldStop; });
+			}
+
+			if (!firstFrame)
+				std::copy(resultBuf.begin(), resultBuf.end(), dstOut);
+			else
+			{
+				std::fill_n(dstOut, N, 0.0f);
+				firstFrame = false;
+			}
+
+			std::copy_n(srcFlat, N, srcBuf.begin());
+
+			{
+				std::lock_guard lk(mx);
+				hasWork = true;
+			}
+			cv.notify_one();
+		}
+	};
+
+	FieldWorker bWorker;
+	FieldWorker eWorker;
 
 	~AsyncFieldSolver()
 	{
@@ -922,102 +1000,25 @@ struct CopiableSimulation::AsyncFieldSolver
 
 	void Start()
 	{
-		magSrcBuf.resize(N, 0.0f);
-		eSrcBuf.resize(N, 0.0f);
-		bFieldResult.resize(N, 0.0f);
-		eFieldResult.resize(N, 0.0f);
-
-		// Initialize worker's own FFT objects
-		workerMagFFT = std::make_unique<CopiableSimulation::MagFFT>();
-		workerMagFFT->Init(XCELLS, YCELLS);
-		workerElecFFT = std::make_unique<CopiableSimulation::ElecFFT>();
-		workerElecFFT->Init(XCELLS, YCELLS);
-
-		shouldStop = false;
-		firstFrame = true;
-		worker = std::thread([this]() { Run(); });
+		bWorker.Start(false); // B-field → MagFFT
+		eWorker.Start(true);  // E-field → ElecFFT
 	}
 
 	void Stop()
 	{
-		if (worker.joinable())
-		{
-			{
-				std::lock_guard lk(mx);
-				shouldStop = true;
-				hasWork = true;
-			}
-			cv.notify_one();
-			worker.join();
-		}
+		bWorker.Stop();
+		eWorker.Stop();
 	}
 
-	// Main thread: copy sources in, get results out, signal worker (non-blocking)
-	// Call once per frame. First call returns zero results (1-frame pipeline).
+	// Exchange both fields: copies sources in, gets results out (non-blocking)
 	void Exchange(const float *magSrcFlat, const float *eSrcFlat,
 	              float *bFieldOut, float *eFieldOut)
 	{
-		// Wait for previous work to be done (should already be done from last frame)
-		{
-			std::unique_lock lk(mx);
-			cv.wait(lk, [this]() { return !hasWork || shouldStop; });
-		}
-
-		// Read out results from last frame
-		if (!firstFrame)
-		{
-			std::copy(bFieldResult.begin(), bFieldResult.end(), bFieldOut);
-			std::copy(eFieldResult.begin(), eFieldResult.end(), eFieldOut);
-		}
-		else
-		{
-			// First frame: zero results
-			std::fill_n(bFieldOut, N, 0.0f);
-			std::fill_n(eFieldOut, N, 0.0f);
-			firstFrame = false;
-		}
-
-		// Copy in new sources
-		std::copy_n(magSrcFlat, N, magSrcBuf.begin());
-		std::copy_n(eSrcFlat, N, eSrcBuf.begin());
-
-		// Signal worker
-		{
-			std::lock_guard lk(mx);
-			hasWork = true;
-		}
-		cv.notify_one();
-	}
-
-private:
-	void Run()
-	{
-		while (true)
-		{
-			// Wait for work
-			{
-				std::unique_lock lk(mx);
-				cv.wait(lk, [this]() { return hasWork || shouldStop; });
-				if (shouldStop) return;
-				hasWork = false;
-			}
-
-			// Compute B-field (CPU FFTW always in worker thread)
-			if (workerMagFFT)
-			{
-				std::vector<float> resultB(N);
-				workerMagFFT->Solve(magSrcBuf.data(), resultB.data(), XCELLS, YCELLS);
-				bFieldResult = std::move(resultB);
-			}
-
-			// Compute E-field
-			if (workerElecFFT)
-			{
-				std::vector<float> resultE(N);
-				workerElecFFT->Solve(eSrcBuf.data(), resultE.data(), XCELLS, YCELLS);
-				eFieldResult = std::move(resultE);
-			}
-		}
+		// Both workers run in parallel — dispatch B first, then E
+		// (each Exchange() internally waits for previous work, copies result,
+		//  copies new source, and signals worker)
+		bWorker.Exchange(magSrcFlat, bFieldOut);
+		eWorker.Exchange(eSrcFlat, eFieldOut);
 	}
 };
 
