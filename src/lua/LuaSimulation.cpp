@@ -1654,6 +1654,21 @@ static int threads(lua_State *L)
 	return 0;
 }
 
+static int asyncFields(lua_State *L)
+{
+	auto *lsi = GetLSI();
+	auto *sim = lsi->gameModel->GetSimulation();
+	lsi->AssertInterfaceEvent();
+	if (lua_gettop(L) == 0)
+	{
+		lua_pushboolean(L, sim->asyncFieldsEnabled);
+		return 1;
+	}
+	bool enable = lua_toboolean(L, 1);
+	sim->EnableAsyncFields(enable);
+	return 0;
+}
+
 static int takeSnapshot(lua_State *L)
 {
 	auto *lsi = GetLSI();
@@ -2188,6 +2203,7 @@ void LuaSimulation::Open(lua_State *L)
 		LFUNC(fanVelocityY),
 		LFUNC(listDefaultGol),
 		LFUNC(threads),
+		LFUNC(asyncFields),
 #undef LFUNC
 		{ nullptr, nullptr }
 	};
