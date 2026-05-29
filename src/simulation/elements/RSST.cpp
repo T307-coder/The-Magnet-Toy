@@ -1,4 +1,5 @@
 #include "simulation/ElementCommon.h"
+#include "simulation/ElectricityCommon.h"
 
 int update(UPDATE_FUNC_ARGS);
 

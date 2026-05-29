@@ -1,4 +1,5 @@
 #include "simulation/ElementCommon.h"
+#include "simulation/ElectricityCommon.h"
 #include "NTCT.h"
 
 void Element::Element_NTCT()
