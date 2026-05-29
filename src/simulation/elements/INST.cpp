@@ -49,7 +49,7 @@ void Element::Element_INST()
 static int update(UPDATE_FUNC_ARGS)
 {
 	int cx = x/CELL, cy = y/CELL;
-	if (magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_INST, 0.5f, 2, 30))
+	if (magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_INST, 0.5f, 3))
 		return 1;
 	return 0;
 }

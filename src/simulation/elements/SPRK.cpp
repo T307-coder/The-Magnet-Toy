@@ -82,6 +82,12 @@ static int update(UPDATE_FUNC_ARGS)
 
 		if (sim->part_change_type(i,x,y,ct))
 			return 1;
+		// Induced SPRK (magnetic induction): give element long cooldown, reset magnetization
+		if (parts[i].tmp3 == 1)
+		{
+			parts[i].life = 100;
+			parts[i].tmp3 = 0;
+		}
 		return 0;
 	}
 	//Some functions of SPRK based on ctype (what it is on)
@@ -372,6 +378,7 @@ static int update(UPDATE_FUNC_ARGS)
 						if (receiver==PT_WATR) parts[ID(r)].life = 6;
 						else parts[ID(r)].life = 5;
 						parts[ID(r)].ctype = receiver;
+						if (parts[i].tmp3 == 1) parts[ID(r)].tmp3 = 1;
 					}
 				}
 				else if (receiver==PT_INST) {
@@ -386,13 +393,15 @@ static int update(UPDATE_FUNC_ARGS)
 						sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
 						parts[ID(r)].life = 5;
 						parts[ID(r)].ctype = receiver;
+						if (parts[i].tmp3 == 1) parts[ID(r)].tmp3 = 1;
 					}
 				}
 				else if (parts[ID(r)].life==0 && parts[i].life<4) {
 					parts[ID(r)].life = 4;
 					parts[ID(r)].ctype = receiver;
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
-					if (parts[ID(r)].temp+10.0f<673.0f&&!sim->legacy_enable&&(receiver==PT_METL||receiver==PT_BMTL||receiver==PT_BRMT||receiver==PT_PSCN||receiver==PT_NSCN||receiver==PT_ETRD||receiver==PT_NBLE||receiver==PT_IRON))
+					sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);				// Propagate induced-flag: if source SPRK was induced, new SPRK is too
+				if (parts[i].tmp3 == 1)
+					parts[ID(r)].tmp3 = 1;					if (parts[ID(r)].temp+10.0f<673.0f&&!sim->legacy_enable&&(receiver==PT_METL||receiver==PT_BMTL||receiver==PT_BRMT||receiver==PT_PSCN||receiver==PT_NSCN||receiver==PT_ETRD||receiver==PT_NBLE||receiver==PT_IRON))
 						parts[ID(r)].temp = parts[ID(r)].temp+10.0f;
 				}
 				else if (!parts[ID(r)].life && sender==PT_ETRD && parts[i].life==5) //ETRD is odd and conducts to others only at life 5, this could probably be somewhere else

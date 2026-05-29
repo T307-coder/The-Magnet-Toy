@@ -150,7 +150,7 @@ static int update(UPDATE_FUNC_ARGS)
 			sim->magSrc[cy][cx] += parts[i].tmp3 * 0.02f;
 	}
 	// Induction: only when completely unmagnetized
-	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_TTAN, 1.5f, 6, 30))
+	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_TTAN, 1.5f, 6))
 		return 1;
 	if (parts[i].tmp3 != 0) parts[i].life = 100;
 	// Electric charging: contact POSC, store charge in tmp4

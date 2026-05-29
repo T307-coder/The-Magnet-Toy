@@ -50,7 +50,7 @@ void Element::Element_INWR()
 static int update(UPDATE_FUNC_ARGS)
 {
 	int cx = x/CELL, cy = y/CELL;
-	if (magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_INWR, 0.5f, 2, 30))
+	if (magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_INWR, 0.5f, 3))
 		return 1;
 	// Electric charging: contact POSC, store charge in tmp4
 	if (sim->electricityEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)

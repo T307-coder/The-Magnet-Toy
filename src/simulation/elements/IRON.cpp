@@ -172,7 +172,7 @@ static int update(UPDATE_FUNC_ARGS)
 			sim->magSrc[cy][cx] += parts[i].tmp3 * 0.02f;
 	}
 	// Induction: only when completely unmagnetized (shared function, 30-frame cooldown)
-	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_IRON, 1.5f, 5, 30))
+	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_IRON, 1.5f, 5))
 		return 1;
 	if (parts[i].tmp3 != 0) parts[i].life = 100;
 	// Electric charging and diffusion (shared functions)
