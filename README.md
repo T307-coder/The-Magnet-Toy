@@ -37,25 +37,28 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 
 ## Key Features
 
-### 🧲 Magnetization & Induction
+### Magnetization & Induction
 - **13 conductors** detect changing magnetic flux and spark (dB/dt induction): METL, GOLD, TUNG, PTNM, IRON, BMTL, TTAN, TESC, INWR, INST, MERC, BRMT, BREC.
 - **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields.
 
-### ⚡ Electrification & Charge
+### Electrification & Charge
 - **24 conductors** accept charge by contact with POSC, FIXC, ELEC (electrons), or PROT (protons). Charge stored in `tmp4` (or `tmp3` for LITH).
 - **Charge diffusion**: DEUT-style random trade between any `PROP_CONDUCTS` neighbors. A charged wire charges the whole circuit.
 - Charged solids produce their own electric field (eSrc contribution).
 
-### 🔁 Electro-Magnetic Coupling
+### Electro-Magnetic Coupling
 - **Lorentz force**: Charged moving particles deflect in magnetic fields. `dθ = Bz × q × 0.05 / mass`. Pure rotation preserves kinetic energy.
+- **Biot-Savart effect**: Moving charges (ELEC, PROT, charged conductors) produce their own magnetic field circling around their velocity vector. Solids pushed by PSTN (with Realistic PSTN enabled) also contribute via `tmp5`/`tmp6` effective velocity.
+- **SPRK current effect**: Each SPRK conduction event acts as a current element, producing a magnetic field around the wire. Strength scales with SPRK life (SWCH > WATR > METL). Togglable via `K` button.
+- **Magnetic induction**: Conductors detect changing magnetic flux (dB/dt) and spark. Induced SPRK tags propagate through connected conductors, preventing feedback loops with a 100-frame cooldown.
 - **ELEC/PROT standard**: All Coulomb forces use coefficient 0.5, matching the native ELEC/PROT behavior exactly.
 
-### 💧 Dielectrophoresis
+### Dielectrophoresis
 - Uncharged conductors are pulled toward stronger |E| regions (polarization force).
 - Polar liquids (WATR, SLTW) respond strongly — water bends toward charged objects.
 - Force automatically scales with particle mass via `Gravity` property: light particles move faster.
 
-### 📊 Visual Overlays
+### Visual Overlays
 - **B-field display** (E button): Red=N, Blue=S, gradient dot trails.
 - **E-field display** (E button): Yellow=positive, Cyan=negative, gradient dot trails.
 - **Debug HUD** (H key): Shows `GX/GY` (gravity), `Bz` (magnetic), `EX/EY` (electric vector) at mouse position.
@@ -64,22 +67,35 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 
 ## Controls
 
+Sidebar buttons (right column):
 | Key | Action |
 |---|---|
-| **M** | Toggle magnetism simulation |
-| **B** | Toggle magnetic field display |
+| **B** | Toggle magnetism simulation |
+| **I** | Toggle magnetic induction (dB/dt sparking) |
+| **J** | Toggle current magnetic field (moving charges) |
+| **K** | Toggle SPRK current magnetic field |
+| **R** | Toggle realistic PSTN (gives velocity to pushed particles) |
 | **E** | Toggle electric field display |
 | **Y** | Toggle electricity simulation |
+
+Keyboard shortcuts:
+| Key | Action |
+|---|---|
+| **M** | Toggle magnetism (master) |
+| **B** | Toggle magnetic field display |
+| **E** | Toggle electric field display |
 | **H** | Toggle debug HUD |
 
 ---
 
 ## Technical Notes
 
-- **FFT Solvers**: `MagFFT` and `ElecFFT` use `fftw3f` with 3× zero-padded grids. Poisson equation `∇²φ = -source` solved in frequency domain with `1/(k²+1)` kernel.
+- **FFT Solvers**: `MagFFT` and `ElecFFT` use `fftw3f` with 3x zero-padded grids. Poisson equation `∇²φ = -source` solved in frequency domain with `1/(k²+1)` kernel.
+- **Biot-Savart**: All three current-to-field paths (moving charges, solids via PSTN, SPRK conduction) share a single `magnetism_addBiotSavart()` function in `MagnetismCommon.h`.
+- **Particle fields**: `tmp2` = B-field history, `tmp3` = magnetization / induced-flag, `tmp4` = electric charge, `tmp5`/`tmp6` = solid effective velocity (PSTN).
 - **Force Separation**: Charged particles (`tmp4 ≠ 0`) → pure Coulomb. Uncharged → pure dielectrophoresis. No mixing.
 - **Solids Don't Move**: Walls accept charge and produce fields but never receive motion forces.
-- **Gravity Weighting**: `F_effective = F_raw / (Gravity + 0.05)`. Light particles (WATR: 0.10 → 6.7×) respond much faster than heavy ones (MERC: 0.30 → 2.9×).
+- **Gravity Weighting**: `F_effective = F_raw / (Gravity + 0.05)`. Light particles (WATR: 0.10 → 6.7x) respond much faster than heavy ones (MERC: 0.30 → 2.9x).
 
 ---
 
