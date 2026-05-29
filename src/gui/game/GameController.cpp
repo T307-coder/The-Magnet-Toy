@@ -97,12 +97,12 @@ GameController::GameController():
 
 	Client::Ref().AddListener(this);
 
-	debugInfo.push_back(std::make_unique<DebugParts            >(DEBUG_PARTS     , gameModel->GetSimulation()));
-	debugInfo.push_back(std::make_unique<ElementPopulationDebug>(DEBUG_ELEMENTPOP, gameModel->GetSimulation()));
+	debugInfo.push_back(std::make_unique<DebugParts            >(DEBUG_PARTS     , gameModel));
+	debugInfo.push_back(std::make_unique<ElementPopulationDebug>(DEBUG_ELEMENTPOP, gameModel));
 	debugInfo.push_back(std::make_unique<DebugLines            >(DEBUG_LINES     , gameView, this));
-	debugInfo.push_back(std::make_unique<ParticleDebug         >(DEBUG_PARTICLE  , gameModel->GetSimulation(), gameModel));
-	debugInfo.push_back(std::make_unique<SurfaceNormals        >(DEBUG_SURFNORM  , gameModel->GetSimulation(), gameView, this));
-	debugInfo.push_back(std::make_unique<AirVelocity           >(DEBUG_AIRVEL    , gameModel->GetSimulation(), gameView, this));
+	debugInfo.push_back(std::make_unique<ParticleDebug         >(DEBUG_PARTICLE  , gameModel));
+	debugInfo.push_back(std::make_unique<SurfaceNormals        >(DEBUG_SURFNORM  , gameModel, gameView, this));
+	debugInfo.push_back(std::make_unique<AirVelocity           >(DEBUG_AIRVEL    , gameModel, gameView, this));
 }
 
 GameController::~GameController()
@@ -568,7 +568,7 @@ bool GameController::MouseUp(int x, int y, unsigned button, MouseupReason reason
 						OpenSearch(str.Substr(3, si.first - 3));
 						break;
 					case sign::Type::Button:
-						gameModel->GetSimulation()->create_part(-1, foundSign.x, foundSign.y, PT_SPRK);
+						gameModel->GetSimulation()->create_part_outer(-1, foundSign.x, foundSign.y, PT_SPRK);
 						break;
 					default: break;
 					}
@@ -795,7 +795,7 @@ void GameController::ResetSpark()
 			}
 			else
 			{
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 			}
 		}
 		else if (sim->parts[i].type == PT_WIRE)
@@ -934,6 +934,10 @@ void GameController::Update()
 		gameView->SetSample(gameModel->GetSimulation()->GetSample(pos.X, pos.Y));
 
 	Simulation * sim = gameModel->GetSimulation();
+	if (gameModel->GetSimThreadCount())
+	{
+		static_cast<SimVariant<ParallelVariant> *>(sim)->SetAllowThreadedSimulation(ThreadedSimulationAllowed());
+	}
 	if (gameModel->IsSimRunning())
 	{
 		gameModel->UpdateUpTo(NPART);
@@ -1801,6 +1805,11 @@ bool GameController::ThreadedRenderingAllowed()
 	return gameModel->GetThreadedRendering() && !GetPaused() && !commandInterface->HaveSimGraphicsEventHandlers();
 }
 
+bool GameController::ThreadedSimulationAllowed() const
+{
+	return !commandInterface->HaveUnparallelizableCallbacks();
+}
+
 void GameController::SetToolIndex(ByteString identifier, std::optional<int> index)
 {
 	if (commandInterface)
@@ -1812,4 +1821,14 @@ void GameController::SetToolIndex(ByteString identifier, std::optional<int> inde
 FrameTime *GameController::GetFrameTime() const
 {
 	return gameModel->frameTime.get();
+}
+
+void GameController::SetSimThreadCount(int newThreadCount)
+{
+	gameModel->SetSimThreadCount(newThreadCount);
+}
+
+int GameController::GetSimThreadCount() const
+{
+	return gameModel->GetSimThreadCount();
 }

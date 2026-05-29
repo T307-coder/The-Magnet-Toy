@@ -4,7 +4,7 @@
 
 static void props_pipe_to_part(const Particle *pipe, Particle *part, bool STOR);
 static void transfer_pipe_to_pipe(Particle *src, Particle *dest, bool STOR);
-static void pushParticle(Simulation * sim, int i, int count, int original);
+static void pushParticle(auto *sim, RNG &rng, int i, int count, int original);
 
 void Element::Element_PIPE()
 {
@@ -50,8 +50,10 @@ void Element::Element_PIPE()
 
 	DefaultProperties.life = 60;
 
-	Update = &Element_PIPE_update;
+	ASSIGN_SIM_CALLBACK(Update, Element_PIPE_update)
 	Graphics = &Element_PIPE_graphics;
+
+	InfiniteNeighborhood = true;
 }
 
 constexpr int PPIP_TMPFLAG_REVERSED        = 0x01000000;
@@ -229,12 +231,12 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 			}
 			else
 			{
-				pushParticle(sim, i,0,i);
+				pushParticle(sim, rng, i,0,i);
 			}
 
 			if (nt)//there is something besides PIPE around current particle
 			{
-				auto rndstore = sim->rng.gen();
+				auto rndstore = rng.gen();
 				auto rnd = rndstore&7;
 				auto rx = Element_PIPE_offsets[rnd].X;
 				auto ry = Element_PIPE_offsets[rnd].Y;
@@ -538,7 +540,7 @@ static void transfer_pipe_to_pipe(Particle *src, Particle *dest, bool STOR)
 	dest->tmp4 = src->tmp4;
 }
 
-static void pushParticle(Simulation * sim, int i, int count, int original)
+static void pushParticle(auto *sim, RNG &rng, int i, int count, int original)
 {
 	unsigned int notctype = nextColor(sim->parts[i].tmp);
 	if (!TYP(sim->parts[i].ctype) || count >= 2)//don't push if there is nothing there, max speed of 2 per frame
@@ -548,7 +550,7 @@ static void pushParticle(Simulation * sim, int i, int count, int original)
 	if( !(sim->parts[i].tmp&0x200) )
 	{
 		//normal random push
-		auto rndstore = sim->rng.gen();
+		auto rndstore = rng.gen();
 		// RAND_MAX is at least 32767 on all platforms i.e. pow(8,5)-1
 		// so can go 5 cycles without regenerating rndstore
 		// (although now we use our own randomizer so maybe should reevaluate all the rndstore usages in every element)
@@ -567,7 +569,7 @@ static void pushParticle(Simulation * sim, int i, int count, int original)
 				if (ID(r) > original)
 					sim->parts[ID(r)].flags |= PFLAG_NORMALSPEED;//skip particle push, normalizes speed
 				count++;
-				pushParticle(sim, ID(r),count,original);
+				pushParticle(sim, rng, ID(r),count,original);
 			}
 			else if (TYP(r) == PT_PRTI) //Pass particles into PRTI for a pipe speed increase
 			{
@@ -596,7 +598,7 @@ static void pushParticle(Simulation * sim, int i, int count, int original)
 			if (ID(r) > original)
 				sim->parts[ID(r)].flags |= PFLAG_NORMALSPEED;//skip particle push, normalizes speed
 			count++;
-			pushParticle(sim, ID(r),count,original);
+			pushParticle(sim, rng, ID(r),count,original);
 		}
 		else if (TYP(r) == PT_PRTI) //Pass particles into PRTI for a pipe speed increase
 		{

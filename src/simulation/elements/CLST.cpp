@@ -44,9 +44,9 @@ void Element::Element_CLST()
 	HighTemperature = 1256.0f;
 	HighTemperatureTransition = PT_LAVA; //@ CLST -> LAVA(CLST)
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
-	Create = &create;
+	ASSIGN_SIM_CALLBACK(Create, create)
 }
 
 static int update(UPDATE_FUNC_ARGS)
@@ -62,7 +62,7 @@ static int update(UPDATE_FUNC_ARGS)
 					continue;
 				if (TYP(r)==PT_WATR)
 				{
-					if (sim->rng.chance(1, 1500))
+					if (rng.chance(1, 1500))
 					{
 						//@ CLST + WATR -> PSTS
 						sim->create_part(i, x, y, PT_PSTS);
@@ -106,5 +106,5 @@ static int graphics(GRAPHICS_FUNC_ARGS)
 
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
-	sim->parts[i].tmp = sim->rng.between(0, 6);
+	sim->parts[i].tmp = rng.between(0, 6);
 }

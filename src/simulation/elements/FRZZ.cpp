@@ -43,7 +43,7 @@ void Element::Element_FRZZ()
 	HighTemperature = 273.15f;
 	HighTemperatureTransition = PT_FRZW;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 }
 
 static int update(UPDATE_FUNC_ARGS)
@@ -57,7 +57,7 @@ static int update(UPDATE_FUNC_ARGS)
 				auto r = pmap[y+ry][x+rx];
 				if (!r)
 					continue;
-				if (TYP(r)==PT_WATR && sim->rng.chance(1, 20))
+				if (TYP(r)==PT_WATR && rng.chance(1, 20))
 				{
 					//@ FRZZ + WATR -> FRZW
 					sim->part_change_type(ID(r),x+rx,y+ry,PT_FRZW);

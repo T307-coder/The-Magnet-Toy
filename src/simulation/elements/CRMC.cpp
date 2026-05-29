@@ -44,9 +44,9 @@ void Element::Element_CRMC()
 	HighTemperature = 2887.15f;
 	HighTemperatureTransition = ST; //@ CRMC -> LAVA(CRMC)
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
-	Create = &create;
+	ASSIGN_SIM_CALLBACK(Create, create)
 }
 
 static int update(UPDATE_FUNC_ARGS)
@@ -70,5 +70,5 @@ static int graphics(GRAPHICS_FUNC_ARGS)
 
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
-	sim->parts[i].tmp2 = sim->rng.between(0, 4);
+	sim->parts[i].tmp2 = rng.between(0, 4);
 }

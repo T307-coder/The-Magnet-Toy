@@ -43,7 +43,7 @@ void Element::Element_AMTR()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
 }
 
@@ -68,7 +68,7 @@ static int update(UPDATE_FUNC_ARGS)
 						return 1;
 					}
 					//@ AMTR + anything -> AMTR + PHOT
-					if (sim->rng.chance(1, 10))
+					if (rng.chance(1, 10))
 						sim->create_part(ID(r), x+rx, y+ry, PT_PHOT);
 					else
 						sim->kill_part(ID(r));

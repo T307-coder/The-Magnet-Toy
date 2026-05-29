@@ -71,7 +71,7 @@ private:
 	std::unique_ptr<Simulation> sim;
 	bool paused = false;
 	int queuedFrames = 0;
-	Renderer * ren;
+	std::unique_ptr<Renderer> ren;
 	RendererSettings rendererSettings;
 	std::vector<std::unique_ptr<Menu>> menuList;
 	std::vector<QuickOption*> quickOptions;
@@ -146,6 +146,7 @@ private:
 	void SaveToSimParameters(const GameSave &saveData);
 
 	bool threadedRendering = false;
+	int simThreadCount = 0;
 
 	GameView *view;
 
@@ -295,6 +296,7 @@ public:
 	void FrameStep(int frames);
 	const std::optional<User> &GetUser() const;
 	void SetUser(std::optional<User> user);
+	// please don't hold onto this for too long, it can change without notice
 	Simulation * GetSimulation();
 	Renderer * GetRenderer();
 	RendererSettings &GetRendererSettings()
@@ -370,4 +372,9 @@ public:
 	}
 
 	std::unique_ptr<FrameTime> frameTime;
+	void SetSimThreadCount(int newThreadCount);
+	int GetSimThreadCount() const
+	{
+		return simThreadCount;
+	}
 };

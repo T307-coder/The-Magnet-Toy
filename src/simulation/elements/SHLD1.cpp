@@ -42,7 +42,7 @@ void Element::Element_SHLD1()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 }
 
 static int update(UPDATE_FUNC_ARGS)
@@ -58,7 +58,7 @@ static int update(UPDATE_FUNC_ARGS)
 					continue;
 				else if (TYP(r)==PT_SPRK&&parts[i].life==0)
 				{
-					if (sim->rng.chance(11, 40))
+					if (rng.chance(11, 40))
 					{
 						sim->part_change_type(i,x,y,PT_SHLD2);
 						parts[i].life = 7;
@@ -75,7 +75,7 @@ static int update(UPDATE_FUNC_ARGS)
 						}
 					}
 				}
-				else if (TYP(r) == PT_SHLD3 && sim->rng.chance(2, 5))
+				else if (TYP(r) == PT_SHLD3 && rng.chance(2, 5))
 				{
 					sim->part_change_type(i,x,y,PT_SHLD2);
 					parts[i].life = 7;

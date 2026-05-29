@@ -45,8 +45,10 @@ void Element::Element_DTEC()
 
 	DefaultProperties.tmp2 = 2;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	CtypeDraw = &Element::ctypeDrawVInTmp;
+
+	InfiniteNeighborhood = true;
 }
 
 static int update(UPDATE_FUNC_ARGS)

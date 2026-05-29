@@ -68,9 +68,9 @@ GameModel::GameModel(GameView *newView):
 	decoSpace(DECOSPACE_SRGB),
 	view(newView)
 {
-	sim = Simulation::Factory();
+	sim = Simulation::LegacyFactory();
 	sim->useLuaCallbacks = true;
-	ren = new Renderer();
+	ren = std::make_unique<Renderer>();
 
 	activeTools = regularToolset.data();
 
@@ -238,7 +238,7 @@ GameModel::~GameModel()
 	}
 
 	sim.reset();
-	delete ren;
+	ren.reset();
 	//if(activeTools)
 	//	delete[] activeTools;
 }
@@ -858,11 +858,11 @@ void GameModel::SaveToSimParameters(const GameSave &saveData)
 	sim->frameCount = saveData.frameCount;
 	if (saveData.hasRngState)
 	{
-		sim->rng.state(saveData.rngState);
+		sim->sharedRng.state(saveData.rngState);
 	}
 	else
 	{
-		sim->rng = RNG();
+		sim->sharedRng = RNG();
 	}
 	sim->ensureDeterminism = saveData.ensureDeterminism;
 }
@@ -946,7 +946,7 @@ Simulation * GameModel::GetSimulation()
 
 Renderer * GameModel::GetRenderer()
 {
-	return ren;
+	return ren.get();
 }
 
 const std::optional<User> &GameModel::GetUser() const
@@ -2094,4 +2094,24 @@ void GameModel::BuildMenus()
 	notifyActiveMenuToolListChanged();
 	notifyActiveToolsChanged();
 	notifyLastToolChanged();
+}
+
+void GameModel::SetSimThreadCount(int newThreadCount)
+{
+	if (!simThreadCount && newThreadCount)
+	{
+		auto newSim = Simulation::ParallelFactory();
+		newSim->CopyFrom(*sim);
+		std::swap(sim, newSim);
+		notifySimulationChanged();
+	}
+	if (simThreadCount && !newThreadCount)
+	{
+		auto newSim = Simulation::LegacyFactory();
+		newSim->CopyFrom(*sim);
+		std::swap(sim, newSim);
+		notifySimulationChanged();
+	}
+	simThreadCount = newThreadCount;
+	sim->threadCount = newThreadCount;
 }

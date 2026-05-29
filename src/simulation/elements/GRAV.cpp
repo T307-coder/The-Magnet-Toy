@@ -44,13 +44,13 @@ void Element::Element_GRAV()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
 }
 
 static int update(UPDATE_FUNC_ARGS)
 {
-	if (parts[i].vx*parts[i].vx + parts[i].vy*parts[i].vy >= 0.1f && sim->rng.chance(1, 512))
+	if (parts[i].vx*parts[i].vx + parts[i].vy*parts[i].vy >= 0.1f && rng.chance(1, 512))
 	{
 		if (!parts[i].life)
 			parts[i].life = 48;

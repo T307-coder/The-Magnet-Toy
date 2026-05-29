@@ -44,7 +44,7 @@ void Element::Element_ROCK()
 	HighTemperatureTransition = PT_LAVA; //@ ROCK -> LAVA(ROCK)
 
 	Graphics = &graphics;
-	Create = &create;
+	ASSIGN_SIM_CALLBACK(Create, create)
 }
 
 
@@ -69,5 +69,5 @@ static int graphics(GRAPHICS_FUNC_ARGS)
 
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
-	sim->parts[i].tmp2 = sim->rng.between(0, 10);
+	sim->parts[i].tmp2 = rng.between(0, 10);
 }

@@ -45,7 +45,7 @@ void Element::Element_CBNW()
 	HighTemperature = 373.0f;
 	HighTemperatureTransition = PT_WTRV; //@ CBNW -> WTRV
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
 }
 
@@ -55,7 +55,7 @@ static int update(UPDATE_FUNC_ARGS)
 	auto &elements = sd.elements;
 	if (sim->pv[y/CELL][x/CELL]<=3)
 	{
-		if (sim->pv[y/CELL][x/CELL] <= -0.5 || sim->rng.chance(1, 4000))
+		if (sim->pv[y/CELL][x/CELL] <= -0.5 || rng.chance(1, 4000))
 		{
 			//@ CBNW -> CO2
 			sim->part_change_type(i,x,y,PT_CO2);
@@ -66,15 +66,15 @@ static int update(UPDATE_FUNC_ARGS)
 	if (parts[i].tmp2!=20) {
 		parts[i].tmp2 -= (parts[i].tmp2>20)?1:-1;
 	}
-	else if (sim->rng.chance(1, 200))
+	else if (rng.chance(1, 200))
 	{
-		parts[i].tmp2 = sim->rng.between(0, 39);
+		parts[i].tmp2 = rng.between(0, 39);
 	}
 
 	if(parts[i].tmp>0)
 	{
 		//Explode
-		if(parts[i].tmp==1 && sim->rng.chance(3, 4))
+		if(parts[i].tmp==1 && rng.chance(3, 4))
 		{
 			//@ CBNW -> CO2
 			sim->part_change_type(i,x,y,PT_CO2);
@@ -92,12 +92,12 @@ static int update(UPDATE_FUNC_ARGS)
 				auto r = pmap[y+ry][x+rx];
 				if (!r)
 					continue;
-				if ((elements[TYP(r)].Properties&TYPE_PART) && parts[i].tmp == 0 && sim->rng.chance(1, 83))
+				if ((elements[TYP(r)].Properties&TYPE_PART) && parts[i].tmp == 0 && rng.chance(1, 83))
 				{
 					//Start explode
-					parts[i].tmp = sim->rng.between(0, 24);
+					parts[i].tmp = rng.between(0, 24);
 				}
-				else if((elements[TYP(r)].Properties&TYPE_SOLID) && TYP(r)!=PT_DMND && TYP(r)!=PT_GLAS && parts[i].tmp == 0 && sim->rng.chance(int(2 - sim->pv[y/CELL][x/CELL]), 6667))
+				else if((elements[TYP(r)].Properties&TYPE_SOLID) && TYP(r)!=PT_DMND && TYP(r)!=PT_GLAS && parts[i].tmp == 0 && rng.chance(int(2 - sim->pv[y/CELL][x/CELL]), 6667))
 				{
 					//@ CBNW -> CO2
 					sim->part_change_type(i,x,y,PT_CO2);
@@ -124,7 +124,7 @@ static int update(UPDATE_FUNC_ARGS)
 				}
 				else if (TYP(r)==PT_RBDM||TYP(r)==PT_LRBD)
 				{
-					if ((sim->legacy_enable||parts[i].temp>(273.15f+12.0f)) && sim->rng.chance(1, 166))
+					if ((sim->legacy_enable||parts[i].temp>(273.15f+12.0f)) && rng.chance(1, 166))
 					{
 						//@ CBNW + RBDM/LRBD -> CBNW + FIRE
 						sim->part_change_type(i,x,y,PT_FIRE);
@@ -134,7 +134,7 @@ static int update(UPDATE_FUNC_ARGS)
 				}
 				else if (TYP(r)==PT_FIRE && parts[ID(r)].ctype!=PT_WATR){
 					sim->kill_part(ID(r));
-					if (sim->rng.chance(1, 50))
+					if (rng.chance(1, 50))
 					{
 						sim->kill_part(i);
 						return 1;

@@ -44,8 +44,10 @@ void Element::Element_LDTC()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	CtypeDraw = &Element::ctypeDrawVInCtype;
+
+	InfiniteNeighborhood = true; // TODO-TILES: this is a function of tmp2 and tmp
 }
 
 constexpr int FLAG_INVERT_FILTER =  0x1;

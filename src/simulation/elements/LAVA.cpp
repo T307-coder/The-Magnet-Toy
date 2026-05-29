@@ -47,9 +47,9 @@ void Element::Element_LAVA()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &Element_FIRE_update;
+	ASSIGN_SIM_CALLBACK(Update, Element_FIRE_update)
 	Graphics = &graphics;
-	Create = &create;
+	ASSIGN_SIM_CALLBACK(Create, create)
 }
 
 static int graphics(GRAPHICS_FUNC_ARGS)
@@ -72,5 +72,5 @@ static int graphics(GRAPHICS_FUNC_ARGS)
 
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
-	sim->parts[i].life = sim->rng.between(240, 359);
+	sim->parts[i].life = rng.between(240, 359);
 }

@@ -47,9 +47,9 @@ void Element::Element_TUNG()
 	HighTemperature = 3695.0f;// TUNG melts in its update function instead of in the normal way, but store the threshold here so that it can be changed from Lua
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
-	Create = &create;
+	ASSIGN_SIM_CALLBACK(Create, create)
 }
 
 static int update(UPDATE_FUNC_ARGS)
@@ -76,17 +76,17 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 		}
 	}
-	if((parts[i].temp > MELTING_POINT && sim->rng.chance(1, 20)) || splode)
+	if((parts[i].temp > MELTING_POINT && rng.chance(1, 20)) || splode)
 	{
-		if (sim->rng.chance(1, 50))
+		if (rng.chance(1, 50))
 		{
 			sim->pv[y/CELL][x/CELL] += 50.0f;
 		}
-		else if (sim->rng.chance(1, 100))
+		else if (rng.chance(1, 100))
 		{
 			//@ TUNG -> FIRE
 			sim->part_change_type(i, x, y, PT_FIRE);
-			parts[i].life = sim->rng.between(0, 499);
+			parts[i].life = rng.between(0, 499);
 			return 1;
 		}
 		else
@@ -98,10 +98,10 @@ static int update(UPDATE_FUNC_ARGS)
 		}
 		if(splode)
 		{
-			parts[i].temp = restrict_flt(MELTING_POINT + sim->rng.between(200, 799), MIN_TEMP, MAX_TEMP);
+			parts[i].temp = restrict_flt(MELTING_POINT + rng.between(200, 799), MIN_TEMP, MAX_TEMP);
 		}
-		parts[i].vx += sim->rng.between(-50, 50);
-		parts[i].vy += sim->rng.between(-50, 50);
+		parts[i].vx += rng.between(-50, 50);
+		parts[i].vy += rng.between(-50, 50);
 		return 1;
 	}
 	auto press = int(sim->pv[y/CELL][x/CELL] * 64);

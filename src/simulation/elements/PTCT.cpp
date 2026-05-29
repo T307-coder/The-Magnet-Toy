@@ -43,7 +43,7 @@ void Element::Element_PTCT()
 	HighTemperature = 1687.0f;
 	HighTemperatureTransition = PT_LAVA; //@ PTCT -> LAVA(PTCT)
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 }
 
 static int update(UPDATE_FUNC_ARGS)

@@ -49,9 +49,11 @@ void Element::Element_SOAP()
 	DefaultProperties.tmp = -1;
 	DefaultProperties.tmp2 = -1;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
-	ChangeType = &changeType;
+	ASSIGN_SIM_CALLBACK(ChangeType, changeType)
+
+	InfiniteNeighborhood = true;
 }
 
 static bool validIndex(int i)
@@ -317,6 +319,15 @@ static void changeType(ELEMENT_CHANGETYPE_FUNC_ARGS)
 {
 	if (from == PT_SOAP && to != PT_SOAP)
 	{
+		constexpr auto Parallel = std::is_same_v<decltype(sim), SimVariant<ParallelVariant> *>;
+		if constexpr (Parallel)
+		{
+			if (sim->parts[i].ctype & 6)
+			{
+				sim->DeferSoapDetach(i);
+			}
+			return;
+		}
 		Element_SOAP_detach(sim, i);
 	}
 }

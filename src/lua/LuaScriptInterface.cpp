@@ -29,7 +29,7 @@ static int mathRandom(lua_State *L)
 {
 	auto *lsi = GetLSI();
 	// only thing that matters is that the rng not be sim->rng when !(eventTraits & eventTraitSimRng)
-	auto &rng = (lsi->eventTraits & eventTraitSimRng) ? lsi->sim->rng : interfaceRng;
+	auto &rng = (lsi->eventTraits & eventTraitSimRng) ? lsi->gameModel->GetSimulation()->sharedRng : interfaceRng;
 	double lower, upper;
 	switch (lua_gettop(L))
 	{
@@ -131,7 +131,6 @@ LuaScriptInterface::LuaScriptInterface(GameController *newGameController, GameMo
 	gameModel(newGameModel),
 	gameController(newGameController),
 	window(gameController->GetView()),
-	sim(gameModel->GetSimulation()),
 	g(ui::Engine::Ref().g),
 	customElements(PT_NUM),
 	gameControllerEventHandlers(std::variant_size_v<GameControllerEvent>)
@@ -327,11 +326,11 @@ void LuaSetProperty(lua_State *L, StructProperty property, intptr_t propertyAddr
 void LuaSetParticleProperty(lua_State *L, int particleID, StructProperty property, intptr_t propertyAddress, int stackPos)
 {
 	auto *lsi = GetLSI();
-	auto *sim = lsi->sim;
+	auto *sim = lsi->gameModel->GetSimulation();
 	if (property.Name == "type")
 	{
 		lsi->AssertMonopartAccessEvent(-1);
-		sim->part_change_type(particleID, int(sim->parts[particleID].x+0.5f), int(sim->parts[particleID].y+0.5f), luaL_checkinteger(L, 3));
+		sim->part_change_type_outer(particleID, int(sim->parts[particleID].x+0.5f), int(sim->parts[particleID].y+0.5f), luaL_checkinteger(L, 3));
 	}
 	else if (property.Name == "x" || property.Name == "y")
 	{
@@ -341,7 +340,7 @@ void LuaSetParticleProperty(lua_State *L, int particleID, StructProperty propert
 		float y = sim->parts[particleID].y;
 		float nx = property.Name == "x" ? val : x;
 		float ny = property.Name == "y" ? val : y;
-		sim->move(particleID, (int)(x + 0.5f), (int)(y + 0.5f), nx, ny);
+		sim->move_outer(particleID, (int)(x + 0.5f), (int)(y + 0.5f), nx, ny);
 	}
 	else
 	{
@@ -517,12 +516,25 @@ bool CommandInterface::HaveSimGraphicsEventHandlers()
 	auto *lsi = static_cast<LuaScriptInterface *>(this);
 	for (int i = 0; i < int(lsi->customElements.size()); ++i)
 	{
-		if (lsi->customElements[i].graphics && !sd.graphicscache[i].isready && lsi->sim->elementCount[i])
+		if (lsi->customElements[i].graphics && !sd.graphicscache[i].isready && lsi->gameModel->GetSimulation()->elementCount[i])
 		{
 			return true;
 		}
 	}
 	return HaveSimGraphicsEventHandlersHelper<0>(lsi->gameControllerEventHandlers);
+}
+
+bool CommandInterface::HaveUnparallelizableCallbacks()
+{
+	auto *lsi = static_cast<LuaScriptInterface *>(this);
+	for (int i = 0; i < int(lsi->customElements.size()); ++i)
+	{
+		if (lsi->customElements[i].createAllowed || lsi->customElements[i].changeType)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void CommandInterface::OnTick()

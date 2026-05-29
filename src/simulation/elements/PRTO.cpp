@@ -45,8 +45,10 @@ void Element::Element_PRTO()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
+
+	InfiniteNeighborhood = true;
 }
 
 /*these are the count values of where the particle gets stored, depending on where it came from
@@ -75,7 +77,7 @@ static int update(UPDATE_FUNC_ARGS)
 				fe = 1;
 				for (auto nnx =0 ; nnx<80; nnx++)
 				{
-					int randomness = (count + sim->rng.between(-1, 1) + 4) % 8;//add -1,0,or 1 to count
+					int randomness = (count + rng.between(-1, 1) + 4) % 8;//add -1,0,or 1 to count
 					if (sim->portalp[parts[i].tmp][randomness][nnx].type==PT_SPRK)// TODO: make it look better, spark creation
 					{
 						sim->create_part(-1,x+1,y,PT_SPRK);
@@ -144,8 +146,8 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		int orbd[4] = {0, 0, 0, 0};	//Orbital distances
 		int orbl[4] = {0, 0, 0, 0};	//Orbital locations
-		if (!sim->parts[i].life) parts[i].life = sim->rng.gen();
-		if (!sim->parts[i].ctype) parts[i].ctype = sim->rng.gen();
+		if (!sim->parts[i].life) parts[i].life = rng.gen();
+		if (!sim->parts[i].ctype) parts[i].ctype = rng.gen();
 		orbitalparts_get(parts[i].life, parts[i].ctype, orbd, orbl);
 		for (auto r = 0; r < 4; r++)
 		{
@@ -154,7 +156,7 @@ static int update(UPDATE_FUNC_ARGS)
 				orbd[r] += 16;
 				if (orbd[r]>254) {
 					orbd[r] = 0;
-					orbl[r] = sim->rng.between(0, 254);
+					orbl[r] = rng.between(0, 254);
 				}
 				else
 				{
@@ -165,7 +167,7 @@ static int update(UPDATE_FUNC_ARGS)
 			else
 			{
 				orbd[r] = 0;
-				orbl[r] = sim->rng.between(0, 254);
+				orbl[r] = rng.between(0, 254);
 			}
 		}
 		orbitalparts_set(&parts[i].life, &parts[i].ctype, orbd, orbl);

@@ -43,7 +43,7 @@ void Element::Element_GOO()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 }
 
 constexpr float ADVECTION = 0.1f;
@@ -51,7 +51,7 @@ constexpr float ADVECTION = 0.1f;
 static int update(UPDATE_FUNC_ARGS)
 {
 	if (!parts[i].life && sim->pv[y/CELL][x/CELL]>1.0f)
-		parts[i].life = sim->rng.between(300, 379);
+		parts[i].life = rng.between(300, 379);
 	if (parts[i].life)
 	{
 		parts[i].vx += ADVECTION*sim->vx[y/CELL][x/CELL];

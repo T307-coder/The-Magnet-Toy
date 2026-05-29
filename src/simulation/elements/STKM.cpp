@@ -51,11 +51,13 @@ void Element::Element_STKM()
 
 	DefaultProperties.life = 100;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &Element_STKM_graphics;
-	Create = &create;
-	CreateAllowed = &createAllowed;
-	ChangeType = &changeType;
+	ASSIGN_SIM_CALLBACK(Create, create)
+	ASSIGN_SIM_CALLBACK(CreateAllowed, createAllowed)
+	ASSIGN_SIM_CALLBACK(ChangeType, changeType)
+
+	InfiniteNeighborhood = true;
 }
 
 static int update(UPDATE_FUNC_ARGS)
@@ -73,9 +75,13 @@ int Element_STKM_graphics(GRAPHICS_FUNC_ARGS)
 
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
-	int spawnID = sim->create_part(-3, x, y, PT_SPAWN);
-	if (spawnID >= 0)
-		sim->player.spawnID = spawnID;
+	constexpr auto Parallel = std::is_same_v<decltype(sim), SimVariant<ParallelVariant> *>;
+	if constexpr (!Parallel)
+	{
+		int spawnID = sim->create_part(-3, x, y, PT_SPAWN);
+		if (spawnID >= 0)
+			sim->player.spawnID = spawnID;
+	}
 }
 
 static bool createAllowed(ELEMENT_CREATE_ALLOWED_FUNC_ARGS)
@@ -94,7 +100,7 @@ static void changeType(ELEMENT_CHANGETYPE_FUNC_ARGS)
 		sim->player.spwn = 0;
 }
 
-void die(Simulation *sim, playerst *playerp, int i)
+void die(auto *sim, playerst *playerp, int i)
 {
 	if (playerp->fan)
 	{
@@ -442,7 +448,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 				else if (sim->bmap[(ry+y)/CELL][(rx+x)/CELL]==WL_GRAV /* && parts[i].type!=PT_FIGH */)
 					playerp->rocketBoots = true;
 				if (TYP(r)==PT_PRTI)
-					Element_STKM_interact(sim, playerp, i, rx, ry);
+					Element_STKM_interact(sim, rng, playerp, i, rx, ry);
 				if (!parts[i].type)//STKM_interact may kill STKM
 					return 1;
 			}
@@ -454,7 +460,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 	//Spawn
 	if (((int)(playerp->comm)&0x08) == 0x08)
 	{
-		ry -= 2 * sim->rng.between(0, 1) + 1;
+		ry -= 2 * rng.between(0, 1) + 1;
 		r = pmap[ry][rx];
 		if (elements[TYP(r)].Properties&TYPE_SOLID)
 		{
@@ -490,7 +496,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 			{
 				if (playerp->elem == PT_PHOT)
 				{
-					int random = abs((sim->rng.between(-1, 1)))*3;
+					int random = abs((rng.between(-1, 1)))*3;
 					if (random==0)
 					{
 						sim->kill_part(np);
@@ -511,7 +517,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 					if (gvx!=0 || gvy!=0)
 						angle = int(atan2(mvx, mvy)*180.0f/std::numbers::pi_v<float>);
 					else
-						angle = sim->rng.between(0, 359);
+						angle = rng.between(0, 359);
 					if (((int)playerp->pcomm)&0x01)
 						angle += 180;
 					if (angle>360)
@@ -519,7 +525,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 					if (angle<0)
 						angle+=360;
 					parts[np].tmp = angle;
-					parts[np].life = sim->rng.between(0, 1+power/15) + power/7;
+					parts[np].life = rng.between(0, 1+power/15) + power/7;
 					parts[np].temp = parts[np].life*power/2.5;
 					parts[np].tmp2 = 1;
 				}
@@ -621,10 +627,10 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 	}
 
 	//If legs touch something
-	Element_STKM_interact(sim, playerp, i, (int)(playerp->legs[4]+0.5), (int)(playerp->legs[5]+0.5));
-	Element_STKM_interact(sim, playerp, i, (int)(playerp->legs[12]+0.5), (int)(playerp->legs[13]+0.5));
-	Element_STKM_interact(sim, playerp, i, (int)(playerp->legs[4]+0.5), (int)playerp->legs[5]);
-	Element_STKM_interact(sim, playerp, i, (int)(playerp->legs[12]+0.5), (int)playerp->legs[13]);
+	Element_STKM_interact(sim, rng, playerp, i, (int)(playerp->legs[4]+0.5), (int)(playerp->legs[5]+0.5));
+	Element_STKM_interact(sim, rng, playerp, i, (int)(playerp->legs[12]+0.5), (int)(playerp->legs[13]+0.5));
+	Element_STKM_interact(sim, rng, playerp, i, (int)(playerp->legs[4]+0.5), (int)playerp->legs[5]);
+	Element_STKM_interact(sim, rng, playerp, i, (int)(playerp->legs[12]+0.5), (int)playerp->legs[13]);
 	if (!parts[i].type)
 		return 1;
 
@@ -632,7 +638,11 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 	return 0;
 }
 
-void Element_STKM_interact(Simulation *sim, playerst *playerp, int i, int x, int y)
+#define DEFINE_RUNSTICKMAN(Var) template int Element_STKM_run_stickman(playerst *playerp, SimVariant<Var> *sim, UPDATE_FUNC_ARGS_TAIL);
+ALL_SIM_IMPLS(DEFINE_RUNSTICKMAN)
+#undef DEFINE_RUNSTICKMAN
+
+void Element_STKM_interact(auto *sim, RNG &rng, playerst *playerp, int i, int x, int y)
 {
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
@@ -645,7 +655,7 @@ void Element_STKM_interact(Simulation *sim, playerst *playerp, int i, int x, int
 		int damage = 0;
 		if (TYP(r)==PT_SPRK && playerp->elem!=PT_LIGH) //If on charge
 		{
-			damage += sim->rng.between(32, 51);
+			damage += rng.between(32, 51);
 		}
 
 		if (!sd.IsHeatInsulator(sim->parts[ID(r)]) && ((playerp->elem!=PT_LIGH && sim->parts[ID(r)].temp>=323) || sim->parts[ID(r)].temp<=243) && (!playerp->rocketBoots || TYP(r)!=PT_PLSM))

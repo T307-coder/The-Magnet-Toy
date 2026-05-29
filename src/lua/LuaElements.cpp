@@ -1,4 +1,5 @@
 #include "LuaScriptInterface.h"
+#include "common/VariantIndex.h"
 #include "gui/game/GameModel.h"
 #include "simulation/ElementClasses.h"
 #include "simulation/ElementCommon.h"
@@ -79,7 +80,8 @@ static void manageElementIdentifier(lua_State *L, int id, bool add)
 	}
 }
 
-static int luaUpdateWrapper(UPDATE_FUNC_ARGS)
+template<class SimVariant>
+static int luaUpdateWrapper(SimVariant *sim, UPDATE_FUNC_ARGS_TAIL)
 {
 	if (!sim->useLuaCallbacks)
 	{
@@ -87,7 +89,7 @@ static int luaUpdateWrapper(UPDATE_FUNC_ARGS)
 	}
 	auto *lsi = GetLSI();
 	auto &builtinElements = GetElements();
-	auto *builtinUpdate = builtinElements[parts[i].type].Update;
+	auto *builtinUpdate = std::get<VariantIndex<SimImpls, typename SimVariant::Variant>()>(builtinElements[parts[i].type].Update);
 	auto &customElements = lsi->customElements;
 	if (builtinUpdate && customElements[parts[i].type].updateMode == UPDATE_AFTER)
 	{
@@ -137,7 +139,7 @@ static int luaGraphicsWrapper(GRAPHICS_FUNC_ARGS)
 	}
 	auto *lsi = GetLSI();
 	auto &customElements = lsi->customElements;
-	auto *sim = lsi->sim;
+	auto *sim = lsi->gameModel->GetSimulation();
 	if (customElements[cpart->type].graphics)
 	{
 		auto *pipeSubcallWcpart = gfctx.pipeSubcallCpart ? sim->parts + (gfctx.pipeSubcallCpart - gfctx.sim->parts) : nullptr;
@@ -376,6 +378,7 @@ static int allocate(lua_State *L)
 			elements[newID] = Element();
 			elements[newID].Enabled = true;
 			elements[newID].Identifier = identifier;
+			elements[newID].InfiniteNeighborhood = true;
 		}
 
 		lua_getglobal(L, "elements");
@@ -435,13 +438,19 @@ static int element(lua_State *L)
 			{
 				customElements[id].update.Assign(L, -1);
 				customElements[id].updateMode = UPDATE_AFTER;
-				elements[id].Update = luaUpdateWrapper;
+				elements[id].Update = {
+#define WRAPPER(Var) luaUpdateWrapper<SimVariant<Var>>,
+ALL_SIM_IMPLS(WRAPPER)
+#undef WRAPPER
+				};
+				elements[id].InfiniteNeighborhood = true;
 			}
 			else if (lua_type(L, -1) == LUA_TBOOLEAN && !lua_toboolean(L, -1))
 			{
 				customElements[id].update.Clear();
 				customElements[id].updateMode = UPDATE_AFTER;
 				elements[id].Update = builtinElements[id].Update;
+				elements[id].InfiniteNeighborhood = builtinElements[id].InfiniteNeighborhood;
 			}
 			lua_pop(L, 1);
 
@@ -462,7 +471,11 @@ static int element(lua_State *L)
 			if (lua_type(L, -1) == LUA_TFUNCTION)
 			{
 				customElements[id].create.Assign(L, -1);
-				elements[id].Create = luaCreateWrapper;
+				elements[id].Create = {
+#define WRAPPER(Var) luaCreateWrapper<SimVariant<Var>>,
+ALL_SIM_IMPLS(WRAPPER)
+#undef WRAPPER
+				};
 			}
 			else if (lua_type(L, -1) == LUA_TBOOLEAN && !lua_toboolean(L, -1))
 			{
@@ -475,7 +488,11 @@ static int element(lua_State *L)
 			if (lua_type(L, -1) == LUA_TFUNCTION)
 			{
 				customElements[id].createAllowed.Assign(L, -1);
-				elements[id].CreateAllowed = luaCreateAllowedWrapper;
+				elements[id].CreateAllowed = {
+#define WRAPPER(Var) luaCreateAllowedWrapper<SimVariant<Var>>,
+ALL_SIM_IMPLS(WRAPPER)
+#undef WRAPPER
+				};
 			}
 			else if (lua_type(L, -1) == LUA_TBOOLEAN && !lua_toboolean(L, -1))
 			{
@@ -488,7 +505,11 @@ static int element(lua_State *L)
 			if (lua_type(L, -1) == LUA_TFUNCTION)
 			{
 				customElements[id].changeType.Assign(L, -1);
-				elements[id].ChangeType = luaChangeTypeWrapper;
+				elements[id].ChangeType = {
+#define WRAPPER(Var) luaChangeTypeWrapper<SimVariant<Var>>,
+ALL_SIM_IMPLS(WRAPPER)
+#undef WRAPPER
+				};
 			}
 			else if (lua_type(L, -1) == LUA_TBOOLEAN && !lua_toboolean(L, -1))
 			{
@@ -607,13 +628,19 @@ static int property(lua_State *L)
 					break;
 				}
 				customElements[id].update.Assign(L, 3);
-				elements[id].Update = luaUpdateWrapper;
+				elements[id].Update = {
+#define WRAPPER(Var) luaUpdateWrapper<SimVariant<Var>>,
+ALL_SIM_IMPLS(WRAPPER)
+#undef WRAPPER
+				};
+				elements[id].InfiniteNeighborhood = true;
 			}
 			else if (lua_type(L, 3) == LUA_TBOOLEAN && !lua_toboolean(L, 3))
 			{
 				customElements[id].update.Clear();
 				customElements[id].updateMode = UPDATE_AFTER;
 				elements[id].Update = builtinElements[id].Update;
+				elements[id].InfiniteNeighborhood = builtinElements[id].InfiniteNeighborhood;
 			}
 		}
 		else if (propertyName == "Graphics")
@@ -635,7 +662,11 @@ static int property(lua_State *L)
 			if (lua_type(L, 3) == LUA_TFUNCTION)
 			{
 				customElements[id].create.Assign(L, 3);
-				elements[id].Create = luaCreateWrapper;
+				elements[id].Create = {
+#define WRAPPER(Var) luaCreateWrapper<SimVariant<Var>>,
+ALL_SIM_IMPLS(WRAPPER)
+#undef WRAPPER
+				};
 			}
 			else if (lua_type(L, 3) == LUA_TBOOLEAN && !lua_toboolean(L, 3))
 			{
@@ -648,7 +679,11 @@ static int property(lua_State *L)
 			if (lua_type(L, 3) == LUA_TFUNCTION)
 			{
 				customElements[id].createAllowed.Assign(L, 3);
-				elements[id].CreateAllowed = luaCreateAllowedWrapper;
+				elements[id].CreateAllowed = {
+#define WRAPPER(Var) luaCreateAllowedWrapper<SimVariant<Var>>,
+ALL_SIM_IMPLS(WRAPPER)
+#undef WRAPPER
+				};
 			}
 			else if (lua_type(L, 3) == LUA_TBOOLEAN && !lua_toboolean(L, 3))
 			{
@@ -661,7 +696,11 @@ static int property(lua_State *L)
 			if (lua_type(L, 3) == LUA_TFUNCTION)
 			{
 				customElements[id].changeType.Assign(L, 3);
-				elements[id].ChangeType = luaChangeTypeWrapper;
+				elements[id].ChangeType = {
+#define WRAPPER(Var) luaChangeTypeWrapper<SimVariant<Var>>,
+ALL_SIM_IMPLS(WRAPPER)
+#undef WRAPPER
+				};
 			}
 			else if (lua_type(L, 3) == LUA_TBOOLEAN && !lua_toboolean(L, 3))
 			{

@@ -45,7 +45,7 @@ void Element::Element_CFLM()
 	HighTemperatureTransition = NT;
 
 	Graphics = &graphics;
-	Create = &create;
+	ASSIGN_SIM_CALLBACK(Create, create)
 }
 
 static int graphics(GRAPHICS_FUNC_ARGS)
@@ -68,5 +68,5 @@ static int graphics(GRAPHICS_FUNC_ARGS)
 
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
-	sim->parts[i].life = sim->rng.between(50, 199);
+	sim->parts[i].life = rng.between(50, 199);
 }

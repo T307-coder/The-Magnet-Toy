@@ -1,13 +1,14 @@
 #include "SurfaceNormals.h"
 #include "gui/game/GameView.h"
 #include "gui/game/GameController.h"
+#include "gui/game/GameModel.h"
 #include "gui/interface/Engine.h"
 #include "simulation/Simulation.h"
 #include "simulation/ElementClasses.h"
 #include "graphics/Graphics.h"
 
-SurfaceNormals::SurfaceNormals(unsigned int id, const Simulation *newSim, GameView *newView, GameController *newController) :
-	DebugInfo(id), sim(newSim), view(newView), controller(newController)
+SurfaceNormals::SurfaceNormals(unsigned int id, GameModel *model, GameView *newView, GameController *newController) :
+	DebugInfo(id), model(model), view(newView), controller(newController)
 {
 }
 
@@ -15,6 +16,7 @@ void SurfaceNormals::Draw()
 {
 	auto *g = ui::Engine::Ref().g;
 	ui::Point pos = controller->PointTranslate(view->GetCurrentMouse());
+	const auto *sim = model->GetSimulation();
 	auto p = sim->photons[pos.Y][pos.X];
 	if (!p)
 	{
@@ -29,14 +31,14 @@ void SurfaceNormals::Draw()
 	auto &parts = sim->parts;
 	auto x = int(parts[i].x + 0.5f);
 	auto y = int(parts[i].y + 0.5f);
-	auto mr = Simulation::PlanMove<false>(*sim, i, x, y);
+	auto mr = sim->PlanMoveOuter(i, x, y);
 	if (t == PT_PHOT)
 	{
 		if (parts[i].flags & FLAG_SKIPMOVE)
 		{
 			return;
 		}
-		if (sim->eval_move(PT_PHOT, mr.fin_x, mr.fin_y, nullptr))
+		if (sim->eval_move_outer(PT_PHOT, mr.fin_x, mr.fin_y, nullptr))
 		{
 			int rt = TYP(sim->pmap[mr.fin_y][mr.fin_x]);
 			int lt = TYP(sim->pmap[y][x]);
@@ -48,7 +50,7 @@ void SurfaceNormals::Draw()
 			}
 		}
 	}
-	auto gn = sim->get_normal_interp<false>(*sim, t, parts[i].x, parts[i].y, mr.vx, mr.vy);
+	auto gn = sim->get_normal_interp_outer(t, parts[i].x, parts[i].y, mr.vx, mr.vy);
 	if (!gn.success)
 	{
 		return;

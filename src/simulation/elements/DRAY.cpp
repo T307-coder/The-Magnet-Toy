@@ -43,9 +43,11 @@ void Element::Element_DRAY()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = nullptr; // is this needed?
 	CtypeDraw = &Element::ctypeDrawVInCtype;
+
+	InfiniteNeighborhood = true;
 }
 
 static int update(UPDATE_FUNC_ARGS)

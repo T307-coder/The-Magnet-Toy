@@ -43,7 +43,9 @@ void Element::Element_ARAY()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
+
+	InfiniteNeighborhood = true;
 }
 
 static int update(UPDATE_FUNC_ARGS)
@@ -131,7 +133,7 @@ static int update(UPDATE_FUNC_ARGS)
 							{
 								if (parts[r].tmp != 6)
 								{
-									colored = Element_FILT_interactWavelengths(sim, &parts[r], colored);
+									colored = Element_FILT_interactWavelengths(rng, &parts[r], colored);
 									if (!colored)
 										break;
 								}

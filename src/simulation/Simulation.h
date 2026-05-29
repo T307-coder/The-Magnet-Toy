@@ -9,11 +9,12 @@
 #include "AccessProperty.h"
 #include "CoordStack.h"
 #include "common/tpt-rand.h"
+#include "common/RoundDiv.h"
 #include "gravity/Gravity.h"
 #include "graphics/RendererFrame.h"
-#include "Element.h"
 #include "SimulationConfig.h"
 #include "SimulationSettings.h"
+#include "SimImpls.h"
 #include <cstring>
 #include <cstddef>
 #include <vector>
@@ -22,6 +23,12 @@
 #include <optional>
 
 constexpr int CHANNELS = int(MAX_TEMP - 73) / 100 + 2;
+
+constexpr int TILE_SIZE = 16; // in cells
+constexpr Vec2<int> TILES = { ceilDiv(CELLS.X, TILE_SIZE).first, ceilDiv(CELLS.Y, TILE_SIZE).first };
+
+template<class Item>
+using TilePlane = PlaneAdapter<std::array<Item, (TILES.X + 1) * (TILES.Y + 1)>, TILES.X + 1, TILES.Y + 1>;
 
 class FrameTime;
 class Snapshot;
@@ -37,10 +44,10 @@ class GameSave;
 
 class Parts
 {
+public:
 	int pfree;
 
-public:
-	std::array<Particle, NPART> data;
+	alignas(64) std::array<Particle, NPART> data;
 	// initialized in clear_sim
 	int active;
 
@@ -54,12 +61,9 @@ public:
 		return data.data();
 	}
 
-	Parts()
-	{
-		Reset();
-	}
+	Parts();
 
-	Parts(const Parts &other) = default;
+	Parts(const Parts &other) = delete;
 
 	Parts &operator =(const Parts &other)
 	{
@@ -69,18 +73,7 @@ public:
 		return *this;
 	}
 
-	Parts(const Parts &&other) = delete;
-	Parts &operator =(const Parts &&other) = delete;
-
 	void Reset();
-	void Free(int i);
-	int Alloc();
-	void Flatten();
-
-	bool MaxPartsReached() const
-	{
-		return pfree == -1;
-	}
 };
 
 struct RenderableSimulation
@@ -104,10 +97,10 @@ struct RenderableSimulation
 	playerst player2;
 	playerst fighters[MAX_FIGHTERS]; //Defined in Stickman.h
 
-	float vx[YCELLS][XCELLS];
-	float vy[YCELLS][XCELLS];
-	float pv[YCELLS][XCELLS];
-	float hv[YCELLS][XCELLS];
+	alignas(64) float vx[YCELLS][XCELLS_ALIGNED];
+	alignas(64) float vy[YCELLS][XCELLS_ALIGNED];
+	alignas(64) float pv[YCELLS][XCELLS_ALIGNED];
+	alignas(64) float hv[YCELLS][XCELLS_ALIGNED];
 	float bField[YCELLS][XCELLS];
 	float magSrc[YCELLS][XCELLS];
 	float prevBField[YCELLS][XCELLS];
@@ -117,25 +110,21 @@ struct RenderableSimulation
 	float prevEField[YCELLS][XCELLS];
 	bool prevEFieldValid = false;
 
-	unsigned char bmap[YCELLS][XCELLS];
-	unsigned char emap[YCELLS][XCELLS];
+	alignas(64) unsigned char bmap[YCELLS][XCELLS_ALIGNED];
+	alignas(64) unsigned char emap[YCELLS][XCELLS_ALIGNED];
 
 	Parts parts;
-	int pmap[YRES][XRES];
-	int photons[YRES][XRES];
+	alignas(64) int pmap[YRES][XRES_ALIGNED];
+	alignas(64) int photons[YRES][XRES_ALIGNED];
 
 	int aheat_enable = 0;
 
 	bool useLuaCallbacks = false;
 };
 
-class Simulation : public RenderableSimulation
+struct CopiableSimulation : public RenderableSimulation
 {
-public:
-	GravityPtr grav;
-	std::unique_ptr<Air> air;
-
-	RNG rng;
+	RNG sharedRng;
 
 	int replaceModeSelected = 0;
 	int replaceModeFlags = 0;
@@ -171,16 +160,11 @@ public:
 
 	int CGOL = 0;
 	int GSPEED = 1;
-	unsigned int gol[YRES][XRES][5];
 
 	float fvx[YCELLS][XCELLS];
 	float fvy[YCELLS][XCELLS];
-	int Element_LOLZ_lolz[XRES/9][YRES/9];
-	int Element_LOVE_love[XRES/9][YRES/9];
 	int Element_PSTN_tempParts[std::max(XRES, YRES)];
 	int Element_PPIP_ppip_changed;
-
-	unsigned int pmap_count[YRES][XRES];
 
 	int edgeMode = EDGE_VOID;
 	int gravityMode = GRAV_VERTICAL;
@@ -203,6 +187,20 @@ public:
 	int sandcolour;
 	int sandcolour_interface;
 
+	FrameTime *frameTime = nullptr;
+	int threadCount = 1;
+};
+
+class Simulation : public CopiableSimulation
+{
+public:
+	GravityPtr grav;
+	std::unique_ptr<Air> air;
+
+	Simulation(const Simulation &other) = delete;
+
+	void CopyFrom(const Simulation &other);
+
 	void Load(const GameSave *save, bool includePressure, Vec2<int> blockP); // block coordinates
 	std::unique_ptr<GameSave> Save(bool includePressure, Rect<int> partR); // particle coordinates
 	void SaveSimOptions(GameSave &gameSave);
@@ -211,14 +209,8 @@ public:
 	std::unique_ptr<Snapshot> CreateSnapshot() const;
 	void Restore(const Snapshot &snap);
 
-	int is_blocking(int t, int x, int y) const;
-	int is_boundary(int pt, int x, int y) const;
-	int find_next_boundary(int pt, int *x, int *y, int dm, int *em, bool reverse) const;
-	void photoelectric_effect(int nx, int ny);
-	int do_move(int i, int x, int y, float nxf, float nyf);
-	bool move(int i, int x, int y, float nxf, float nyf);
-	int try_move(int i, int x, int y, int nx, int ny);
-	int eval_move(int pt, int nx, int ny, unsigned *rr) const;
+	virtual bool move_outer(int i, int x, int y, float nxf, float nyf) = 0;
+	virtual int eval_move_outer(int pt, int nx, int ny, unsigned *rr) const = 0;
 
 	struct PlanMoveResult
 	{
@@ -226,35 +218,22 @@ public:
 		float fin_xf, fin_yf, clear_xf, clear_yf;
 		float vx, vy;
 	};
-	template<bool UpdateEmap, class Sim>
-	static PlanMoveResult PlanMove(Sim &sim, int i, int x, int y);
+	virtual PlanMoveResult PlanMoveOuter(int i, int x, int y) const = 0;
 
 	bool IsWallBlocking(int x, int y, int type) const;
-	void create_cherenkov_photon(int pp);
-	void create_gain_photon(int pp);
-	void kill_part(int i);
+	virtual void kill_part_outer(int i) = 0;
 	bool FloodFillPmapCheck(int x, int y, int type) const;
 	int flood_prop(int x, int y, const AccessProperty &changeProperty);
-	bool flood_water(int x, int y, int i);
-	int FloodINST(int x, int y);
-	void detach(int i);
-	bool part_change_type(int i, int x, int y, int t);
-	//int InCurrentBrush(int i, int j, int rx, int ry);
-	//int get_brush_flags();
-	int create_part(int p, int x, int y, int t, int v = -1);
-	int createPartTempVel(int i, int x, int y, int t);
+	virtual bool part_change_type_outer(int i, int x, int y, int t) = 0;
+	virtual int create_part_outer(int p, int x, int y, int t, int v = -1) = 0;
 	void delete_part(int x, int y);
-	void get_sign_pos(int i, int *x0, int *y0, int *w, int *h);
-	int is_wire(int x, int y);
-	int is_wire_off(int x, int y);
-	void set_emap(int x, int y);
+	virtual void set_emap_outer(int x, int y) = 0;
 	int parts_avg(int ci, int ni, int t);
 	virtual void UpdateParticles(int start, int end) = 0; // Dispatches an update to the range [start, end).
-	void SimulateGoL();
-	void RecalcFreeParticles(bool do_life_dec);
-	void CheckStacking();
-	void BeforeSim(bool willUpdate);
-	void AfterSim();
+	virtual void RecalcFreeParticlesOuter(bool do_life_dec) = 0;
+	void RequestElementRecount();
+	virtual void BeforeSim(bool willUpdate) = 0;
+	virtual void AfterSim() = 0;
 	void clear_area(int area_x, int area_y, int area_w, int area_h);
 
 	void SetEdgeMode(int newEdgeMode);
@@ -279,22 +258,20 @@ public:
 	int CreateParts(int p, int x, int y, int rx, int ry, int c, int flags);
 	int CreatePartFlags(int p, int x, int y, int c, int flags);
 	void CreateLine(int x1, int y1, int x2, int y2, int c, Brush const &cBrush, int flags);
-	void CreateLine(int x1, int y1, int x2, int y2, int c);
+	virtual void CreateLineOuter(int x1, int y1, int x2, int y2, int c) = 0;
 	void CreateBox(int p, int x1, int y1, int x2, int y2, int c, int flags);
 	int FloodParts(int x, int y, int c, int cm, int flags);
 
 	void GetGravityField(int x, int y, float particleGrav, float newtonGrav, float & pGravX, float & pGravY) const;
 
-	int get_wavelength_bin(int *wm);
 	struct GetNormalResult
 	{
 		bool success;
 		float nx, ny;
 		int lx, ly, rx, ry;
 	};
-	GetNormalResult get_normal(int pt, int x, int y, float dx, float dy) const;
-	template<bool PhotoelectricEffect, class Sim>
-	static GetNormalResult get_normal_interp(Sim &sim, int pt, float x0, float y0, float dx, float dy);
+	virtual GetNormalResult get_normal_interp_outer(int pt, float x0, float y0, float dx, float dy) const = 0;
+
 	void clear_sim();
 	Simulation();
 	virtual ~Simulation();
@@ -306,14 +283,49 @@ public:
 	void EnableSprkCurrent(bool enable);
 	void EnableElectricity(bool enable);
 
-	FrameTime *frameTime = nullptr;
+	static std::unique_ptr<Simulation> LegacyFactory();
+	static std::unique_ptr<Simulation> ParallelFactory();
 
-	static std::unique_ptr<Simulation> Factory();
+	virtual bool CreateAllowedOuter(int i, int x, int y, int t) = 0;
 
-private:
-	CoordStack& getCoordStackSingleton();
+protected:
+	std::unique_ptr<CoordStack> coordStack;
 
 	void ResetNewtonianGravity(GravityInput newGravIn, GravityOutput newGravOut);
 	void DispatchNewtonianGravity();
 	void UpdateGravityMask();
 };
+
+template<class VariantParam>
+class SimVariant : public Simulation
+{
+public:
+	void set_emap(int x, int y);
+	void kill_part(int i);
+	bool part_change_type(int i, int x, int y, int t);
+	int create_part(int p, int x, int y, int t, int v = -1);
+	int FloodINST(int x, int y);
+	void CreateLine(int x1, int y1, int x2, int y2, int c);
+	bool move(int i, int x, int y, float nxf, float nyf);
+	int createPartTempVel(int i, int x, int y, int t);
+	int eval_move(int pt, int nx, int ny, unsigned *rr) const;
+
+	inline bool MaxPartsReached() const;
+
+	void DeferSoapDetach(int i);
+	void SetAllowThreadedSimulation(bool newValue);
+
+	using Variant = VariantParam;
+};
+
+template<>
+inline bool SimVariant<LegacyVariant>::MaxPartsReached() const
+{
+	return parts.pfree == -1;
+}
+
+template<>
+inline bool SimVariant<ParallelVariant>::MaxPartsReached() const
+{
+	return false;
+}

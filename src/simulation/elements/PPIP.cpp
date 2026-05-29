@@ -45,8 +45,10 @@ void Element::Element_PPIP()
 
 	DefaultProperties.life = 60;
 
-	Update = &Element_PIPE_update;
+	ASSIGN_SIM_CALLBACK(Update, Element_PIPE_update)
 	Graphics = &Element_PIPE_graphics;
+
+	InfiniteNeighborhood = true;
 }
 
 // parts[].tmp flags
@@ -69,7 +71,7 @@ void Element_PPIP_flood_trigger(Simulation * sim, int x, int y, int sparkedBy)
 	int x1, x2;
 
 	Particle * parts = sim->parts;
-	int (*pmap)[XRES] = sim->pmap;
+	auto &pmap = sim->pmap;
 	int t = TYP(pmap[y][x]);
 	if (t != PT_PIPE && t != PT_PPIP)
 		return;

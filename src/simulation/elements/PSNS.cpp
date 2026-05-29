@@ -43,7 +43,9 @@ void Element::Element_PSNS()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
+
+	InfiniteNeighborhood = true; // TODO-TILES: this is only for tmp=1
 }
 
 static int update(UPDATE_FUNC_ARGS)
