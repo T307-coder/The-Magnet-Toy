@@ -900,7 +900,8 @@ struct CopiableSimulation::AsyncFieldSolver
 		std::thread thread;
 		std::mutex mx;
 		std::condition_variable cv;
-		bool hasWork = false;
+		bool workReady = false;  // main → worker: source data is ready
+		bool workDone  = false;  // worker → main: result is ready
 		bool shouldStop = false;
 		bool firstFrame = true;
 
@@ -908,7 +909,7 @@ struct CopiableSimulation::AsyncFieldSolver
 		std::vector<float> resultBuf;
 		std::unique_ptr<CopiableSimulation::MagFFT> magFFT;  // for B
 		std::unique_ptr<CopiableSimulation::ElecFFT> elecFFT; // for E
-		bool isElectric = false; // true → use elecFFT, false → use magFFT
+		bool isElectric = false;
 
 		void Run()
 		{
@@ -916,9 +917,9 @@ struct CopiableSimulation::AsyncFieldSolver
 			{
 				{
 					std::unique_lock lk(mx);
-					cv.wait(lk, [this]() { return hasWork || shouldStop; });
+					cv.wait(lk, [this]() { return workReady || shouldStop; });
 					if (shouldStop) return;
-					hasWork = false;
+					workReady = false;
 				}
 
 				std::vector<float> result(N);
@@ -927,6 +928,12 @@ struct CopiableSimulation::AsyncFieldSolver
 				else if (!isElectric && magFFT)
 					magFFT->Solve(srcBuf.data(), result.data(), XCELLS, YCELLS);
 				resultBuf = std::move(result);
+
+				{
+					std::lock_guard lk(mx);
+					workDone = true;
+				}
+				cv.notify_one();
 			}
 		}
 
@@ -957,19 +964,20 @@ struct CopiableSimulation::AsyncFieldSolver
 				{
 					std::lock_guard lk(mx);
 					shouldStop = true;
-					hasWork = true;
+					workReady = true;
 				}
 				cv.notify_one();
 				thread.join();
 			}
 		}
 
-		// Exchange: copy source in, get result out, signal worker (non-blocking)
+		// Exchange: wait for previous result, copy out, copy new source in, signal worker
 		void Exchange(const float *srcFlat, float *dstOut)
 		{
+			// Wait for worker to finish previous frame's computation
 			{
 				std::unique_lock lk(mx);
-				cv.wait(lk, [this]() { return !hasWork || shouldStop; });
+				cv.wait(lk, [this]() { return workDone || firstFrame || shouldStop; });
 			}
 
 			if (!firstFrame)
@@ -980,11 +988,13 @@ struct CopiableSimulation::AsyncFieldSolver
 				firstFrame = false;
 			}
 
+			// Copy new source and signal worker
 			std::copy_n(srcFlat, N, srcBuf.begin());
 
 			{
 				std::lock_guard lk(mx);
-				hasWork = true;
+				workDone = false;
+				workReady = true;
 			}
 			cv.notify_one();
 		}
@@ -1010,13 +1020,9 @@ struct CopiableSimulation::AsyncFieldSolver
 		eWorker.Stop();
 	}
 
-	// Exchange both fields: copies sources in, gets results out (non-blocking)
 	void Exchange(const float *magSrcFlat, const float *eSrcFlat,
 	              float *bFieldOut, float *eFieldOut)
 	{
-		// Both workers run in parallel — dispatch B first, then E
-		// (each Exchange() internally waits for previous work, copies result,
-		//  copies new source, and signals worker)
 		bWorker.Exchange(magSrcFlat, bFieldOut);
 		eWorker.Exchange(eSrcFlat, eFieldOut);
 	}
