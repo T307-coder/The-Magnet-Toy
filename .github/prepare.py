@@ -13,6 +13,8 @@ def set_output(key, value):
 	with open(os.getenv('GITHUB_OUTPUT'), 'a') as f:
 		f.write(f"{key}={value}\n")
 
+import shutil
+shutil.rmtree('build-prepare', ignore_errors=True)
 subprocess.run([ 'meson', 'setup', '-Dprepare=true', 'build-prepare' ], check = True)
 build_options = {}
 with open('build-prepare/meson-info/intro-buildoptions.json') as f:
