@@ -74,7 +74,7 @@ elif match_snapshot:
 	build_num = match_snapshot.group(1)
 	release_type = 'snapshot'
 	release_name = f'snapshot-{build_num}'
-	do_release = True
+	do_release = False
 	do_priority = -5
 elif match_tptlibsdev:
 	branch = match_tptlibsdev.group(1)
