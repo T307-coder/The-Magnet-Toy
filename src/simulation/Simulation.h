@@ -95,6 +95,7 @@ struct RenderableSimulation
 	bool magnetismEnabled = true;
 	bool inductionEnabled = true;
 	bool currentBFieldEnabled = true;
+	bool sprkCurrentEnabled = true;
 	bool realisticPstnEnabled = false;
 	bool electricityEnabled = true;
 
@@ -295,6 +296,7 @@ public:
 	void EnableMagnetism(bool enable);
 	void EnableInduction(bool enable);
 	void EnableCurrentBField(bool enable);
+	void EnableSprkCurrent(bool enable);
 	void EnableElectricity(bool enable);
 
 	FrameTime *frameTime = nullptr;

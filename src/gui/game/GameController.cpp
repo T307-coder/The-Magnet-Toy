@@ -886,6 +886,11 @@ void GameController::ToggleRealisticPstn()
 	gameModel->SetRealisticPstnEnabled(!gameModel->GetRealisticPstnEnabled());
 }
 
+void GameController::ToggleSprkCurrent()
+{
+	gameModel->SetSprkCurrentEnabled(!gameModel->GetSprkCurrentEnabled());
+}
+
 void GameController::ToggleNewtonianGravity()
 {
 	gameModel->SetNewtonianGravity(!gameModel->GetNewtonianGrvity());

@@ -106,3 +106,11 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+
+class SprkCurrentOption: public QuickOption
+{
+public:
+	SprkCurrentOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

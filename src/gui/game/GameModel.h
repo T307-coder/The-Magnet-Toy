@@ -279,6 +279,8 @@ public:
 	bool GetCurrentBFieldEnabled();
 	void SetRealisticPstnEnabled(bool enable);
 	bool GetRealisticPstnEnabled();
+	void SetSprkCurrentEnabled(bool enable);
+	bool GetSprkCurrentEnabled();
 	void SetElectricityEnabled(bool enable);
 	bool GetElectricityEnabled();
 	void ClearSimulation();

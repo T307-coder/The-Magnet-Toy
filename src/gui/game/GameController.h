@@ -131,6 +131,7 @@ public:
 	void ToggleInduction();
 	void ToggleCurrentBField();
 	void ToggleRealisticPstn();
+	void ToggleSprkCurrent();
 	void SetHudEnable(bool hudState);
 	bool GetHudEnable();
 	void SetBrushEnable(bool brushState);

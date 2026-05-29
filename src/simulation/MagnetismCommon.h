@@ -57,3 +57,24 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 	}
 	return false;
 }
+
+// Shared Biot-Savart: add magnetic field contribution from a current element to magSrc.
+// px, py = source position (pixels); vx, vy = direction vector (pixels); scale = overall multiplier.
+// radius = grid search radius in cells.
+static inline void magnetism_addBiotSavart(Simulation *sim, float px, float py, float vx, float vy, float scale, int radius)
+{
+	int pcx = (int)(px) / CELL;
+	int pcy = (int)(py) / CELL;
+	for (int dy = -radius; dy <= radius; dy++)
+		for (int dx = -radius; dx <= radius; dx++)
+		{
+			int cx = pcx + dx, cy = pcy + dy;
+			if (cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS) continue;
+			float rx = cx * CELL + CELL * 0.5f - px;
+			float ry = cy * CELL + CELL * 0.5f - py;
+			float r2 = rx * rx + ry * ry + 1.0f;
+			float r = sqrtf(r2);
+			float dB = scale * (vx * ry - vy * rx) / (r2 * r);
+			sim->magSrc[cy][cx] += dB;
+		}
+}

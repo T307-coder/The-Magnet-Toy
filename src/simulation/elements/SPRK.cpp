@@ -1,4 +1,5 @@
 #include "simulation/ElementCommon.h"
+#include "simulation/MagnetismCommon.h"
 #include "NTCT.h"
 #include "PIPE.h"
 #include "FIRE.h"
@@ -399,10 +400,22 @@ static int update(UPDATE_FUNC_ARGS)
 				else if (parts[ID(r)].life==0 && parts[i].life<4) {
 					parts[ID(r)].life = 4;
 					parts[ID(r)].ctype = receiver;
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);				// Propagate induced-flag: if source SPRK was induced, new SPRK is too
+				sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+				// Propagate induced-flag: if source SPRK was induced, new SPRK is too
 				if (parts[i].tmp3 == 1)
-					parts[ID(r)].tmp3 = 1;					if (parts[ID(r)].temp+10.0f<673.0f&&!sim->legacy_enable&&(receiver==PT_METL||receiver==PT_BMTL||receiver==PT_BRMT||receiver==PT_PSCN||receiver==PT_NSCN||receiver==PT_ETRD||receiver==PT_NBLE||receiver==PT_IRON))
-						parts[ID(r)].temp = parts[ID(r)].temp+10.0f;
+					parts[ID(r)].tmp3 = 1;
+				// Biot-Savart: SPRK current element (weaker than induction, material-dependent via life)
+				if (sim->magnetismEnabled && sim->sprkCurrentEnabled)
+				{
+					constexpr float SPRK_BIOT_BASE = 12.0f;
+					constexpr int SPRK_BIOT_R = 5;
+					float scale = SPRK_BIOT_BASE * (parts[i].life / 4.0f);
+					float dx = (float)(rx * CELL);
+					float dy = (float)(ry * CELL);
+					magnetism_addBiotSavart(sim, (float)x, (float)y, dx, dy, scale, SPRK_BIOT_R);
+				}
+				if (parts[ID(r)].temp+10.0f<673.0f&&!sim->legacy_enable&&(receiver==PT_METL||receiver==PT_BMTL||receiver==PT_BRMT||receiver==PT_PSCN||receiver==PT_NSCN||receiver==PT_ETRD||receiver==PT_NBLE||receiver==PT_IRON))
+					parts[ID(r)].temp = parts[ID(r)].temp+10.0f;
 				}
 				else if (!parts[ID(r)].life && sender==PT_ETRD && parts[i].life==5) //ETRD is odd and conducts to others only at life 5, this could probably be somewhere else
 				{

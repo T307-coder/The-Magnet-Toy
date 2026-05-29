@@ -204,3 +204,17 @@ void RealisticPstnOption::perform()
 {
 	m->SetRealisticPstnEnabled(!m->GetRealisticPstnEnabled());
 }
+
+SprkCurrentOption::SprkCurrentOption(GameModel * m):
+QuickOption("K", "SPRK current magnetic field", m, Toggle)
+{
+
+}
+bool SprkCurrentOption::GetToggle()
+{
+	return m->GetSprkCurrentEnabled();
+}
+void SprkCurrentOption::perform()
+{
+	m->SetSprkCurrentEnabled(!m->GetSprkCurrentEnabled());
+}

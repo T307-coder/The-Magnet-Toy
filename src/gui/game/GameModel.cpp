@@ -273,6 +273,7 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new DrawElectricOption(this));
 	quickOptions.push_back(new ElectricityEnableOption(this));
 	quickOptions.push_back(new CurrentBFieldOption(this));
+	quickOptions.push_back(new SprkCurrentOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
 
 	notifyQuickOptionsChanged();
@@ -1280,6 +1281,21 @@ void GameModel::SetRealisticPstnEnabled(bool enable)
 bool GameModel::GetRealisticPstnEnabled()
 {
 	return sim->realisticPstnEnabled;
+}
+
+void GameModel::SetSprkCurrentEnabled(bool enable)
+{
+	sim->EnableSprkCurrent(enable);
+	if (enable)
+		SetInfoTip("SPRK Current B-Field: On");
+	else
+		SetInfoTip("SPRK Current B-Field: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetSprkCurrentEnabled()
+{
+	return sim->sprkCurrentEnabled;
 }
 
 void GameModel::ShowElectricField(bool show)
