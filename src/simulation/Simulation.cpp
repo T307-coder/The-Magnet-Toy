@@ -5484,6 +5484,13 @@ void Simulation::CopyFrom(const Simulation &other)
 		EnableNewtonianGravity(true);
 	}
 	air->CopyFrom(*other.air);
+	// Re-initialize FFT objects (operator= resets unique_ptrs)
+	if (magnetismEnabled)
+		InitMagFFT();
+	if (electricityEnabled)
+		InitElecFFT();
+	if (gpuFFTEnabled)
+		InitGPUFFT();
 }
 
 template<>
