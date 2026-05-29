@@ -1489,6 +1489,21 @@ void GameView::OnKeyPress(int key, int scan, bool repeat, bool shift, bool ctrl,
 		else
 			c->AdjustGridSize(1);
 		break;
+	case SDL_SCANCODE_1:
+		c->SetSliceAxis(0); // X-axis slice
+		break;
+	case SDL_SCANCODE_2:
+		c->SetSliceAxis(1); // Y-axis slice
+		break;
+	case SDL_SCANCODE_3:
+		c->SetSliceAxis(2); // Z-axis slice (default)
+		break;
+	case SDL_SCANCODE_COMMA:
+		c->SetSliceDepth(c->GetSliceDepth() - 1);
+		break;
+	case SDL_SCANCODE_PERIOD:
+		c->SetSliceDepth(c->GetSliceDepth() + 1);
+		break;
 	case SDL_SCANCODE_F1:
 		if(!introText)
 			introText = 8047;

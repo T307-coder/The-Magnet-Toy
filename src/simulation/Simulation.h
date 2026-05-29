@@ -83,6 +83,8 @@ public:
 	}
 };
 
+class Viewport3D;
+
 struct RenderableSimulation
 {
 	GravityInput gravIn;
@@ -97,6 +99,8 @@ struct RenderableSimulation
 	bool currentBFieldEnabled = true;
 	bool sprkCurrentEnabled = true;
 	bool realisticPstnEnabled = false;
+	int sliceAxis = 2;    // 0=X, 1=Y, 2=Z — which axis the slice is perpendicular to
+	int sliceDepth = 20;  // current slice position along that axis
 	bool electricityEnabled = true;
 
 	playerst player;
@@ -158,6 +162,9 @@ public:
 	std::unique_ptr<ElecFFT> elecFFT;
 	void InitElecFFT();
 	void ComputeEField();
+
+	Viewport3D *viewport3D = nullptr;
+	void InitViewport3D();
 
 	Particle portalp[CHANNELS][8][80];
 	int wireless[CHANNELS][2];

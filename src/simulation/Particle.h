@@ -7,6 +7,7 @@ struct Particle
 	int type;
 	int life, ctype;
 	float x, y, vx, vy;
+	float z, vz;
 	float temp;
 	int tmp3;
 	int tmp4;

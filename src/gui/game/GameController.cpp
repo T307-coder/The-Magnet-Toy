@@ -891,6 +891,21 @@ void GameController::ToggleSprkCurrent()
 	gameModel->SetSprkCurrentEnabled(!gameModel->GetSprkCurrentEnabled());
 }
 
+void GameController::SetSliceAxis(int axis)
+{
+	gameModel->SetSliceAxis(axis);
+}
+
+void GameController::SetSliceDepth(int depth)
+{
+	gameModel->SetSliceDepth(depth);
+}
+
+int GameController::GetSliceDepth()
+{
+	return gameModel->GetSliceDepth();
+}
+
 void GameController::ToggleNewtonianGravity()
 {
 	gameModel->SetNewtonianGravity(!gameModel->GetNewtonianGrvity());

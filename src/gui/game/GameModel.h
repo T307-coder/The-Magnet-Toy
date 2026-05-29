@@ -281,6 +281,9 @@ public:
 	bool GetRealisticPstnEnabled();
 	void SetSprkCurrentEnabled(bool enable);
 	bool GetSprkCurrentEnabled();
+	void SetSliceAxis(int axis);
+	void SetSliceDepth(int depth);
+	int GetSliceDepth();
 	void SetElectricityEnabled(bool enable);
 	bool GetElectricityEnabled();
 	void ClearSimulation();

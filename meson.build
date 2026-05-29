@@ -518,6 +518,8 @@ if get_option('build_powder')
 		lua_dep,
 		curl_dep,
 		fftw_dep,
+		cpp_compiler.find_library('opengl32', required: false),
+		cpp_compiler.find_library('glu32', required: false),
 		sta_libs['common'],
 		sta_libs['gui'],
 		sta_libs['simulation'],

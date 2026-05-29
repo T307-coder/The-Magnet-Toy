@@ -2,6 +2,7 @@
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
+#include "graphics/Viewport3D.h"
 #include "TransitionConstants.h"
 #include "gravity/Gravity.h"
 #include "ToolClasses.h"
@@ -175,6 +176,15 @@ void Simulation::EnableCurrentBField(bool enable)
 void Simulation::EnableSprkCurrent(bool enable)
 {
 	sprkCurrentEnabled = enable;
+}
+
+void Simulation::InitViewport3D()
+{
+	if (!viewport3D)
+	{
+		viewport3D = new Viewport3D();
+		viewport3D->Init();
+	}
 }
 
 // Electric FFT Poisson solver for E-field computation (identical to MagFFT)
@@ -2213,6 +2223,8 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].y = (float)y;
 	parts[i].tmp5 = 0;
 	parts[i].tmp6 = 0;
+	parts[i].z = (float)sliceDepth;
+	parts[i].vz = 0.0f;
 
 	//and finally set the pmap/photon maps to the newly created particle
 	if (elements[t].Properties & TYPE_ENERGY)
@@ -3646,6 +3658,10 @@ void Simulation::RecalcFreeParticles(bool do_life_dec)
 		auto t = parts[i].type;
 		auto x = int(parts[i].x+0.5f);
 		auto y = int(parts[i].y+0.5f);
+		// 3D slice filter: skip particles not on current slice
+		if (sliceAxis == 0 && x != sliceDepth) continue;
+		if (sliceAxis == 1 && y != sliceDepth) continue;
+		if (sliceAxis == 2 && int(parts[i].z+0.5f) != sliceDepth) continue;
 		bool inBounds = false;
 		if (x>=0 && y>=0 && x<XRES && y<YRES)
 		{
@@ -4010,6 +4026,9 @@ void Simulation::BeforeSim(bool willUpdate)
 {
 	if (willUpdate)
 	{
+		// Lazy-init 3D viewport on first frame
+		if (!viewport3D) InitViewport3D();
+
 		{
 			FrameTime::Span span(frameTime, "Air::update_air");
 			air->update_air();
@@ -4059,6 +4078,10 @@ void Simulation::BeforeSim(bool willUpdate)
 			ComputeBField();
 			memset(magSrc, 0, sizeof(magSrc));
 		}
+
+		// 3D viewport: render all particles
+		if (viewport3D && viewport3D->IsOpen())
+			viewport3D->Render(this);
 
 		// Electric field: save previous frame, compute new
 		if (electricityEnabled)

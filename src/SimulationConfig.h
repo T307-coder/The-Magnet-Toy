@@ -17,7 +17,8 @@ constexpr int YCELLS = CELLS.Y;
 constexpr int NCELL  = XCELLS * YCELLS;
 constexpr int XRES   = RES.X;
 constexpr int YRES   = RES.Y;
-constexpr int NPART  = XRES * YRES;
+constexpr int ZRES   = 40;                    // 3D depth layers
+constexpr int NPART  = 1000000;                // 1M particle budget for 3D
 
 constexpr int XCNTR = XRES / 2;
 constexpr int YCNTR = YRES / 2;

@@ -132,6 +132,9 @@ public:
 	void ToggleCurrentBField();
 	void ToggleRealisticPstn();
 	void ToggleSprkCurrent();
+	void SetSliceAxis(int axis);
+	void SetSliceDepth(int depth);
+	int GetSliceDepth();
 	void SetHudEnable(bool hudState);
 	bool GetHudEnable();
 	void SetBrushEnable(bool brushState);

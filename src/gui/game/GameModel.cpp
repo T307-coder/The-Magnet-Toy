@@ -1298,6 +1298,30 @@ bool GameModel::GetSprkCurrentEnabled()
 	return sim->sprkCurrentEnabled;
 }
 
+void GameModel::SetSliceAxis(int axis)
+{
+	sim->sliceAxis = axis;
+	if (axis == 0) SetInfoTip("Slice Axis: X");
+	else if (axis == 1) SetInfoTip("Slice Axis: Y");
+	else SetInfoTip("Slice Axis: Z");
+}
+
+void GameModel::SetSliceDepth(int depth)
+{
+	int maxD = (sim->sliceAxis == 2) ? ZRES : (sim->sliceAxis == 1) ? YRES : XRES;
+	if (depth < 0) depth = 0;
+	if (depth >= maxD) depth = maxD - 1;
+	sim->sliceDepth = depth;
+	char buf[32];
+	sprintf(buf, "Slice: %d", depth);
+	SetInfoTip(buf);
+}
+
+int GameModel::GetSliceDepth()
+{
+	return sim->sliceDepth;
+}
+
 void GameModel::ShowElectricField(bool show)
 {
 	rendererSettings.electricFieldEnabled = show;
