@@ -31,7 +31,7 @@ void Element::Element_UBFM()
 	DefaultProperties.tmp = 10;
 	DefaultProperties.tmp2 = 5;
 	HeatConduct = 0;
-	Description = "Uniform B-field magnet. tmp=N/S strength(±), tmp2=range(cells).";
+	Description = "Uniform B-field magnet. tmp=N/S strength(±), tmp2=radius(cells).";
 
 	Properties = TYPE_SOLID;
 
@@ -49,18 +49,19 @@ void Element::Element_UBFM()
 
 static int update(UPDATE_FUNC_ARGS)
 {
-	// Add uniform magnetic source to all cells within tmp2 range
 	int strength = parts[i].tmp;
 	int range = parts[i].tmp2;
 	if (strength == 0 || range <= 0) return 0;
 	int cx0 = x / CELL, cy0 = y / CELL;
+	int r2 = range * range;
 	for (int dy = -range; dy <= range; dy++)
 	{
 		for (int dx = -range; dx <= range; dx++)
 		{
+			if (dx*dx + dy*dy > r2) continue;
 			int cx = cx0 + dx, cy = cy0 + dy;
 			if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
-				sim->magSrc[cy][cx] += (float)strength;
+				sim->bField[cy][cx] += (float)strength;
 		}
 	}
 	return 0;

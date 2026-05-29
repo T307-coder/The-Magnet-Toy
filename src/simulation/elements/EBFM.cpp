@@ -1,14 +1,15 @@
 #include "simulation/ElementCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
+static int graphics(GRAPHICS_FUNC_ARGS);
 
 void Element::Element_EBFM()
 {
 	Identifier = "DEFAULT_PT_EBFM";
 	Name = "EBFM";
-	Colour = 0x44CCCC_rgb;
+	Colour = 0x0A7B5B_rgb;
 	MenuVisible = 1;
-	MenuSection = SC_SPECIAL;
+	MenuSection = SC_POWERED;
 	Enabled = 1;
 
 	Advection = 0.0f;
@@ -29,10 +30,10 @@ void Element::Element_EBFM()
 	Weight = 100;
 
 	DefaultProperties.tmp = 5;
-	HeatConduct = 251;
-	Description = "Electric uniform B-field magnet. Temperature=strength(±273.15=zero), tmp=range. Needs SPRK.";
+	HeatConduct = 0;
+	Description = "Electric uniform B-field. PSCN on, NSCN off. tmp=radius, temp=strength(±273.15K=zero).";
 
-	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_LIFE_DEC;
+	Properties = TYPE_SOLID;
 
 	LowPressure = IPL;
 	LowPressureTransition = NT;
@@ -43,27 +44,69 @@ void Element::Element_EBFM()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
+	DefaultProperties.life = 10;
+
 	Update = &update;
+	Graphics = &graphics;
 }
 
 static int update(UPDATE_FUNC_ARGS)
 {
-	// Only active when sparked (life > 0)
-	if (parts[i].life <= 0) return 0;
-	int range = parts[i].tmp;
-	if (range <= 0) return 0;
-	// Temperature determines strength: 0 at 273.15K, positive above, negative below
-	int strength = (int)((parts[i].temp - 273.15f) * 0.1f);
-	if (strength == 0) return 0;
-	int cx0 = x / CELL, cy0 = y / CELL;
-	for (int dy = -range; dy <= range; dy++)
+	if (parts[i].life != 10)
 	{
-		for (int dx = -range; dx <= range; dx++)
+		if (parts[i].life > 0)
+			parts[i].life--;
+	}
+	else
+	{
+		int range = parts[i].tmp;
+		if (range <= 0) return 0;
+		int strength = (int)((parts[i].temp - 273.15f) * 0.1f);
+		if (strength == 0) return 0;
+		int cx0 = x / CELL, cy0 = y / CELL;
+		int r2 = range * range;
+		for (int dy = -range; dy <= range; dy++)
 		{
-			int cx = cx0 + dx, cy = cy0 + dy;
-			if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
-				sim->magSrc[cy][cx] += (float)strength;
+			for (int dx = -range; dx <= range; dx++)
+			{
+				if (dx*dx + dy*dy > r2) continue;
+				int cx = cx0 + dx, cy = cy0 + dy;
+				if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+					sim->bField[cy][cx] += (float)strength;
+			}
 		}
+		// Propagate state to neighbors (like GPMP/ELMG)
+		for (auto rx = -2; rx <= 2; rx++)
+		{
+			for (auto ry = -2; ry <= 2; ry++)
+			{
+				if (rx || ry)
+				{
+					auto r = pmap[y+ry][x+rx];
+					if (!r) continue;
+					if (TYP(r) == PT_EBFM)
+					{
+						if (parts[ID(r)].life < 10 && parts[ID(r)].life > 0)
+							parts[i].life = 9;
+						else if (parts[ID(r)].life == 0)
+							parts[ID(r)].life = 10;
+					}
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+static int graphics(GRAPHICS_FUNC_ARGS)
+{
+	if (cpart->life == 10)
+	{
+		*colr = 30; *colg = 180; *colb = 140;
+	}
+	else
+	{
+		*colr = 10; *colg = 60; *colb = 50;
 	}
 	return 0;
 }
