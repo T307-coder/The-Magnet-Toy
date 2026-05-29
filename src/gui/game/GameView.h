@@ -77,6 +77,8 @@ private:
 	bool isButtonTipFadingIn;
 	ui::Fade introText{ ui::Fade::LinearProfile{ 60.f, 60.f }, 0, 2048 };
 	String introTextMessage;
+	String introTextMessage2;
+	bool introTextPhaseTwo = false;
 
 	bool doScreenshot;
 	int screenshotIndex;

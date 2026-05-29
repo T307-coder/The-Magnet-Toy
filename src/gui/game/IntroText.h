@@ -39,26 +39,32 @@ inline ByteString VersionInfo()
 	return sb.Build();
 }
 
-inline ByteString IntroText()
+inline ByteString IntroTextMod()
 {
 	ByteStringBuilder sb;
-	sb << "\bu\bU" << APPNAME << "\bU\bl - Version " << DISPLAY_VERSION[0] << "." << DISPLAY_VERSION[1] << " - https://powdertoy.co.uk, irc.libera.chat #powder, https://tpt.io/discord\n"
+	sb << "\bu\bU" << APPNAME << "\bU\bl - Version " << DISPLAY_VERSION[0] << "." << DISPLAY_VERSION[1] << "\n"
 	      "\n"
 	      "\buClassical Electromagnetism + GPU Acceleration + Multi-threading\n"
-	      "\blMagnetic fields, electric fields, Lorentz force, dielectrophoresis, and more.\n"
-	      "Fields computed via FFT-based Poisson solvers, accelerated with CUDA cuFFT on GPU.\n"
+	      "\blMagnetic & electric fields, Lorentz force, dielectrophoresis, induction, and more.\n"
+	      "Fields computed via FFT Poisson solvers, GPU-accelerated with CUDA cuFFT.\n"
 	      "\n"
-	      "\buAcceleration Controls:\n"
-	      "\bgPress U in-game to toggle GPU FFT acceleration (CUDA cuFFT / CPU FFTW fallback).\n"
-	      "\bgUse sim.threads(N) in the console to enable N-threaded particle updates. (sim.threads(0) to turn off)\n"
+	      "\buQuick Start:\n"
+	      "\bgPress U to toggle GPU FFT acceleration (CUDA cuFFT / CPU FFTW fallback).\n"
+	      "\bgUse sim.threads(N) in the console for N-threaded particle updates.\n"
+	      "\bgUse tpt.fpsCap(2) to remove the 60 FPS cap. Left-side buttons toggle field features.\n"
 	      "\n"
 	      "\buCredits:\n"
-	      "\blMulti-threading engine ported from The Parallel Toy by LBPHacker (@LBPHacker).\n"
-	      "\blElectromagnetism simulation designed by netherpro.\n"
+	      "\blMulti-threading from The Parallel Toy by LBPHacker.\n"
+	      "\blElectromagnetism by netherpro. Built on The Powder Toy.\n"
 	      "\n"
-	      "\boYou will often hit the default FPS cap of 60 with this mod; use tpt.fpsCap(2) in the console to remove the cap.\n"
-	      "You can also use tpt.debug(0x100) in the console to get timing information, if you know what you are doing.\n"
-	      "Note: This mod is an experiment; expect and please report simulation weirdness and crashes.\n"
+	      "\boClick or press any key to continue to controls...";
+	return sb.Build();
+}
+
+inline ByteString IntroTextBasics()
+{
+	ByteStringBuilder sb;
+	sb << "\buControls & Tips\n"
 	      "\n"
 	      "\bgControl+C/V/X are Copy, Paste and cut respectively.\n"
 	      "\bgTo choose a material, hover over one of the icons on the right, it will show a selection of elements in that group.\n"
@@ -75,6 +81,9 @@ inline ByteString IntroText()
 	      "Use 'S' to save parts of the window as 'stamps'. 'L' loads the most recent stamp, 'K' shows a library of stamps you saved.\n"
 	      "Use 'P' to take a screenshot and save it into the current directory.\n"
 	      "Use 'H' to toggle the HUD. Use 'D' to toggle debug mode in the HUD.\n"
+	      "\n"
+	      "\boYou can also use tpt.debug(0x100) in the console to get timing information.\n"
+	      "Note: This mod is an experiment; expect and please report simulation weirdness and crashes.\n"
 	      "\n";
 	if constexpr (BETA)
 	{
@@ -87,4 +96,9 @@ inline ByteString IntroText()
 	}
 	sb << "\n\bt" << VersionInfo();
 	return sb.Build();
+}
+
+inline ByteString IntroText()
+{
+	return IntroTextMod();
 }

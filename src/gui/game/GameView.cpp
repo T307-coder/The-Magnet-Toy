@@ -192,7 +192,8 @@ GameView::GameView():
 	infoTip(""),
 	buttonTip(""),
 	isButtonTipFadingIn(false),
-	introTextMessage(IntroText().FromUtf8()),
+	introTextMessage(IntroTextMod().FromUtf8()),
+	introTextMessage2(IntroTextBasics().FromUtf8()),
 
 	doScreenshot(false),
 	screenshotIndex(1),
@@ -1491,9 +1492,15 @@ void GameView::OnKeyPress(int key, int scan, bool repeat, bool shift, bool ctrl,
 		break;
 	case SDL_SCANCODE_F1:
 		if(!introText)
+		{
+			introTextPhaseTwo = false;
 			introText = 8047;
+		}
 		else
+		{
 			introText = 0;
+			introTextPhaseTwo = true;
+		}
 		break;
 	case SDL_SCANCODE_F11:
 		ui::Engine::Ref().SetFullscreen(!ui::Engine::Ref().GetFullscreen());
@@ -1730,10 +1737,18 @@ void GameView::OnFileDrop(ByteString filename)
 void GameView::SkipIntroText()
 {
 	introText = 0;
+	introTextPhaseTwo = true; // skip both phases
 }
 
 void GameView::OnTick()
 {
+	// Two-phase intro text: when phase 1 fades out, start phase 2
+	if (!introTextPhaseTwo && introText == 0 && introTextMessage2.length())
+	{
+		introTextPhaseTwo = true;
+		introText = 2048;
+	}
+
 	if (selectMode == PlaceSave && !placeSaveThumb)
 		selectMode = SelectNone;
 	if (zoomEnabled && !zoomCursorFixed)
@@ -2699,7 +2714,7 @@ void GameView::OnDraw()
 	if(introText && showHud)
 	{
 		g->BlendFilledRect(RectSized(Vec2{ 0, 0 }, WINDOW), 0x000000_rgb .WithAlpha(introText>51?102:introText*2));
-		g->BlendText({ 16, 16 }, introTextMessage, 0xFFFFFF_rgb .WithAlpha(introText>51?255:introText*5));
+		g->BlendText({ 16, 16 }, introTextPhaseTwo ? introTextMessage2 : introTextMessage, 0xFFFFFF_rgb .WithAlpha(introText>51?255:introText*5));
 	}
 }
 
