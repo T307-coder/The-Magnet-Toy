@@ -81,63 +81,8 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		if (parts[i].temp < 773.15f)
 		{
-			// Contact charging: MAGN, ELMG, MGPN
-			for (auto rx = -1; rx <= 1; rx++)
-				for (auto ry = -1; ry <= 1; ry++)
-				{
-					if (!rx && !ry) continue;
-					auto r = pmap[y+ry][x+rx];
-					if (r)
-					{
-						int rt = TYP(r);
-						if (rt == PT_MAGN)
-						{
-							int mag = parts[ID(r)].tmp;
-							if (parts[i].tmp3 < mag) parts[i].tmp3++;
-							else if (parts[i].tmp3 > mag) parts[i].tmp3--;
-						}
-						else if (rt == PT_ELMG && parts[ID(r)].life == 10)
-						{
-							int mag = (int)((parts[ID(r)].temp - 273.15f) / 5.0f);
-							if (mag > 100) mag = 100;
-							if (mag < -100) mag = -100;
-							if (parts[i].tmp3 < mag) parts[i].tmp3++;
-							else if (parts[i].tmp3 > mag) parts[i].tmp3--;
-						}
-					}
-					auto pr = sim->photons[y+ry][x+rx];
-					if (pr && TYP(pr) == PT_MGPN)
-					{
-						int mag = parts[ID(pr)].tmp;
-						if (parts[i].tmp3 < mag) parts[i].tmp3++;
-						else if (parts[i].tmp3 > mag) parts[i].tmp3--;
-					}
-				}
-			// Internal diffusion: DEUT-style random trade (conserves total)
-			for (auto trade = 0; trade < 4; trade++)
-			{
-				auto rx = sim->rng.between(-2, 2);
-				auto ry = sim->rng.between(-2, 2);
-				if (!rx && !ry) continue;
-				auto r = pmap[y+ry][x+rx];
-				if (!r) continue;
-				int rt = TYP(r);
-				if (rt==PT_TTAN||rt==PT_TTAN||rt==PT_BMTL||rt==PT_BRMT)
-				{
-					int diff = parts[i].tmp3 - parts[ID(r)].tmp3;
-					if (diff > 1)
-					{
-						int transfer = diff / 2;
-						parts[ID(r)].tmp3 += transfer;
-						parts[i].tmp3 -= transfer;
-					}
-					else if (diff == 1)
-					{
-						parts[ID(r)].tmp3++;
-						parts[i].tmp3--;
-					}
-				}
-			}
+			magnetism_contactCharge(sim, parts[i], x, y, parts[i].tmp3);
+			magnetism_diffuseCharge(sim, parts[i], x, y, parts[i].tmp3);
 		}
 		else
 		{

@@ -58,9 +58,111 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 	return false;
 }
 
+// Range-based magnetization: ferromagnets receive magnetization from nearby MAGN/ELMG/MGPN.
+// reach = 1 + |source_strength| / 25 (stronger sources reach further).
+// Distance² falloff via rng.chance.
+static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref)
+{
+	int cx = x / CELL, cy = y / CELL;
+	if (!sim->magnetismEnabled || cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS) return;
+	if (p.temp >= 773.15f) return; // above Curie temperature, doesn't magnetize
+
+	constexpr int scanR = 30;
+	for (int rx = -scanR; rx <= scanR; rx++)
+		for (int ry = -scanR; ry <= scanR; ry++)
+		{
+			if (!rx && !ry) continue;
+			int dist = std::max(abs(rx), abs(ry));
+			auto r = sim->pmap[y + ry][x + rx];
+			if (r)
+			{
+				int rt = TYP(r);
+				int target = 0;
+				bool hasTarget = false;
+				if (rt == PT_MAGN)
+				{
+					target = sim->parts[ID(r)].tmp;
+					hasTarget = true;
+				}
+				else if (rt == PT_ELMG && sim->parts[ID(r)].life == 10)
+				{
+					target = (int)((sim->parts[ID(r)].temp - 273.15f) / 5.0f);
+					if (target > 100) target = 100;
+					if (target < -100) target = -100;
+					hasTarget = true;
+				}
+				if (hasTarget)
+				{
+					int reach = 1 + std::abs(target) / 25;
+					if (dist <= reach)
+					{
+						int chance = dist * dist;
+						if (dist <= 1 || sim->rng.chance(1, chance))
+						{
+							if (tmp3Ref < target) tmp3Ref++;
+							else if (tmp3Ref > target) tmp3Ref--;
+						}
+					}
+				}
+			}
+			auto pr = sim->photons[y + ry][x + rx];
+			if (pr && TYP(pr) == PT_MGPN)
+			{
+				int target = sim->parts[ID(pr)].tmp;
+				int reach = 1 + std::abs(target) / 25;
+				if (dist <= reach)
+				{
+					int chance = dist * dist;
+					if (dist <= 1 || sim->rng.chance(1, chance))
+					{
+						if (tmp3Ref < target) tmp3Ref++;
+						else if (tmp3Ref > target) tmp3Ref--;
+					}
+				}
+			}
+		}
+}
+
+// DEUT-style magnetization diffusion between ferromagnets in range.
+// reach = 1 + |strength|/25; stronger magnets spread further.
+// Probe count scales with reach² to maintain hit rate.
+static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref)
+{
+	int reach = 1 + std::abs(tmp3Ref) / 25;
+	if (reach < 2) reach = 2;
+	if (reach > 15) reach = 15;
+	int numTrades = reach * reach / 2; // scale probes with area
+	if (numTrades < 4) numTrades = 4;
+	for (int trade = 0; trade < numTrades; trade++)
+	{
+		int rx = sim->rng.between(-reach, reach);
+		int ry = sim->rng.between(-reach, reach);
+		if (!rx && !ry) continue;
+		int nx = x + rx, ny = y + ry;
+		if (nx < 0 || ny < 0 || nx >= XRES || ny >= YRES) continue;
+		auto r = sim->pmap[ny][nx];
+		if (!r) continue;
+		int rt = TYP(r);
+		if (rt == PT_IRON || rt == PT_TTAN || rt == PT_BMTL || rt == PT_BRMT)
+		{
+			int &other = sim->parts[ID(r)].tmp3;
+			int diff = tmp3Ref - other;
+			if (diff > 1)
+			{
+				int transfer = diff / 2;
+				other += transfer;
+				tmp3Ref -= transfer;
+			}
+			else if (diff == 1)
+			{
+				other++;
+				tmp3Ref--;
+			}
+		}
+	}
+}
+
 // Shared Biot-Savart: add magnetic field contribution from a current element to magSrc.
-// px, py = source position (pixels); vx, vy = direction vector (pixels); scale = overall multiplier.
-// radius = grid search radius in cells.
 static inline void magnetism_addBiotSavart(Simulation *sim, float px, float py, float vx, float vy, float scale, int radius)
 {
 	int pcx = (int)(px) / CELL;
