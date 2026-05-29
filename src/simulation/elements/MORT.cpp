@@ -51,6 +51,6 @@ void Element::Element_MORT()
 
 static int update(UPDATE_FUNC_ARGS)
 {
-	sim->create_part(-1, x, y-1, PT_SMKE);
+	sim->create_part_outer(-1, x, y-1, PT_SMKE);
 	return 0;
 }

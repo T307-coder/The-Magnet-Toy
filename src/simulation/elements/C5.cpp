@@ -64,7 +64,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if (rng.chance(1, 6))
 					{
 						//@ C5 -> CFLM
-						sim->part_change_type(i,x,y,PT_CFLM);
+						sim->part_change_type_outer(i,x,y,PT_CFLM);
 						parts[ID(r)].temp = parts[i].temp = 0;
 						parts[i].life = rng.between(50, 199);
 						sim->pv[y/CELL][x/CELL] += 1.5;
@@ -79,7 +79,7 @@ static int update(UPDATE_FUNC_ARGS)
 		float vy = (parts[i].tmp >> 16) / 255.0f;
 		float dx = ((parts[i].tmp2 << 16) >> 16) / 255.0f;
 		float dy = (parts[i].tmp2 >> 16) / 255.0f;
-		auto r = sim->create_part(-3, x, y, PT_PHOT);
+		auto r = sim->create_part_outer(-3, x, y, PT_PHOT);
 		if (r != -1)
 		{
 			parts[r].ctype = parts[i].ctype;

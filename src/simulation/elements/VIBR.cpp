@@ -96,7 +96,7 @@ int Element_VIBR_update(UPDATE_FUNC_ARGS)
 			{
 				parts[ID(r)].life = 4;
 				parts[ID(r)].ctype = TYP(r);
-				sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+				sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SPRK);
 			}
 		}
 		//Release all heat
@@ -118,16 +118,16 @@ int Element_VIBR_update(UPDATE_FUNC_ARGS)
 			{
 				//@ VIBR/BVBR -> EXOT + ELEC + PHOT + BREC
 				rndstore = rng.gen();
-				int index = sim->create_part(-3, x + (orbit_rx[rndstore & 7]), y + (orbit_ry[rndstore & 7]), PT_ELEC);
+				int index = sim->create_part_outer(-3, x + (orbit_rx[rndstore & 7]), y + (orbit_ry[rndstore & 7]), PT_ELEC);
 				if (index != -1)
 					parts[index].temp = 7000;
-				index = sim->create_part(-3, x + (orbit_rx[(rndstore >> 3) & 7]), y + (orbit_ry[(rndstore >> 3) & 7]), PT_PHOT);
+				index = sim->create_part_outer(-3, x + (orbit_rx[(rndstore >> 3) & 7]), y + (orbit_ry[(rndstore >> 3) & 7]), PT_PHOT);
 				if (index != -1)
 					parts[index].temp = 7000;
-				index = sim->create_part(-1, x + (orbit_rx[(rndstore >> 6) & 7]), y + (orbit_ry[(rndstore >> 6) & 7]), PT_BREC);
+				index = sim->create_part_outer(-1, x + (orbit_rx[(rndstore >> 6) & 7]), y + (orbit_ry[(rndstore >> 6) & 7]), PT_BREC);
 				if (index != -1)
 					parts[index].temp = 7000;
-				sim->create_part(i, x, y, PT_EXOT);
+				sim->create_part_outer(i, x, y, PT_EXOT);
 				parts[i].tmp2 = (rndstore >> 9) % 1000;
 				parts[i].temp=9000;
 				sim->pv[y/CELL][x/CELL] += 50;
@@ -177,14 +177,14 @@ int Element_VIBR_update(UPDATE_FUNC_ARGS)
 					if (TYP(r) == PT_EXOT && rng.chance(1, 25))
 					{
 						//@ VIBR/BVBR + EXOT -> 2xEXOT
-						sim->part_change_type(i, x, y, PT_EXOT);
+						sim->part_change_type_outer(i, x, y, PT_EXOT);
 						return 1;
 					}
 				}
 				//@ VIBR + ANAR -> BVBR
 				if (parts[i].type != PT_BVBR && TYP(r) == PT_ANAR)
 				{
-					sim->part_change_type(i,x,y,PT_BVBR);
+					sim->part_change_type_outer(i,x,y,PT_BVBR);
 					sim->pv[y/CELL][x/CELL] -= 1;
 				}
 			}

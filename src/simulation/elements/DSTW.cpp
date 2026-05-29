@@ -61,24 +61,24 @@ static int update(UPDATE_FUNC_ARGS)
 					if (rng.chance(1, 50))
 					{
 						//@ DSTW + SALT -> 2xSLTW
-						sim->part_change_type(i,x,y,PT_SLTW);
+						sim->part_change_type_outer(i,x,y,PT_SLTW);
 						// on average, convert 3 DSTW to SLTW before SALT turns into SLTW
 						if (rng.chance(1, 3))
-							sim->part_change_type(ID(r),x+rx,y+ry,PT_SLTW);
+							sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SLTW);
 					}
 					break;
 				case PT_SLTW:
 					if (rng.chance(1, 2000))
 					{
 						//@ DSTW + SLTW -> 2xSLTW
-						sim->part_change_type(i,x,y,PT_SLTW);
+						sim->part_change_type_outer(i,x,y,PT_SLTW);
 						break;
 					}
 				case PT_WATR:
 					if (rng.chance(1, 100))
 					{
 						//@ DSTW + WATR -> 2xWATR
-						sim->part_change_type(i,x,y,PT_WATR);
+						sim->part_change_type_outer(i,x,y,PT_WATR);
 					}
 					break;
 				case PT_RBDM:
@@ -86,15 +86,15 @@ static int update(UPDATE_FUNC_ARGS)
 					if ((sim->legacy_enable||parts[i].temp>12.0f) && rng.chance(1, 100))
 					{
 						//@ DSTW + RBDM/LRBD -> FIRE + RBDM/LRBD
-						sim->part_change_type(i,x,y,PT_FIRE);
+						sim->part_change_type_outer(i,x,y,PT_FIRE);
 						parts[i].life = 4;
 					}
 					break;
 				case PT_FIRE:
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 					if (rng.chance(1, 30))
 					{
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 					break;
@@ -105,9 +105,9 @@ static int update(UPDATE_FUNC_ARGS)
 						if (rng.chance(1, 100))
 						{
 							//@ DSTW + SMKE -> BASE
-							sim->part_change_type(i,x,y,PT_BASE);
+							sim->part_change_type_outer(i,x,y,PT_BASE);
 							parts[i].life = 1;
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 						}
 					}
 					break;

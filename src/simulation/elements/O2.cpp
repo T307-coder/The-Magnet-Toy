@@ -67,14 +67,14 @@ static int update(UPDATE_FUNC_ARGS)
 					parts[ID(r)].tmp |= 2;
 
 					//@ O2 + FIRE -> 2xFIRE
-					sim->create_part(i,x,y,PT_FIRE);
+					sim->create_part_outer(i,x,y,PT_FIRE);
 					parts[i].temp += rng.between(0, 99);
 					parts[i].tmp |= 2;
 				}
 				else if (TYP(r)==PT_PLSM && !(parts[ID(r)].tmp&4))
 				{
 					//@ O2 + PLSM -> FIRE + PLSM
-					sim->create_part(i,x,y,PT_FIRE);
+					sim->create_part_outer(i,x,y,PT_FIRE);
 					parts[i].temp += rng.between(0, 99);
 					parts[i].tmp |= 2;
 				}
@@ -91,12 +91,12 @@ static int update(UPDATE_FUNC_ARGS)
 			if (rng.chance(1, 5))
 			{
 				int j;
-				sim->create_part(i,x,y,PT_BRMT);
+				sim->create_part_outer(i,x,y,PT_BRMT);
 
-				j = sim->create_part(-3,x,y,PT_NEUT);
+				j = sim->create_part_outer(-3,x,y,PT_NEUT);
 				if (j != -1)
 					parts[j].temp = MAX_TEMP;
-				j = sim->create_part(-3,x,y,PT_PHOT);
+				j = sim->create_part_outer(-3,x,y,PT_PHOT);
 				if (j != -1)
 				{
 					parts[j].temp = MAX_TEMP;
@@ -105,14 +105,14 @@ static int update(UPDATE_FUNC_ARGS)
 				auto rx = x + rng.between(-1, 1), ry = y + rng.between(-1, 1), r = TYP(pmap[ry][rx]);
 				if (can_move[PT_PLSM][r] || r == PT_O2)
 				{
-					j = sim->create_part(-3,rx,ry,PT_PLSM);
+					j = sim->create_part_outer(-3,rx,ry,PT_PLSM);
 					if (j > -1)
 					{
 						parts[j].temp = MAX_TEMP;
 						parts[j].tmp |= 4;
 					}
 				}
-				j = sim->create_part(-3,x,y,PT_GRVT);
+				j = sim->create_part_outer(-3,x,y,PT_GRVT);
 				if (j != -1)
 					parts[j].temp = MAX_TEMP;
 				parts[i].temp = MAX_TEMP;

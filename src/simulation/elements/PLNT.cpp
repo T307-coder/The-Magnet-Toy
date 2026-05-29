@@ -141,7 +141,7 @@ static int update(UPDATE_FUNC_ARGS)
 									nlife = life/2;
 							}
 
-							si = sim->create_part(-1, x+dir3x3[ndir].X, y+dir3x3[ndir].Y, PT_PLNT);
+							si = sim->create_part_outer(-1, x+dir3x3[ndir].X, y+dir3x3[ndir].Y, PT_PLNT);
 							if (si >= 0)
 							{
 								parts[si].ctype = ((nlife & 0xFF) << PLNT_LIFE) | (parts[i].ctype & (0x3f << PLNT_COLOUR))
@@ -166,7 +166,7 @@ static int update(UPDATE_FUNC_ARGS)
 			else
 			{
 				// Grow forward
-				si = sim->create_part(-1, x+dir3x3[dir].X, y+dir3x3[dir].Y, PT_PLNT);
+				si = sim->create_part_outer(-1, x+dir3x3[dir].X, y+dir3x3[dir].Y, PT_PLNT);
 				if (si >= 0)
 				{
 					parts[si].ctype = ((life & 0xFF) << PLNT_LIFE) | (parts[i].ctype & (0x3f << PLNT_COLOUR))
@@ -186,7 +186,7 @@ static int update(UPDATE_FUNC_ARGS)
 				if (phase || life < 12)
 				{
 					//@ PLNT -> WOOD
-					sim->create_part(i, x, y, PT_WOOD);
+					sim->create_part_outer(i, x, y, PT_WOOD);
 
 					parts[i].ctype = 0;
 					parts[i].life = 0;
@@ -199,7 +199,7 @@ static int update(UPDATE_FUNC_ARGS)
 				{
 					// Thick stem
 					//@ PLNT -> GOO
-					sim->create_part(i, x, y, PT_GOO);
+					sim->create_part_outer(i, x, y, PT_GOO);
 
 					parts[i].ctype = 0;
 					parts[i].life = 0;
@@ -218,8 +218,8 @@ static int update(UPDATE_FUNC_ARGS)
 						right_dir = (dir+3)%8;
 					}
 
-					sim->create_part(-1, x+dir3x3[left_dir].X, y+dir3x3[left_dir].Y, PT_WOOD);
-					sim->create_part(-1, x+dir3x3[right_dir].X, y+dir3x3[right_dir].Y, PT_WOOD);
+					sim->create_part_outer(-1, x+dir3x3[left_dir].X, y+dir3x3[left_dir].Y, PT_WOOD);
+					sim->create_part_outer(-1, x+dir3x3[right_dir].X, y+dir3x3[right_dir].Y, PT_WOOD);
 				}
 			}
 		}
@@ -233,7 +233,7 @@ static int update(UPDATE_FUNC_ARGS)
 			if (rng.chance(1, 10))
 			{
 				//@ PLNT -> PLNT + SEED
-				si = sim->create_part(-1, x+2*dir3x3[dir].X, y+2*dir3x3[dir].Y, PT_SEED);
+				si = sim->create_part_outer(-1, x+2*dir3x3[dir].X, y+2*dir3x3[dir].Y, PT_SEED);
 				if (si >= 0)
 				{
 					parts[si].vx = float(dir3x3[dir].X);
@@ -275,7 +275,7 @@ static int update(UPDATE_FUNC_ARGS)
 							if (rng.chance(1, 50))
 							{
 								//@ PLNT + WATR -> 2xPLNT
-								auto np = sim->create_part(ID(r),x+rx,y+ry,PT_PLNT);
+								auto np = sim->create_part_outer(ID(r),x+rx,y+ry,PT_PLNT);
 								if (np<0) continue;
 								parts[np].life = 0;
 								parts[np].ctype = parts[i].ctype;//Keep the color identical
@@ -285,7 +285,7 @@ static int update(UPDATE_FUNC_ARGS)
 							if (rng.chance(1, 50))
 							{
 								//@ PLNT + LAVA -> FIRE + LAVA
-								sim->part_change_type(i,x,y,PT_FIRE);
+								sim->part_change_type_outer(i,x,y,PT_FIRE);
 								parts[i].life = 4;
 							}
 							break;
@@ -293,7 +293,7 @@ static int update(UPDATE_FUNC_ARGS)
 						case PT_CO2:
 							if (rng.chance(1, 50))
 							{
-								sim->kill_part(ID(r));
+								sim->kill_part_outer(ID(r));
 								parts[i].life = rng.between(60, 119);
 							}
 							break;
@@ -310,7 +310,7 @@ static int update(UPDATE_FUNC_ARGS)
 									{
 										if (pmap[y+ry+nny][x+rx+nnx])
 											continue;
-										auto np = sim->create_part(-1,x+rx+nnx,y+ry+nny,PT_VINE);
+										auto np = sim->create_part_outer(-1,x+rx+nnx,y+ry+nny,PT_VINE);
 										if (np<0) continue;
 										parts[np].temp = parts[i].temp;
 									}
@@ -334,7 +334,7 @@ static int update(UPDATE_FUNC_ARGS)
 						auto r = pmap[y+ry][x+rx];
 						//@ PLNT + SMKE/CO2 -> PLNT + O2
 						if (!r)
-							sim->create_part(-1,x+rx,y+ry,PT_O2);
+							sim->create_part_outer(-1,x+rx,y+ry,PT_O2);
 					}
 				}
 			}

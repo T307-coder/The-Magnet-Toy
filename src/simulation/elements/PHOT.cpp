@@ -61,7 +61,7 @@ static int update(UPDATE_FUNC_ARGS)
 	auto &elements = sd.elements;
 
 	if (!(parts[i].ctype&0x3FFFFFFF)) {
-		sim->kill_part(i);
+		sim->kill_part_outer(i);
 		return 1;
 	}
 	if (parts[i].temp > 506)
@@ -81,7 +81,7 @@ static int update(UPDATE_FUNC_ARGS)
 					parts[i].vx *= 0.90f;
 					parts[i].vy *= 0.90f;
 					//@ PHOT + ISOZ/ISZS -> 2xPHOT
-					sim->create_part(ID(r), x+rx, y+ry, PT_PHOT);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_PHOT);
 					auto rrr = rng.between(0, 359) * std::numbers::pi_v<float> / 180.0f;
 					int rr;
 					if (TYP(r) == PT_ISOZ)
@@ -123,16 +123,16 @@ static int update(UPDATE_FUNC_ARGS)
 				if(ct_under > 0 && ct_under < PT_NUM)
 				{
 					//@ PHOT + RSST(ctype) -> ctype
-					sim->create_part(ID(r), x, y, ct_under);
+					sim->create_part_outer(ID(r), x, y, ct_under);
 
 					//If there's a correct tmp set, use it for ctype
 					if((tmp_under > 0) && (tmp_under < PT_NUM) && (elements[ct_under].CarriesTypeIn & (1U << FIELD_CTYPE)))
 						parts[ID(r)].ctype = tmp_under;
 				}
 				else //@ PHOT + RSST -> RSSS
-					sim->part_change_type(ID(r), x, y, PT_RSSS); //Default to RSSS if no ctype
+					sim->part_change_type_outer(ID(r), x, y, PT_RSSS); //Default to RSSS if no ctype
 
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 
 				return 1;
 			}

@@ -66,8 +66,8 @@ static void wtrv_reactions(int wtrv1_id, UPDATE_FUNC_ARGS)
 				//@ PTNM + WTRV + BCOL -> PTNM + OIL
 				if (rt == PT_BCOL && parts[ID(r)].temp > 200.0f + 273.15f && parts[wtrv1_id].temp > 200.0f + 273.15f && sim->pv[(y + ry) / CELL][(x + rx) / CELL] > 7.f)
 				{
-					sim->part_change_type(ID(r), x + rx, y + ry, PT_OIL);
-					sim->kill_part(wtrv1_id);
+					sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_OIL);
+					sim->kill_part_outer(wtrv1_id);
 					return;
 				}
 			}
@@ -91,22 +91,22 @@ static void hygn_reactions(int hygn1_id, UPDATE_FUNC_ARGS)
 				//@ PTNM + H2 + DESL -> PTNM + OIL + WATR
 				if (rt == PT_DESL)
 				{
-					sim->part_change_type(ID(r), x + rx, y + ry, PT_WATR);
-					sim->part_change_type(hygn1_id, (int)(parts[hygn1_id].x + 0.5f), (int)(parts[hygn1_id].y + 0.5f), PT_OIL);
+					sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_WATR);
+					sim->part_change_type_outer(hygn1_id, (int)(parts[hygn1_id].x + 0.5f), (int)(parts[hygn1_id].y + 0.5f), PT_OIL);
 					return;
 				}
 
 				//@ PTNM + H2 + O2 -> PTNM + 2xDSTW
 				if (rt == PT_O2 && !parts[i].life)
 				{
-					sim->part_change_type(ID(r), x + rx, y + ry, PT_DSTW);
-					sim->part_change_type(hygn1_id, (int)(parts[hygn1_id].x + 0.5f), (int)(parts[hygn1_id].y + 0.5f), PT_DSTW);
+					sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_DSTW);
+					sim->part_change_type_outer(hygn1_id, (int)(parts[hygn1_id].x + 0.5f), (int)(parts[hygn1_id].y + 0.5f), PT_DSTW);
 					parts[ID(r)].temp += 5.0f;
 					parts[hygn1_id].temp += 5.0f;
 
 					parts[i].ctype = PT_PTNM;
 					parts[i].life = 4;
-					sim->part_change_type(i, x, y, PT_SPRK);
+					sim->part_change_type_outer(i, x, y, PT_SPRK);
 					return;
 				}
 
@@ -114,14 +114,14 @@ static void hygn_reactions(int hygn1_id, UPDATE_FUNC_ARGS)
 				if (rt == PT_H2 && rng.chance(1, 1000) && parts[ID(r)].temp > 500.0f + 273.15f && parts[hygn1_id].temp > 500.0f + 273.15f)
 				{
 					//@ PTNM + 2xH2 -> PTNM + NBLE + NEUT + PHOT + maybe ELEC
-					sim->part_change_type(ID(r), x + rx, y + ry, PT_NBLE);
-					sim->part_change_type(hygn1_id, (int)(parts[hygn1_id].x + 0.5f), (int)(parts[hygn1_id].y + 0.5f), PT_NEUT);
+					sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_NBLE);
+					sim->part_change_type_outer(hygn1_id, (int)(parts[hygn1_id].x + 0.5f), (int)(parts[hygn1_id].y + 0.5f), PT_NEUT);
 
 					parts[ID(r)].temp += 1000.0f;
 					parts[hygn1_id].temp += 1000.0f;
 					sim->pv[(y + ry) / CELL][(x + rx) / CELL] += 10.0f;
 
-					int j = sim->create_part(-3, x + rx, y + ry, PT_PHOT);
+					int j = sim->create_part_outer(-3, x + rx, y + ry, PT_PHOT);
 					if (j > -1)
 					{
 						parts[j].ctype = 0x7C0000;
@@ -130,7 +130,7 @@ static void hygn_reactions(int hygn1_id, UPDATE_FUNC_ARGS)
 					}
 					if (rng.chance(1, 10))
 					{
-						int j = sim->create_part(-3, x + rx, y + ry, PT_ELEC);
+						int j = sim->create_part_outer(-3, x + rx, y + ry, PT_ELEC);
 						if (j > -1)
 							parts[j].temp = parts[ID(r)].temp;
 					}
@@ -158,7 +158,7 @@ static int update(UPDATE_FUNC_ARGS)
 			int r = pmap[y + ry][x + rx];
 			if (r && TYP(r) == PT_SPRK && parts[ID(r)].life && parts[ID(r)].life < 4)
 			{
-				sim->part_change_type(i, x, y, PT_SPRK);
+				sim->part_change_type_outer(i, x, y, PT_SPRK);
 				parts[i].life = 4;
 				parts[i].ctype = PT_PTNM;
 			}
@@ -196,7 +196,7 @@ static int update(UPDATE_FUNC_ARGS)
 					case PT_SHLD2: next = PT_SHLD3; break;
 					case PT_SHLD3: next = PT_SHLD4; break;
 					}
-					sim->part_change_type(ID(r), x + rx, y + ry, next);
+					sim->part_change_type_outer(ID(r), x + rx, y + ry, next);
 					parts[ID(r)].life = 7;
 					continue;
 				}
@@ -204,8 +204,8 @@ static int update(UPDATE_FUNC_ARGS)
 				//@ PTNM + ISZS/ISOZ -> PTNM + PLUT + PHOT
 				if (rt == PT_ISZS || rt == PT_ISOZ)
 				{
-					sim->part_change_type(ID(r), x + rx, y + ry, PT_PLUT);
-					sim->create_part(-3, x + rx, y + ry, PT_PHOT);
+					sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_PLUT);
+					sim->create_part_outer(-3, x + rx, y + ry, PT_PHOT);
 					continue;
 				}
 
@@ -223,7 +223,7 @@ static int update(UPDATE_FUNC_ARGS)
 						if (parts[ID(r)].temp >= 200.0f + 273.15f && sim->pv[(y + ry) / CELL][(x + rx) / CELL] > 2.0f)
 						{
 							//@ PTNM + GAS -> PTNM + INSL
-							sim->part_change_type(ID(r), x + rx, y + ry, PT_INSL);
+							sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_INSL);
 							parts[i].temp += 60.0f; // Other part is INSL, adding temp is useless
 						}
 						break;
@@ -232,18 +232,18 @@ static int update(UPDATE_FUNC_ARGS)
 						if (parts[ID(r)].temp > 1000.0f + 273.15f && sim->pv[(y + ry) / CELL][(x + rx) / CELL] > 50.0f)
 						{
 							//@ PTNM + BREC -> PTNM + EXOT
-							sim->part_change_type(ID(r), x + rx, y + ry, PT_EXOT);
+							sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_EXOT);
 							parts[ID(r)].temp -= 30.0f;
 							parts[i].temp -= 30.0f;
 						}
 						break;
 
 					case PT_SMKE: //@ PTNM + SMKE -> PTNM + CO2
-						sim->part_change_type(ID(r), x + rx, y + ry, PT_CO2);
+						sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_CO2);
 						break;
 
 					case PT_RSST: //@ PTNM + RSST -> PTNM + BIZR
-						sim->create_part(ID(r), x + rx, y + ry, PT_BIZR);
+						sim->create_part_outer(ID(r), x + rx, y + ry, PT_BIZR);
 						break;
 					}
 				}
@@ -304,7 +304,7 @@ static int update(UPDATE_FUNC_ARGS)
 	// Charge diffusion: equalize between conductors (DEUT-style)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

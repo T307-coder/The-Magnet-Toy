@@ -52,7 +52,7 @@ static int update(UPDATE_FUNC_ARGS)
 	if (rng.chance(1, 200) && rng.chance(int(-4.0f * sim->pv[y/CELL][x/CELL]), 1000))
 	{
 		//@ ISOZ -> PHOT
-		sim->create_part(i, x, y, PT_PHOT);
+		sim->create_part_outer(i, x, y, PT_PHOT);
 		rr = rng.between(128, 355) / 127.0f;
 		rrr = rng.between(0, 359) * std::numbers::pi_v<float> / 180.0f;
 		parts[i].vx = rr*cosf(rrr);

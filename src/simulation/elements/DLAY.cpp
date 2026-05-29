@@ -89,7 +89,7 @@ static int update(UPDATE_FUNC_ARGS)
 				}
 				else if(TYP(r)==PT_NSCN && oldl==1)
 				{
-					sim->create_part(-1, x+rx, y+ry, PT_SPRK);
+					sim->create_part_outer(-1, x+rx, y+ry, PT_SPRK);
 				}
 			}
 		}

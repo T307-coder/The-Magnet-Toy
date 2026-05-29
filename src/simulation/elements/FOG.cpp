@@ -62,7 +62,7 @@ static int update(UPDATE_FUNC_ARGS)
 				if ((elements[TYP(r)].Properties&TYPE_SOLID) && rng.chance(1, 10) && parts[i].life==0 && !(TYP(r)==PT_CLNE || TYP(r)==PT_PCLN)) // TODO: should this also exclude BCLN?
 				{
 					//@ FOG -> RIME
-					sim->part_change_type(i,x,y,PT_RIME);
+					sim->part_change_type_outer(i,x,y,PT_RIME);
 				}
 				if (TYP(r)==PT_SPRK)
 				{
@@ -70,7 +70,7 @@ static int update(UPDATE_FUNC_ARGS)
 				}
 				if (TYP(r) == PT_GAS && parts[i].tmp < 10)
 				{
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 					parts[i].tmp++;
 				}
 			}

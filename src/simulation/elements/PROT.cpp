@@ -66,7 +66,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		//remove active sparks
 		int sparked = parts[uID].ctype;
-		if (!sim->part_change_type(uID, x, y, sparked))
+		if (!sim->part_change_type_outer(uID, x, y, sparked))
 		{
 			parts[uID].life = 44 + parts[uID].life;
 			parts[uID].ctype = 0;
@@ -79,7 +79,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (rng.chance(-((int)sim->pv[y / CELL][x / CELL] - 4) + (parts[uID].life / 100), 200))
 		{
 			DeutImplosion(sim, parts[uID].life, x, y, restrict_flt(parts[uID].temp + parts[uID].life * 500, MIN_TEMP, MAX_TEMP), PT_PROT);
-			sim->kill_part(uID);
+			sim->kill_part_outer(uID);
 		}
 		break;
 	case PT_LCRY:
@@ -87,7 +87,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (parts[uID].life > 5 && rng.chance(1, 10))
 		{
 			//@ PROT + LCRY -> PHOT + LCRY
-			sim->part_change_type(i, x, y, PT_PHOT);
+			sim->part_change_type_outer(i, x, y, PT_PHOT);
 			parts[i].life *= 2;
 			parts[i].ctype = 0x3FFFFFFF;
 		}
@@ -106,8 +106,8 @@ static int update(UPDATE_FUNC_ARGS)
 		break;
 	case PT_RSSS: //Destroy RSSS
 		{
-			sim->kill_part(uID);
-			sim->kill_part(i);
+			sim->kill_part_outer(uID);
+			sim->kill_part_outer(i);
 			return 1;
 		}
 		break;
@@ -132,7 +132,7 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			if (!--parts[i].life)
 			{
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 				return 1;
 			}
 		}
@@ -141,7 +141,7 @@ static int update(UPDATE_FUNC_ARGS)
 		//set off explosives (only when hot because it wasn't as fun when it made an entire save explode)
 		if (parts[i].temp > 273.15f + 500.0f && (elements[utype].Flammable || elements[utype].Explosive || utype == PT_BANG))
 		{
-			sim->create_part(uID, x, y, PT_FIRE);
+			sim->create_part_outer(uID, x, y, PT_FIRE);
 			parts[uID].temp += restrict_flt(float(elements[utype].Flammable * 5), MIN_TEMP, MAX_TEMP);
 			sim->pv[y / CELL][x / CELL] += 1.00f;
 		}
@@ -182,10 +182,10 @@ static int update(UPDATE_FUNC_ARGS)
 			element = PT_CO2; //@ PROT -> CO2
 		else
 			element = PT_NBLE; //@ PROT -> NBLE
-		newID = sim->create_part(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), element);
+		newID = sim->create_part_outer(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), element);
 		if (newID >= 0)
 			parts[newID].temp = restrict_flt(100.0f*parts[i].tmp, MIN_TEMP, MAX_TEMP);
-		sim->kill_part(i);
+		sim->kill_part_outer(i);
 		return 1;
 	}
 	//collide with other protons to make heavier materials
@@ -201,7 +201,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (difference > 3.12659f && difference < 3.15659f && velocity1 + velocity2 > 10.0f)
 		{
 			parts[ID(ahead)].tmp += (int)(velocity1 + velocity2);
-			sim->kill_part(i);
+			sim->kill_part_outer(i);
 			return 1;
 		}
 	}
@@ -257,7 +257,7 @@ static int DeutImplosion(auto *sim, int n, int x, int y, float temp, int t)
 
 	for (int c = 0; c < n; c++)
 	{
-		i = sim->create_part(-3, x, y, t);
+		i = sim->create_part_outer(-3, x, y, t);
 		if (i >= 0)
 			sim->parts[i].temp = temp;
 		else if (sim->MaxPartsReached())

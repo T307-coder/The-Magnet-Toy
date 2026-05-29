@@ -92,7 +92,7 @@ static int update(UPDATE_FUNC_ARGS)
 						continue;
 					if (TYP(r) != PT_CONV && TYP(r) != PT_DMND && TYP(r) != ctype)
 					{
-						sim->create_part(ID(r), x+rx, y+ry, TYP(parts[i].ctype), ID(parts[i].ctype));
+						sim->create_part_outer(ID(r), x+rx, y+ry, TYP(parts[i].ctype), ID(parts[i].ctype));
 					}
 				}
 			}

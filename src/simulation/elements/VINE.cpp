@@ -62,13 +62,13 @@ static int update(UPDATE_FUNC_ARGS)
 		auto r = pmap[y+ry][x+rx];
 		//@ VINE -> PLNT
 		if (!(rndstore % 15))
-			sim->part_change_type(i, x, y, PT_PLNT);
+			sim->part_change_type_outer(i, x, y, PT_PLNT);
 		else if (!r)
 		{
-			auto np = sim->create_part(-1,x+rx,y+ry,PT_VINE);
+			auto np = sim->create_part_outer(-1,x+rx,y+ry,PT_VINE);
 			if (np<0) return 0;
 			parts[np].temp = parts[i].temp;
-			sim->part_change_type(i,x,y,PT_PLNT);
+			sim->part_change_type_outer(i,x,y,PT_PLNT);
 		}
 	}
 	if (parts[i].temp > 350 && parts[i].temp > parts[i].tmp2)

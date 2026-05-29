@@ -62,7 +62,7 @@ int Element_VIRS_update(UPDATE_FUNC_ARGS)
 		//has been cured, so change back into the original element
 		if (!parts[i].tmp3)
 		{
-			sim->part_change_type(i,x,y,parts[i].tmp2);
+			sim->part_change_type_outer(i,x,y,parts[i].tmp2);
 			parts[i].tmp2 = 0;
 			parts[i].tmp3 = 0;
 			parts[i].tmp4 = 0;
@@ -75,7 +75,7 @@ int Element_VIRS_update(UPDATE_FUNC_ARGS)
 	{
 		if (!(rndstore & 0x7) && --parts[i].tmp4 <= 0)
 		{
-			sim->kill_part(i);
+			sim->kill_part_outer(i);
 			return 1;
 		}
 		rndstore >>= 3;
@@ -102,7 +102,7 @@ int Element_VIRS_update(UPDATE_FUNC_ARGS)
 				{
 					parts[i].tmp3 += 10;
 					if (!(rndstore & 0x3))
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 					return 0;
 				}
 				else if (TYP(r) == PT_PLSM)
@@ -110,7 +110,7 @@ int Element_VIRS_update(UPDATE_FUNC_ARGS)
 					if (surround_space && rng.chance(10 + int(sim->pv[(y+ry)/CELL][(x+rx)/CELL]), 100))
 					{
 						//@ VIRS/VRSS/VRSG + PLSM -> 2xPLSM
-						sim->create_part(i, x, y, PT_PLSM);
+						sim->create_part_outer(i, x, y, PT_PLSM);
 						return 1;
 					}
 				}
@@ -126,11 +126,11 @@ int Element_VIRS_update(UPDATE_FUNC_ARGS)
 						else
 							parts[ID(r)].tmp4 = 0;
 						if (parts[ID(r)].temp < 305.0f)
-							sim->part_change_type(ID(r), x+rx, y+ry, PT_VRSS);
+							sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_VRSS);
 						else if (parts[ID(r)].temp > 673.0f)
-							sim->part_change_type(ID(r), x+rx, y+ry, PT_VRSG);
+							sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_VRSG);
 						else
-							sim->part_change_type(ID(r), x+rx, y+ry, PT_VIRS);
+							sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_VIRS);
 					}
 					rndstore >>= 3;
 				}

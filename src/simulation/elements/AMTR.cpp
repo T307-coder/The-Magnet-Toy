@@ -64,14 +64,14 @@ static int update(UPDATE_FUNC_ARGS)
 					parts[i].life++;
 					if (parts[i].life==4)
 					{
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 					//@ AMTR + anything -> AMTR + PHOT
 					if (rng.chance(1, 10))
-						sim->create_part(ID(r), x+rx, y+ry, PT_PHOT);
+						sim->create_part_outer(ID(r), x+rx, y+ry, PT_PHOT);
 					else
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 					sim->pv[y/CELL][x/CELL] -= 2.0f;
 				}
 			}

@@ -137,20 +137,20 @@ static int update(UPDATE_FUNC_ARGS)
 							if (isEnergy)
 							{
 								if (sim->photons[yCopyTo][xCopyTo])
-									sim->kill_part(ID(sim->photons[yCopyTo][xCopyTo]));
+									sim->kill_part_outer(ID(sim->photons[yCopyTo][xCopyTo]));
 							}
 							else
 							{
 								if (pmap[yCopyTo][xCopyTo])
-									sim->kill_part(ID(pmap[yCopyTo][xCopyTo]));
+									sim->kill_part_outer(ID(pmap[yCopyTo][xCopyTo]));
 							}
 						}
 						if (type == PT_SPRK) // spark hack
-							p = sim->create_part(-1, xCopyTo, yCopyTo, PT_METL);
+							p = sim->create_part_outer(-1, xCopyTo, yCopyTo, PT_METL);
 						else if (type == PT_STKM || type == PT_STKM2)
 							continue; // do not try to copy these non-copyable particles
 						else if (type)
-							p = sim->create_part(-1, xCopyTo, yCopyTo, type);
+							p = sim->create_part_outer(-1, xCopyTo, yCopyTo, type);
 						else
 							continue;
 
@@ -158,7 +158,7 @@ static int update(UPDATE_FUNC_ARGS)
 						if (p >= 0)
 						{
 							if (type == PT_SPRK) // spark hack
-								sim->part_change_type(p, xCopyTo, yCopyTo, PT_SPRK);
+								sim->part_change_type_outer(p, xCopyTo, yCopyTo, PT_SPRK);
 
 							if (isEnergy)
 								parts[p] = parts[ID(sim->photons[yCurrent][xCurrent])];

@@ -80,14 +80,14 @@ static int update(UPDATE_FUNC_ARGS)
 					int randomness = (count + rng.between(-1, 1) + 4) % 8;//add -1,0,or 1 to count
 					if (sim->portalp[parts[i].tmp][randomness][nnx].type==PT_SPRK)// TODO: make it look better, spark creation
 					{
-						sim->create_part(-1,x+1,y,PT_SPRK);
-						sim->create_part(-1,x+1,y+1,PT_SPRK);
-						sim->create_part(-1,x+1,y-1,PT_SPRK);
-						sim->create_part(-1,x,y-1,PT_SPRK);
-						sim->create_part(-1,x,y+1,PT_SPRK);
-						sim->create_part(-1,x-1,y+1,PT_SPRK);
-						sim->create_part(-1,x-1,y,PT_SPRK);
-						sim->create_part(-1,x-1,y-1,PT_SPRK);
+						sim->create_part_outer(-1,x+1,y,PT_SPRK);
+						sim->create_part_outer(-1,x+1,y+1,PT_SPRK);
+						sim->create_part_outer(-1,x+1,y-1,PT_SPRK);
+						sim->create_part_outer(-1,x,y-1,PT_SPRK);
+						sim->create_part_outer(-1,x,y+1,PT_SPRK);
+						sim->create_part_outer(-1,x-1,y+1,PT_SPRK);
+						sim->create_part_outer(-1,x-1,y,PT_SPRK);
+						sim->create_part_outer(-1,x-1,y-1,PT_SPRK);
 						memset(&sim->portalp[parts[i].tmp][randomness][nnx], 0, sizeof(Particle));
 						break;
 					}
@@ -102,7 +102,7 @@ static int update(UPDATE_FUNC_ARGS)
 							sim->fighcount--;
 							sim->fighters[(unsigned char)sim->portalp[parts[i].tmp][randomness][nnx].tmp].spwn = 0;
 						}
-						auto np = sim->create_part(-1, x+rx, y+ry, sim->portalp[parts[i].tmp][randomness][nnx].type);
+						auto np = sim->create_part_outer(-1, x+rx, y+ry, sim->portalp[parts[i].tmp][randomness][nnx].type);
 						if (np<0)
 						{
 							if (sim->portalp[parts[i].tmp][randomness][nnx].type==PT_STKM)

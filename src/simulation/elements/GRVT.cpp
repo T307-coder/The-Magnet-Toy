@@ -66,7 +66,7 @@ static int update(UPDATE_FUNC_ARGS)
 	if((utype == PT_RSSS) && rng.chance(1, 5))
 	{
 
-		sim->kill_part(i);
+		sim->kill_part_outer(i);
 		return 1;
 	}
 	sim->gravIn.mass[Vec2{ x, y } / CELL] = 0.2f * parts[i].tmp;

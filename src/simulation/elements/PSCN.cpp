@@ -44,7 +44,7 @@ void Element::Element_PSCN()
 	HighTemperature = 1687.0f;
 	HighTemperatureTransition = PT_LAVA; //@ PSCN -> LAVA(PSCN)
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 }
 
 static int update(UPDATE_FUNC_ARGS)
@@ -87,7 +87,7 @@ static int update(UPDATE_FUNC_ARGS)
 	// Charge diffusion: equalize between conductors (DEUT-style)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

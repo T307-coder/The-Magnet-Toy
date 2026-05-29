@@ -57,7 +57,7 @@ static int update(UPDATE_FUNC_ARGS)
 		sim->pv[y/CELL][x/CELL] = restrict_flt(sim->pv[y/CELL][x/CELL] + (parts[i].tmp2 / 5000) * CFDS, MIN_PRESSURE, MAX_PRESSURE);
 		//@ WARP -> WARP + ELEC
 		if (rng.chance(1, 50))
-			sim->create_part(-3, x, y, PT_ELEC);
+			sim->create_part_outer(-3, x, y, PT_ELEC);
 	}
 	for (int trade = 0; trade < 5; trade ++)
 	{

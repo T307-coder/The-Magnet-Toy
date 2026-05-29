@@ -88,7 +88,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if (burnTimer > 1012 && rng.chance(1, 10))
 					{
 						//@ LITH -> LITH + FIRE
-						sim->create_part(-1, x + rx, y + ry, PT_FIRE);
+						sim->create_part_outer(-1, x + rx, y + ry, PT_FIRE);
 					}
 					continue;
 				}
@@ -106,7 +106,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if (burnTimer > 1016)
 					{
 						//@ LITH + SLTW/WATR/DSTW/CBNW -> LITH + WTRV
-						sim->part_change_type(ID(neighborData), x + rx, y + ry, PT_WTRV);
+						sim->part_change_type_outer(ID(neighborData), x + rx, y + ry, PT_WTRV);
 						neighbor.temp = 440.f;
 						continue;
 					}
@@ -118,13 +118,13 @@ static int update(UPDATE_FUNC_ARGS)
 					if (self.temp > 440.f)
 					{
 						burnTimer = 1024 + (storedEnergy > 24 ? 96 : storedEnergy * 4);
-						sim->part_change_type(ID(neighborData), x + rx, y + ry, PT_H2);
+						sim->part_change_type_outer(ID(neighborData), x + rx, y + ry, PT_H2);
 						hydrogenationFactor = 10;
 					}
 					else
 					{
 						self.temp = restrict_flt(self.temp + 20.365f + storedEnergy * storedEnergy * 1.5f, MIN_TEMP, MAX_TEMP);
-						sim->part_change_type(ID(neighborData), x + rx, y + ry, PT_H2);
+						sim->part_change_type_outer(ID(neighborData), x + rx, y + ry, PT_H2);
 						hydrogenationFactor += 1;
 					}
 					break;
@@ -134,7 +134,7 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						continue;
 					}
-					sim->kill_part(ID(neighborData));
+					sim->kill_part_outer(ID(neighborData));
 					carbonationFactor += 1;
 					break;
 
@@ -160,7 +160,7 @@ static int update(UPDATE_FUNC_ARGS)
 					}
 					if (neighbor.life == 0 && storedEnergy > 0 && !burnTimer)
 					{
-						sim->part_change_type(ID(neighborData), x + rx, y + ry, PT_SPRK);
+						sim->part_change_type_outer(ID(neighborData), x + rx, y + ry, PT_SPRK);
 						neighbor.life = 4;
 						neighbor.ctype = PT_NSCN;
 						discharged = true;
@@ -179,8 +179,8 @@ static int update(UPDATE_FUNC_ARGS)
 					if (burnTimer > 1000 && rng.chance(1, 10))
 					{
 						//@ LITH + O2 -> 2xPLSM
-						sim->part_change_type(i, x, y, PT_PLSM);
-						sim->part_change_type(ID(neighborData), x + rx, y + ry, PT_PLSM);
+						sim->part_change_type_outer(i, x, y, PT_PLSM);
+						sim->part_change_type_outer(ID(neighborData), x + rx, y + ry, PT_PLSM);
 						sim->pv[y / CELL][x / CELL] += 4.0;
 						return 0;
 					}						
@@ -234,7 +234,7 @@ static int update(UPDATE_FUNC_ARGS)
 	if (burnTimer == 1000)
 	{
 		burnTimer = 0;
-		sim->part_change_type(i, x, y, PT_LAVA);
+		sim->part_change_type_outer(i, x, y, PT_LAVA);
 		if (carbonationFactor < 3)
 		{
 			self.temp = restrict_flt(500.f + storedEnergy * 10, MIN_TEMP, MAX_TEMP);
@@ -305,7 +305,7 @@ static int update(UPDATE_FUNC_ARGS)
 	// Charge diffusion: equalize between conductors (DEUT-style, uses tmp3)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

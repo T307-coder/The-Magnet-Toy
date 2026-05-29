@@ -85,14 +85,14 @@ static int update(UPDATE_FUNC_ARGS)
 		else if (rng.chance(1, 100))
 		{
 			//@ TUNG -> FIRE
-			sim->part_change_type(i, x, y, PT_FIRE);
+			sim->part_change_type_outer(i, x, y, PT_FIRE);
 			parts[i].life = rng.between(0, 499);
 			return 1;
 		}
 		else
 		{
 			//@ TUNG -> LAVA(TUNG)
-			sim->part_change_type(i, x, y, PT_LAVA);
+			sim->part_change_type_outer(i, x, y, PT_LAVA);
 			parts[i].ctype = PT_TUNG;
 			return 1;
 		}
@@ -109,7 +109,7 @@ static int update(UPDATE_FUNC_ARGS)
 	if (diff > 32 || diff < -32)
 	{
 		//@ TUNG -> BRMT(TUNG)
-		sim->part_change_type(i,x,y,PT_BRMT);
+		sim->part_change_type_outer(i,x,y,PT_BRMT);
 		parts[i].ctype = PT_TUNG;
 		return 1;
 	}
@@ -155,7 +155,7 @@ static int update(UPDATE_FUNC_ARGS)
 	// Charge diffusion: equalize between conductors (DEUT-style)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

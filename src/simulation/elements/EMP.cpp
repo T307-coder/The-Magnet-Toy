@@ -125,9 +125,9 @@ void Element_EMP_Trigger(auto *sim, RNG &rng, int triggerCount)
 				if (rng.uniform01() < prob_changeCenter)
 				{
 					if (rng.chance(2, 5))
-						sim->part_change_type(r, rx, ry, PT_BREC);
+						sim->part_change_type_outer(r, rx, ry, PT_BREC);
 					else
-						sim->part_change_type(r, rx, ry, PT_NTCT);
+						sim->part_change_type_outer(r, rx, ry, PT_NTCT);
 				}
 			}
 			for (int nx =-2; nx <= 2; nx++)
@@ -150,10 +150,10 @@ void Element_EMP_Trigger(auto *sim, RNG &rng, int triggerCount)
 								if (rng.uniform01() < prob_breakMETL)
 								{
 									//@ EMP + METL -> EMP + BMTL/BRMT
-									sim->part_change_type(n, rx+nx, ry+ny, PT_BMTL);
+									sim->part_change_type_outer(n, rx+nx, ry+ny, PT_BMTL);
 									if (rng.uniform01() < prob_breakMETLMore)
 									{
-										sim->part_change_type(n, rx+nx, ry+ny, PT_BRMT);
+										sim->part_change_type_outer(n, rx+nx, ry+ny, PT_BRMT);
 										parts[n].temp = restrict_flt(parts[n].temp+1000.0f, MIN_TEMP, MAX_TEMP);
 									}
 								}
@@ -163,7 +163,7 @@ void Element_EMP_Trigger(auto *sim, RNG &rng, int triggerCount)
 								temp_metal.apply(rng, parts[n]);
 								if (rng.uniform01() < prob_breakBMTL)
 								{
-									sim->part_change_type(n, rx+nx, ry+ny, PT_BRMT);
+									sim->part_change_type_outer(n, rx+nx, ry+ny, PT_BRMT);
 									parts[n].temp = restrict_flt(parts[n].temp+1000.0f, MIN_TEMP, MAX_TEMP);
 								}
 								break;
@@ -176,7 +176,7 @@ void Element_EMP_Trigger(auto *sim, RNG &rng, int triggerCount)
 								//@ EMP + WIFI -> EMP + BREC
 								if (rng.uniform01() < prob_breakWIFI)
 								{
-									sim->create_part(n, rx+nx, ry+ny, PT_BREC);
+									sim->create_part_outer(n, rx+nx, ry+ny, PT_BREC);
 									parts[n].temp = restrict_flt(parts[n].temp+1000.0f, MIN_TEMP, MAX_TEMP);
 								}
 								continue;
@@ -189,14 +189,14 @@ void Element_EMP_Trigger(auto *sim, RNG &rng, int triggerCount)
 						case PT_SWCH:
 							//@ EMP + SWCH -> EMP + BREC
 							if (rng.uniform01() < prob_breakSWCH)
-								sim->part_change_type(n, rx+nx, ry+ny, PT_BREC);
+								sim->part_change_type_outer(n, rx+nx, ry+ny, PT_BREC);
 							temp_SWCH.apply(rng, parts[n]);
 							break;
 						case PT_ARAY:
 							//@ EMP + ARAY -> EMP + BREC
 							if (rng.uniform01() < prob_breakARAY)
 							{
-								sim->create_part(n, rx+nx, ry+ny, PT_BREC);
+								sim->create_part_outer(n, rx+nx, ry+ny, PT_BREC);
 								parts[n].temp = restrict_flt(parts[n].temp+1000.0f, MIN_TEMP, MAX_TEMP);
 							}
 							break;

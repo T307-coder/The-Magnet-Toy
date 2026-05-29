@@ -68,7 +68,7 @@ static int update(UPDATE_FUNC_ARGS)
 						if (parts[i].life<limit && rng.chance(500, absorbChanceDenom))
 						{
 							parts[i].life++;
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 						}
 						break;
 					case PT_SLTW:
@@ -76,9 +76,9 @@ static int update(UPDATE_FUNC_ARGS)
 						{
 							parts[i].life++;
 							if (rng.chance(3, 4))
-								sim->kill_part(ID(r));
+								sim->kill_part_outer(ID(r));
 							else //@ SPNG + SLTW -> SPNG + SALT
-								sim->part_change_type(ID(r), x+rx, y+ry, PT_SALT);
+								sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_SALT);
 						}
 						break;
 					case PT_CBNW:
@@ -86,7 +86,7 @@ static int update(UPDATE_FUNC_ARGS)
 						{
 							parts[i].life++;
 							//@ SPNG + CBNW -> SPNG + CO2
-							sim->part_change_type(ID(r), x+rx, y+ry, PT_CO2);
+							sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_CO2);
 						}
 						break;
 					case PT_PSTE:
@@ -94,7 +94,7 @@ static int update(UPDATE_FUNC_ARGS)
 						{
 							parts[i].life++;
 							//@ SPNG + PSTE -> SPNG + CLST
-							sim->create_part(ID(r), x+rx, y+ry, PT_CLST);
+							sim->create_part_outer(ID(r), x+rx, y+ry, PT_CLST);
 						}
 						break;
 					default:
@@ -116,7 +116,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if ((!r)&&parts[i].life>=1)//if nothing then create water
 					{
 						//@ SPNG -> SPNG + WATR
-						auto np = sim->create_part(-1,x+rx,y+ry,PT_WATR);
+						auto np = sim->create_part_outer(-1,x+rx,y+ry,PT_WATR);
 						if (np>-1) parts[i].life--;
 					}
 				}
@@ -190,7 +190,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if ((!r)&&parts[i].life>=1)//if nothing then create steam
 					{
 						//@ SPNG -> SPNG + WTRV
-						auto np = sim->create_part(-1,x+rx,y+ry,PT_WTRV);
+						auto np = sim->create_part_outer(-1,x+rx,y+ry,PT_WTRV);
 						if (np>-1)
 						{
 							parts[np].temp = parts[i].temp;

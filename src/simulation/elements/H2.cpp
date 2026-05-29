@@ -62,8 +62,8 @@ static int update(UPDATE_FUNC_ARGS)
 				if (sim->pv[y/CELL][x/CELL] > 8.0f && rt == PT_DESL)
 				{
 					//@ H2 + DESL -> OIL + WATR
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_WATR);
-					sim->part_change_type(i,x,y,PT_OIL);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_WATR);
+					sim->part_change_type_outer(i,x,y,PT_OIL);
 					return 1;
 				}
 				if (sim->pv[y/CELL][x/CELL] > 45.0f)
@@ -81,7 +81,7 @@ static int update(UPDATE_FUNC_ARGS)
 							parts[ID(r)].temp=2473.15f;
 						parts[ID(r)].tmp |= 1;
 						//@ H2 + FIRE -> 2xFIRE
-						sim->create_part(i,x,y,PT_FIRE);
+						sim->create_part_outer(i,x,y,PT_FIRE);
 						parts[i].temp += rng.between(0, 99);
 						parts[i].tmp |= 1;
 						return 1;
@@ -89,7 +89,7 @@ static int update(UPDATE_FUNC_ARGS)
 					else if ((rt==PT_PLSM && !(parts[ID(r)].tmp&4)) || (rt==PT_LAVA && parts[ID(r)].ctype != PT_BMTL))
 					{
 						//@ H2 + PLSM/LAVA -> FIRE + PLSM/LAVA
-						sim->create_part(i,x,y,PT_FIRE);
+						sim->create_part_outer(i,x,y,PT_FIRE);
 						parts[i].temp += rng.between(0, 99);
 						parts[i].tmp |= 1;
 						return 1;
@@ -104,21 +104,21 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			int j;
 			float temp = parts[i].temp;
-			sim->create_part(i,x,y,PT_NBLE);
+			sim->create_part_outer(i,x,y,PT_NBLE);
 			parts[i].tmp = 0x1;
 
 			//@ H2 -> NBLE + NEUT + PHOT
-			j = sim->create_part(-3,x,y,PT_NEUT);
+			j = sim->create_part_outer(-3,x,y,PT_NEUT);
 			if (j>-1)
 				parts[j].temp = temp;
 			if (rng.chance(1, 10))
 			{
 				//@ H2 -> NBLE + NEUT + PHOT + ELEC
-				j = sim->create_part(-3,x,y,PT_ELEC);
+				j = sim->create_part_outer(-3,x,y,PT_ELEC);
 				if (j>-1)
 					parts[j].temp = temp;
 			}
-			j = sim->create_part(-3,x,y,PT_PHOT);
+			j = sim->create_part_outer(-3,x,y,PT_PHOT);
 			if (j>-1)
 			{
 				parts[j].ctype = 0x7C0000;
@@ -129,7 +129,7 @@ static int update(UPDATE_FUNC_ARGS)
 			if (can_move[PT_PLSM][rt] || rt == PT_H2)
 			{
 				//@ H2 -> NBLE + NEUT + PHOT + ELEC + PLSM
-				j = sim->create_part(-3,rx,ry,PT_PLSM);
+				j = sim->create_part_outer(-3,rx,ry,PT_PLSM);
 				if (j>-1)
 				{
 					parts[j].temp = temp;

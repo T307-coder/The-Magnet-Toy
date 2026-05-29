@@ -64,7 +64,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if ((TYP(r)==PT_METL || TYP(r)==PT_IRON) && rng.chance(1, 100))
 					{
 						//@ BMTL + METL/IRON -> 2xBMTL
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_BMTL);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_BMTL);
 						parts[ID(r)].tmp = (parts[i].tmp<=7) ? parts[i].tmp=1 : parts[i].tmp - rng.between(0, 4);
 					}
 				}
@@ -75,7 +75,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		//@ BMTL -> BRMT
 		parts[i].tmp = 0;
-		sim->part_change_type(i,x,y,PT_BRMT);
+		sim->part_change_type_outer(i,x,y,PT_BRMT);
 	}
 	// Magnetization: contact with magnets + DEUT-style internal diffusion
 	int cx = x/CELL, cy = y/CELL;
@@ -103,18 +103,18 @@ static int update(UPDATE_FUNC_ARGS)
 	// Strong B-field breaks BMTL -> BRMT
 	if (sim->magnetismEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
 	{
-		if (fabsf(sim->bField[cy][cx]) > 2.0f && sim->rng.chance(1, 50))
+		if (fabsf(sim->bField[cy][cx]) > 2.0f && rng.chance(1, 50))
 		{
-			sim->part_change_type(i, x, y, PT_BRMT);
+			sim->part_change_type_outer(i, x, y, PT_BRMT);
 			return 1;
 		}
 	}
 	// Strong E-field breaks BMTL -> BRMT (dielectric breakdown)
 	if (sim->electricityEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
 	{
-		if (fabsf(sim->eField[cy][cx]) > 2.0f && sim->rng.chance(1, 50))
+		if (fabsf(sim->eField[cy][cx]) > 2.0f && rng.chance(1, 50))
 		{
-			sim->part_change_type(i, x, y, PT_BRMT);
+			sim->part_change_type_outer(i, x, y, PT_BRMT);
 			return 1;
 		}
 	}
@@ -156,7 +156,7 @@ static int update(UPDATE_FUNC_ARGS)
 	// Charge diffusion: equalize between conductors (DEUT-style)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

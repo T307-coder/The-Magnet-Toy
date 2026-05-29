@@ -80,7 +80,7 @@ static int update(UPDATE_FUNC_ARGS)
 						}
 					}
 					else if (rt==PT_SPRK && parts[i].life==10 && parts[ID(r)].life>0 && parts[ID(r)].ctype!=PT_PSCN && parts[ID(r)].ctype!=PT_NSCN) {
-						sim->part_change_type(i,x,y,PT_SPRK);
+						sim->part_change_type_outer(i,x,y,PT_SPRK);
 						parts[i].ctype = PT_SWCH;
 						parts[i].life = 4;
 					}

@@ -65,15 +65,15 @@ static int update(UPDATE_FUNC_ARGS)
 					if (rng.chance(1, 1500))
 					{
 						//@ CLST + WATR -> PSTS
-						sim->create_part(i, x, y, PT_PSTS);
-						sim->kill_part(ID(r));
+						sim->create_part_outer(i, x, y, PT_PSTS);
+						sim->kill_part_outer(ID(r));
 					}
 				}
 				else if (TYP(r)==PT_NITR)
 				{
 					//@ CLST + NITR -> 2xBANG
-					sim->create_part(i, x, y, PT_BANG);
-					sim->create_part(ID(r), x+rx, y+ry, PT_BANG);
+					sim->create_part_outer(i, x, y, PT_BANG);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_BANG);
 				}
 				else if (TYP(r)==PT_CLST)
 				{

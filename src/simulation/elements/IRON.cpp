@@ -94,7 +94,7 @@ static int update(UPDATE_FUNC_ARGS)
 	};
 	if (tryBreak())
 	{
-		sim->part_change_type(i,x,y,PT_BMTL);
+		sim->part_change_type_outer(i,x,y,PT_BMTL);
 		parts[i].tmp = rng.between(20, 29);
 	}
 	// Magnetization: contact with magnets + DEUT-style internal diffusion

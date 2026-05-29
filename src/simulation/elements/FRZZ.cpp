@@ -60,9 +60,9 @@ static int update(UPDATE_FUNC_ARGS)
 				if (TYP(r)==PT_WATR && rng.chance(1, 20))
 				{
 					//@ FRZZ + WATR -> FRZW
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_FRZW);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_FRZW);
 					parts[ID(r)].life = 100;
-					sim->kill_part(i);
+					sim->kill_part_outer(i);
 					return 1;
 				}
 			}

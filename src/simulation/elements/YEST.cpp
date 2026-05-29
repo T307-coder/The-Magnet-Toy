@@ -59,13 +59,13 @@ static int update(UPDATE_FUNC_ARGS)
 				if (TYP(r)==PT_DYST && rng.chance(1, 6) && !sim->legacy_enable)
 				{
 					//@ YEST -> DYST
-					sim->part_change_type(i,x,y,PT_DYST);
+					sim->part_change_type_outer(i,x,y,PT_DYST);
 				}
 			}
 		}
 	}
 	if (parts[i].temp > 303 && parts[i].temp < 317) {
-		sim->create_part(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_YEST);
+		sim->create_part_outer(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_YEST);
 	}
 	return 0;
 }

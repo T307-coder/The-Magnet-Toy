@@ -207,6 +207,25 @@ namespace
 		using Simulation::coordStack;
 		using Simulation::DispatchNewtonianGravity;
 		using Simulation::UpdateGravityMask;
+		using Simulation::magnetismEnabled;
+		using Simulation::inductionEnabled;
+		using Simulation::currentBFieldEnabled;
+		using Simulation::electricityEnabled;
+		using Simulation::sprkCurrentEnabled;
+		using Simulation::bField;
+		using Simulation::magSrc;
+		using Simulation::prevBField;
+		using Simulation::prevBFieldValid;
+		using Simulation::eField;
+		using Simulation::eSrc;
+		using Simulation::prevEField;
+		using Simulation::prevEFieldValid;
+		using Simulation::uniformBField;
+		using Simulation::ComputeBField;
+		using Simulation::ComputeEField;
+		using Simulation::signs;
+		using Simulation::useLuaCallbacks;
+		using Simulation::gravForceRecalc;
 		using PlanMoveResult = Simulation::PlanMoveResult;
 		using GetNormalResult = Simulation::GetNormalResult;
 
@@ -401,7 +420,7 @@ RNG &SimVariantImpl<Variant>::GetRng()
 }
 
 // Magnetic FFT Poisson solver for B-field computation
-struct Simulation::MagFFT
+struct CopiableSimulation::MagFFT
 {
 	fftwf_plan planForward = nullptr;
 	fftwf_plan planInverse = nullptr;
@@ -479,7 +498,7 @@ struct Simulation::MagFFT
 
 // GPUFFT: GPU-accelerated FFT Poisson solver (CPU fallback uses FFTW).
 // Interface matches MagFFT/ElecFFT: Init(w,h) + Solve(src,result,w,h)
-struct Simulation::GPUFFT
+struct CopiableSimulation::GPUFFT
 {
 	bool available = true; // true if any path (CPU or GPU) is usable
 
@@ -669,14 +688,14 @@ struct Simulation::GPUFFT
 #endif
 };
 
-void Simulation::InitMagFFT()
+void CopiableSimulation::InitMagFFT()
 {
 	if (!magFFT)
 		magFFT = std::make_unique<MagFFT>();
 	magFFT->Init(XCELLS, YCELLS);
 }
 
-void Simulation::ComputeBField()
+void CopiableSimulation::ComputeBField()
 {
 	if (!magnetismEnabled) return;
 
@@ -734,7 +753,7 @@ void Simulation::EnableSprkCurrent(bool enable)
 }
 
 // Electric FFT Poisson solver for E-field computation (identical to MagFFT)
-struct Simulation::ElecFFT
+struct CopiableSimulation::ElecFFT
 {
 	fftwf_plan planForward = nullptr;
 	fftwf_plan planInverse = nullptr;
@@ -810,14 +829,14 @@ struct Simulation::ElecFFT
 	}
 };
 
-void Simulation::InitElecFFT()
+void CopiableSimulation::InitElecFFT()
 {
 	if (!elecFFT)
 		elecFFT = std::make_unique<ElecFFT>();
 	elecFFT->Init(XCELLS, YCELLS);
 }
 
-void Simulation::ComputeEField()
+void CopiableSimulation::ComputeEField()
 {
 	if (!electricityEnabled) return;
 
@@ -843,20 +862,74 @@ void Simulation::ComputeEField()
 			eField[j][i] = result[j * XCELLS + i];
 }
 
-void Simulation::InitGPUFFT()
+void CopiableSimulation::InitGPUFFT()
 {
 	if (!gpuFFT)
 		gpuFFT = std::make_unique<GPUFFT>();
 	gpuFFT->Init(XCELLS, YCELLS);
 }
 
-void Simulation::EnableGPUFFT(bool enable)
+void CopiableSimulation::EnableGPUFFT(bool enable)
 {
 	if (enable && !gpuFFT)
 		InitGPUFFT();
 	gpuFFTEnabled = enable;
 	if (!enable && gpuFFT)
 		gpuFFT.reset();
+}
+
+CopiableSimulation &CopiableSimulation::operator =(const CopiableSimulation &other)
+{
+	// Manually copy all members except unique_ptrs (which are reset)
+	sharedRng = other.sharedRng;
+	replaceModeSelected = other.replaceModeSelected;
+	replaceModeFlags = other.replaceModeFlags;
+	debug_nextToUpdate = other.debug_nextToUpdate;
+	debug_mostRecentlyUpdated = other.debug_mostRecentlyUpdated;
+	memcpy(elementCount, other.elementCount, sizeof(elementCount));
+	ISWIRE = other.ISWIRE;
+	force_stacking_check = other.force_stacking_check;
+	emp_trigger_count = other.emp_trigger_count;
+	etrd_count_valid = other.etrd_count_valid;
+	etrd_life0_count = other.etrd_life0_count;
+	lightningRecreate = other.lightningRecreate;
+	gravWallChanged = other.gravWallChanged;
+	memcpy(portalp, other.portalp, sizeof(portalp));
+	memcpy(wireless, other.wireless, sizeof(wireless));
+	CGOL = other.CGOL;
+	GSPEED = other.GSPEED;
+	memcpy(fvx, other.fvx, sizeof(fvx));
+	memcpy(fvy, other.fvy, sizeof(fvy));
+	// Note: Element_PSTN_tempParts and Element_PPIP_ppip_changed are intentionally not copied
+	edgeMode = other.edgeMode;
+	gravityMode = other.gravityMode;
+	customGravityX = other.customGravityX;
+	customGravityY = other.customGravityY;
+	legacy_enable = other.legacy_enable;
+	water_equal_test = other.water_equal_test;
+	pretty_powder = other.pretty_powder;
+	sandcolour_frame = other.sandcolour_frame;
+	deco_space = other.deco_space;
+	elementRecount = other.elementRecount;
+	fighcount = other.fighcount;
+	frameCount = other.frameCount;
+	ensureDeterminism = other.ensureDeterminism;
+	NUM_PARTS = other.NUM_PARTS;
+	sandcolour = other.sandcolour;
+	sandcolour_interface = other.sandcolour_interface;
+	frameTime = other.frameTime;
+	threadCount = other.threadCount;
+
+	// unique_ptr members: take value but do NOT copy the FFT objects
+	// (callers should call Init*FFT as needed)
+	gpuFFTEnabled = other.gpuFFTEnabled;
+	magFFT.reset();
+	elecFFT.reset();
+	gpuFFT.reset();
+
+	// Copy RenderableSimulation base
+	static_cast<RenderableSimulation &>(*this) = static_cast<const RenderableSimulation &>(other);
+	return *this;
 }
 
 void Simulation::EnableElectricity(bool enable)

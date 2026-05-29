@@ -111,9 +111,9 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						sim->portalp[parts[i].tmp][count][nnx] = parts[ID(r)];
 						if (TYP(r) == PT_SPRK)
-							sim->part_change_type(ID(r),x+rx,y+ry,parts[ID(r)].ctype);
+							sim->part_change_type_outer(ID(r),x+rx,y+ry,parts[ID(r)].ctype);
 						else
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 						fe = 1;
 						break;
 					}

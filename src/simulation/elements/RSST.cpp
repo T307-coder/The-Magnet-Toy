@@ -62,17 +62,17 @@ int update(UPDATE_FUNC_ARGS)
 			//@ RSST + GUNP -> FIRW
 			if(TYP(r) == PT_GUNP)
 			{
-				sim->create_part(i, x, y, PT_FIRW);
-				sim->kill_part(ID(r));
+				sim->create_part_outer(i, x, y, PT_FIRW);
+				sim->kill_part_outer(ID(r));
 				return 1;
 			}
 
 			//@ RSST + BCOL -> FSEP
 			if(TYP(r) == PT_BCOL)
 			{
-				sim->create_part(i, x, y, PT_FSEP);
+				sim->create_part_outer(i, x, y, PT_FSEP);
 				parts[i].life = 50;
-				sim->kill_part(ID(r));
+				sim->kill_part_outer(ID(r));
 				return 1;
 			}
 

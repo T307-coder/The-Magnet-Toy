@@ -65,7 +65,7 @@ static int update(UPDATE_FUNC_ARGS)
 	auto &elements = sd.elements;
 	if (parts[i].tmp < 0 || parts[i].tmp >= MAX_FIGHTERS)
 	{
-		sim->kill_part(i);
+		sim->kill_part_outer(i);
 		return 1;
 	}
 	playerst* figh = &sim->fighters[(unsigned char)parts[i].tmp];

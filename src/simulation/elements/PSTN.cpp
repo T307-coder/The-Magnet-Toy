@@ -173,7 +173,7 @@ static int update(UPDATE_FUNC_ARGS)
 									if(newSpace) {
 										//Create new piston section
 										for(int j = 0; j < newSpace; j++) {
-											int nr = sim->create_part(-3, pistonEndX+(nxi*j), pistonEndY+(nyi*j), PT_PSTN);
+											int nr = sim->create_part_outer(-3, pistonEndX+(nxi*j), pistonEndY+(nyi*j), PT_PSTN);
 											if (nr > -1) {
 												parts[nr].life = 1;
 												if (parts[i].dcolour)
@@ -287,7 +287,7 @@ static int MoveStack(auto *sim, int stackX, int stackY, int directionX, int dire
 		//Remove arm section if retracting with FRME
 		if (retract)
 			for(int j = 1; j <= amount; j++)
-				sim->kill_part(ID(sim->pmap[stackY+(directionY*-j)][stackX+(directionX*-j)]));
+				sim->kill_part_outer(ID(sim->pmap[stackY+(directionY*-j)][stackX+(directionX*-j)]));
 		return MoveStack(sim, stackX, stackY, directionX, directionY, maxSize, amount, retract, block, !sim->parts[ID(sim->pmap[stackY][stackX])].tmp, 1);
 	}
 	if(retract){
@@ -295,7 +295,7 @@ static int MoveStack(auto *sim, int stackX, int stackY, int directionX, int dire
 		//Remove arm section if retracting without FRME
 		if (!callDepth)
 			for(int j = 1; j <= amount; j++)
-				sim->kill_part(ID(sim->pmap[stackY+(directionY*-j)][stackX+(directionX*-j)]));
+				sim->kill_part_outer(ID(sim->pmap[stackY+(directionY*-j)][stackX+(directionX*-j)]));
 		int currentPos = 0;
 		for(posX = stackX, posY = stackY; currentPos < maxSize && currentPos < XRES-1; posX += directionX, posY += directionY) {
 			if (!(posX < XRES && posY < YRES && posX >= 0 && posY >= 0)) {

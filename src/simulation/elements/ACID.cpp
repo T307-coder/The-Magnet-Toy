@@ -69,8 +69,8 @@ static int update(UPDATE_FUNC_ARGS)
 					if (rt == PT_PLEX || rt == PT_NITR || rt == PT_GUNP || rt == PT_RBDM || rt == PT_LRBD)
 					{
 						//@ ACID + PLEX/NITR/GUNP/RBDM/LRBD -> 2xFIRE
-						sim->part_change_type(i,x,y,PT_FIRE);
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_FIRE);
+						sim->part_change_type_outer(i,x,y,PT_FIRE);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_FIRE);
 						parts[i].life = 4;
 						parts[ID(r)].life = 4;
 					}
@@ -79,9 +79,9 @@ static int update(UPDATE_FUNC_ARGS)
 						if (rng.chance(1, 250))
 						{
 							//@ ACID + WTRV -> CAUS
-							sim->part_change_type(i, x, y, PT_CAUS);
+							sim->part_change_type_outer(i, x, y, PT_CAUS);
 							parts[i].life = rng.between(25, 74);
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 						}
 					}
 					else if (rt != PT_CLNE && rt != PT_PCLN && ((rt != PT_FOG && rt != PT_RIME) || parts[ID(r)].tmp <= 5) && parts[i].life > 50 && rng.chance(elements[rt].Hardness, 1000))
@@ -98,18 +98,18 @@ static int update(UPDATE_FUNC_ARGS)
 							{
 							case PT_LITH:
 								//@ ACID + LITH -> ACID + H2
-								sim->part_change_type(ID(r), x + rx, y + ry, PT_H2);
+								sim->part_change_type_outer(ID(r), x + rx, y + ry, PT_H2);
 								break;
 
 							default:
-								sim->kill_part(ID(r));
+								sim->kill_part_outer(ID(r));
 								break;
 							}
 						}
 					}
 					else if (parts[i].life<=50)
 					{
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 				}

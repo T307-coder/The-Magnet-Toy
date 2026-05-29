@@ -51,7 +51,7 @@ static int update(UPDATE_FUNC_ARGS)
 {
 	//@ FSEP -> FSEP + PLSM
 	if (parts[i].life<=0) {
-		auto r = sim->create_part(i, x, y, PT_PLSM);
+		auto r = sim->create_part_outer(i, x, y, PT_PLSM);
 		if (r!=-1)
 			parts[r].life = 50;
 		return 1;
@@ -59,7 +59,7 @@ static int update(UPDATE_FUNC_ARGS)
 	else if (parts[i].life < 40) {
 		parts[i].life--;
 		if (rng.chance(1, 10)) {
-			auto r = sim->create_part(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_PLSM);
+			auto r = sim->create_part_outer(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_PLSM);
 			if (r>-1)
 				parts[r].life = 50;
 		}

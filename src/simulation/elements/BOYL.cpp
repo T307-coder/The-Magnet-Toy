@@ -74,15 +74,15 @@ static int update(UPDATE_FUNC_ARGS)
 				{
 					//@ BOYL + WATR -> BOYL + FOG
 					if (rng.chance(1, 30))
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_FOG);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_FOG);
 				}
 				else if (TYP(r)==PT_O2)
 				{
 					//@ BOYL + O2 -> WATR
 					if (rng.chance(1, 9))
 					{
-						sim->kill_part(ID(r));
-						sim->part_change_type(i,x,y,PT_WATR);
+						sim->kill_part_outer(ID(r));
+						sim->part_change_type_outer(i,x,y,PT_WATR);
 						sim->pv[y/CELL][x/CELL] += 4.0;
 						return 1;
 					}

@@ -81,7 +81,7 @@ static int update(UPDATE_FUNC_ARGS)
 						if (parts[ID(r)].life <= maxlife - parts[i].life - 1)
 						{
 							parts[i].life += parts[ID(r)].life + 1;
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 						}
 					}
 				}
@@ -105,7 +105,7 @@ static int update(UPDATE_FUNC_ARGS)
 						auto r = pmap[y+ry][x+rx];
 						if ((!r)&&parts[i].life>=1)//if nothing then create deut
 						{
-							auto np = sim->create_part(-1,x+rx,y+ry,PT_DEUT);
+							auto np = sim->create_part_outer(-1,x+rx,y+ry,PT_DEUT);
 							if (np<0) continue;
 							parts[i].life--;
 							parts[np].temp = parts[i].temp;

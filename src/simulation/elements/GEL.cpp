@@ -77,7 +77,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if (parts[i].tmp<100 && rng.chance(500, absorbChanceDenom))
 					{
 						parts[i].tmp++;
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 					}
 					break;
 				case PT_PSTE:
@@ -85,7 +85,7 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						parts[i].tmp++;
 						//@ GEL + PSTE -> GEL + CLST
-						sim->create_part(ID(r), x+rx, y+ry, PT_CLST);
+						sim->create_part_outer(ID(r), x+rx, y+ry, PT_CLST);
 					}
 					break;
 				case PT_SLTW:
@@ -94,9 +94,9 @@ static int update(UPDATE_FUNC_ARGS)
 						parts[i].tmp++;
 						//@ GEL + SLTW -> GEL + SALT
 						if (rng.chance(3, 4))
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 						else
-							sim->part_change_type(ID(r), x+rx, y+ry, PT_SALT);
+							sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_SALT);
 					}
 					break;
 				case PT_CBNW:
@@ -104,7 +104,7 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						parts[i].tmp++;
 						//@ GEL + CBNW -> GEL + CO2
-						sim->part_change_type(ID(r), x+rx, y+ry, PT_CO2);
+						sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_CO2);
 					}
 					break;
 				case PT_SPNG:

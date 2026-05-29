@@ -46,15 +46,15 @@ void Element::Element_MGPN()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
-	Create = &create;
+	ASSIGN_SIM_CALLBACK(Create, create)
 }
 
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
-	float a = sim->rng.between(0, 359) * std::numbers::pi_v<float> / 180.0f;
-	sim->parts[i].life = 250 + sim->rng.between(0, 199);
+	float a = rng.between(0, 359) * std::numbers::pi_v<float> / 180.0f;
+	sim->parts[i].life = 250 + rng.between(0, 199);
 	sim->parts[i].vx = 2.0f * cosf(a);
 	sim->parts[i].vy = 2.0f * sinf(a);
 }

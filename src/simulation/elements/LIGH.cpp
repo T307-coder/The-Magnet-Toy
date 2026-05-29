@@ -100,7 +100,7 @@ static int update(UPDATE_FUNC_ARGS)
 					elements[rt].Flammable && rng.chance(elements[rt].Flammable + int(sim->pv[(y+ry)/CELL][(x+rx)/CELL] * 10.0f), 1000))
 				{
 					//@ LIGH + flammable -> LIGH + FIRE
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_FIRE);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_FIRE);
 					parts[ID(r)].temp = restrict_flt(elements[PT_FIRE].DefaultProperties.temp + (elements[rt].Flammable/2), MIN_TEMP, MAX_TEMP);
 					parts[ID(r)].life = rng.between(180, 259);
 					parts[ID(r)].tmp = parts[ID(r)].ctype = 0;
@@ -125,7 +125,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if (rng.chance(1, 3))
 					{
 						//@ LIGH + DEUT/PLUT -> LIGH + NEUT
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_NEUT);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_NEUT);
 						parts[ID(r)].life = rng.between(480, 959);
 						parts[ID(r)].vx = float(rng.between(-5, 5));
 						parts[ID(r)].vy = float(rng.between(-5, 5));
@@ -149,7 +149,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if (parts[ID(r)].temp > elements[PT_HEAC].HighTemperature)
 					{
 						//@ LIGH + HEAC -> LIGH + LAVA(HEAC)
-						sim->part_change_type(ID(r), x+rx, y+ry, PT_LAVA);
+						sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_LAVA);
 						parts[ID(r)].ctype = PT_HEAC;
 					}
 					break;
@@ -157,7 +157,7 @@ static int update(UPDATE_FUNC_ARGS)
 					break;
 				}
 				if ((elements[TYP(r)].Properties&PROP_CONDUCTS) && parts[ID(r)].life==0)
-					sim->create_part(ID(r),x+rx,y+ry,PT_SPRK);
+					sim->create_part_outer(ID(r),x+rx,y+ry,PT_SPRK);
 				sim->pv[y/CELL][x/CELL] = restrict_flt(sim->pv[y/CELL][x/CELL] + powderful/400, MIN_PRESSURE, MAX_PRESSURE);
 				if (!sd.IsHeatInsulator(parts[ID(r)])) parts[ID(r)].temp = restrict_flt(parts[ID(r)].temp+powderful/1.3, MIN_TEMP, MAX_TEMP);
 			}
@@ -175,7 +175,7 @@ static int update(UPDATE_FUNC_ARGS)
 	}
 	if (parts[i].tmp2 == 5 || parts[i].life <= 1)
 	{
-		sim->kill_part(i);
+		sim->kill_part_outer(i);
 		return 1;
 	}
 	auto angle = float((parts[i].tmp + rng.between(-30, 30)) % 360);
@@ -197,7 +197,7 @@ static int update(UPDATE_FUNC_ARGS)
 
 static bool create_LIGH(auto *sim, RNG &rng, int x, int y, int c, float temp, int life, int tmp, int tmp2, bool last, int i)
 {
-	int p = sim->create_part(-1, x, y,c);
+	int p = sim->create_part_outer(-1, x, y,c);
 	if (p != -1)
 	{
 		sim->parts[p].temp = float(temp);

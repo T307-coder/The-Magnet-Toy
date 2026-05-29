@@ -66,8 +66,8 @@ static int update(UPDATE_FUNC_ARGS)
 					if (sim->pv[(y+ry)/CELL][(x+rx)/CELL] > 3)
 					{
 						//@ CAUS + GAS -> 2xRFRG
-						sim->part_change_type(ID(r), x+rx, y+ry, PT_RFRG);
-						sim->part_change_type(i, x, y, PT_RFRG);
+						sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_RFRG);
+						sim->part_change_type_outer(i, x, y, PT_RFRG);
 						converted = true;
 					}
 				}
@@ -83,12 +83,12 @@ static int update(UPDATE_FUNC_ARGS)
 								newtemp = 0;
 							parts[i].temp += newtemp;
 							parts[i].life--;
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 						}
 					}
 					else if (parts[i].life <= 50)
 					{
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 				}

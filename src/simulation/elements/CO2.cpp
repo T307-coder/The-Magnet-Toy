@@ -59,33 +59,33 @@ static int update(UPDATE_FUNC_ARGS)
 					if (parts[i].ctype==5 && rng.chance(1, 2000))
 					{
 						//@ CO2 -> WATR
-						if (sim->create_part(-1, x+rx, y+ry, PT_WATR)>=0)
+						if (sim->create_part_outer(-1, x+rx, y+ry, PT_WATR)>=0)
 							parts[i].ctype = 0;
 					}
 					continue;
 				}
 				if (TYP(r)==PT_FIRE)
 				{
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 					if (rng.chance(1, 30))
 					{
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 				}
 				else if ((TYP(r)==PT_WATR || TYP(r)==PT_DSTW) && rng.chance(1, 50))
 				{
-					sim->part_change_type(ID(r), x+rx, y+ry, PT_CBNW);
+					sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_CBNW);
 					if (parts[i].ctype==5) //conserve number of water particles - ctype=5 means this CO2 hasn't released the water particle from BUBW yet
 					{
 						//@ CO2 + WATR/DSTW -> WATR + CBNW
-						sim->create_part(i, x, y, PT_WATR);
+						sim->create_part_outer(i, x, y, PT_WATR);
 						return 0;
 					}
 					else
 					{
 						//@ CO2 + WATR/DSTW -> CBNW
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 				}
@@ -98,14 +98,14 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			int j;
 			//@ CO2 -> O2 + NEUT
-			sim->create_part(i,x,y,PT_O2);
-			j = sim->create_part(-3,x,y,PT_NEUT);
+			sim->create_part_outer(i,x,y,PT_O2);
+			j = sim->create_part_outer(-3,x,y,PT_NEUT);
 			if (j != -1)
 				parts[j].temp = MAX_TEMP;
 			if (rng.chance(1, 50))
 			{
 				//@ CO2 -> O2 + NEUT + ELEC
-				j = sim->create_part(-3,x,y,PT_ELEC);
+				j = sim->create_part_outer(-3,x,y,PT_ELEC);
 				if (j != -1)
 					parts[j].temp = MAX_TEMP;
 			}

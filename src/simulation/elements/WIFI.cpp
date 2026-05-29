@@ -70,7 +70,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if ((TYP(r)==PT_NSCN||TYP(r)==PT_PSCN||TYP(r)==PT_INWR)&&parts[ID(r)].life==0 && sim->wireless[parts[i].tmp][0])
 					{
 						parts[ID(r)].ctype = TYP(r);
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SPRK);
 						parts[ID(r)].life = 4;
 					}
 				}

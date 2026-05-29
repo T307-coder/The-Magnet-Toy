@@ -66,19 +66,19 @@ int Element_FIRE_update(UPDATE_FUNC_ARGS)
 			if (parts[i].ctype == PT_NBLE)
 			{
 				//@ PLSM(NBLE) -> NBLE
-				sim->part_change_type(i,x,y,PT_NBLE);
+				sim->part_change_type_outer(i,x,y,PT_NBLE);
 				parts[i].life = 0;
 			}
 			else if ((parts[i].tmp&0x3) == 3)
 			{
 				//@ PLSM + O2 + H2 -> WTRV(FIRE)
-				sim->part_change_type(i,x,y,PT_WTRV);
+				sim->part_change_type_outer(i,x,y,PT_WTRV);
 				parts[i].life = 0;
 				parts[i].ctype = PT_FIRE;
 			}
 			else
 			{
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 				return 1;
 			}
 		}
@@ -89,19 +89,19 @@ int Element_FIRE_update(UPDATE_FUNC_ARGS)
 			if ((parts[i].tmp&0x3) == 3)
 			{
 				//@ FIRE + O2 + H2 -> WTRV(FIRE)
-				sim->part_change_type(i,x,y,PT_WTRV);
+				sim->part_change_type_outer(i,x,y,PT_WTRV);
 				parts[i].life = 0;
 				parts[i].ctype = PT_FIRE;
 			}
 			else if (parts[i].temp<625)
 			{
 				//@ FIRE -> SMKE
-				sim->part_change_type(i,x,y,PT_SMKE);
+				sim->part_change_type_outer(i,x,y,PT_SMKE);
 				parts[i].life = rng.between(250, 269);
 			}
 			else
 			{
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 				return 1;
 			}
 		}
@@ -188,12 +188,12 @@ int Element_FIRE_update(UPDATE_FUNC_ARGS)
 				{
 					//@ FIRE/PLSM/LAVA + THRM -> FIRE/PLSM/LAVA + LAVA(BMTL/THRM)
 					if (rng.chance(1, 500)) {
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_LAVA);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_LAVA);
 						parts[ID(r)].ctype = PT_BMTL;
 						parts[ID(r)].temp = 3500.0f;
 						sim->pv[(y+ry)/CELL][(x+rx)/CELL] += 50.0f;
 					} else {
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_LAVA);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_LAVA);
 						parts[ID(r)].life = 400;
 						parts[ID(r)].ctype = PT_THRM;
 						parts[ID(r)].temp = 3500.0f;
@@ -217,14 +217,14 @@ int Element_FIRE_update(UPDATE_FUNC_ARGS)
 						if (parts[i].ctype == PT_IRON && rng.chance(1, 500))
 						{
 							parts[i].ctype = PT_METL;
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 							continue;
 						}
 						//@ LAVA + COAL/BCOL -> LAVA(SLCN)
 						if ((parts[i].ctype == PT_STNE || parts[i].ctype == PT_NONE) && rng.chance(1, 60))
 						{
 							parts[i].ctype = PT_SLCN;
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 							continue;
 						}
 					}
@@ -265,7 +265,7 @@ int Element_FIRE_update(UPDATE_FUNC_ARGS)
 							break;
 						}
 						parts[i].tmp = 0;
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 						continue;
 					}
 					else if (rt == PT_LAVA && (parts[ID(r)].ctype == PT_METL || parts[ID(r)].ctype == PT_BMTL) && parts[i].ctype == PT_SLCN)
@@ -285,7 +285,7 @@ int Element_FIRE_update(UPDATE_FUNC_ARGS)
 							parts[i].tmp2 = 0;
 							parts[i].life = 0;
 
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 							continue;
 						}
 					}
@@ -293,7 +293,7 @@ int Element_FIRE_update(UPDATE_FUNC_ARGS)
 					{
 						if (parts[ID(r)].temp > elements[PT_HEAC].HighTemperature)
 						{
-							sim->part_change_type(ID(r), x+rx, y+ry, PT_LAVA);
+							sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_LAVA);
 							parts[ID(r)].ctype = PT_HEAC;
 						}
 					}
@@ -318,7 +318,7 @@ int Element_FIRE_update(UPDATE_FUNC_ARGS)
 				    (t != PT_PHOT || rt != PT_INSL) &&
 				    (rt != PT_SPNG || parts[ID(r)].life == 0))
 				{
-					sim->part_change_type(ID(r), x+rx, y+ry, PT_FIRE);
+					sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_FIRE);
 					parts[ID(r)].temp = restrict_flt(elements[PT_FIRE].DefaultProperties.temp + (elements[rt].Flammable/2), MIN_TEMP, MAX_TEMP);
 					parts[ID(r)].life = rng.between(180, 259);
 					parts[ID(r)].tmp = parts[ID(r)].ctype = 0;
@@ -366,44 +366,44 @@ static int updateLegacy(UPDATE_FUNC_ARGS)
 							parts[ID(r)].ctype = PT_GLAS;
 						else
 							parts[ID(r)].ctype = rt;
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_LAVA);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_LAVA);
 						parts[ID(r)].life = rng.between(240, 359);
 					}
 					else
 					{
 						parts[i].life = 0;
 						parts[i].ctype = PT_NONE;//rt;
-						sim->part_change_type(i,x,y,(parts[i].ctype)?parts[i].ctype:PT_STNE);
+						sim->part_change_type_outer(i,x,y,(parts[i].ctype)?parts[i].ctype:PT_STNE);
 						return 1;
 					}
 				}
 				if (rt==PT_ICEI || rt==PT_SNOW)
 				{
-					sim->part_change_type(ID(r), x+rx, y+ry, PT_WATR);
+					sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_WATR);
 					if (t==PT_FIRE)
 					{
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 					if (t==PT_LAVA)
 					{
 						parts[i].life = 0;
-						sim->part_change_type(i,x,y,PT_STNE);
+						sim->part_change_type_outer(i,x,y,PT_STNE);
 					}
 				}
 				if (rt==PT_WATR || rt==PT_DSTW || rt==PT_SLTW)
 				{
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 					if (t==PT_FIRE)
 					{
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 					if (t==PT_LAVA)
 					{
 						parts[i].life = 0;
 						parts[i].ctype = PT_NONE;
-						sim->part_change_type(i,x,y,(parts[i].ctype)?parts[i].ctype:PT_STNE);
+						sim->part_change_type_outer(i,x,y,(parts[i].ctype)?parts[i].ctype:PT_STNE);
 					}
 				}
 			}

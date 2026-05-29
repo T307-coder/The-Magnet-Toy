@@ -64,7 +64,7 @@ static int update(UPDATE_FUNC_ARGS)
 					continue;
 				if (TYP(r)!=PT_DMG && TYP(r)!=PT_EMBR && TYP(r)!=PT_DMND && TYP(r)!=PT_CLNE && TYP(r)!=PT_PCLN && TYP(r)!=PT_BCLN)
 				{
-					sim->kill_part(i);
+					sim->kill_part_outer(i);
 					for (auto nxj=-rad; nxj<=rad; nxj++)
 					{
 						for (auto nxi=-rad; nxi<=rad; nxi++)
@@ -87,22 +87,22 @@ static int update(UPDATE_FUNC_ARGS)
 										sim->pv[(y+nxj)/CELL][(x+nxi)/CELL] += 1.0f;
 										auto t = TYP(rr);
 										if (t && elements[t].HighPressureTransition>-1 && elements[t].HighPressureTransition<PT_NUM)
-											sim->part_change_type(ID(rr), x+nxi, y+nxj, elements[t].HighPressureTransition);
+											sim->part_change_type_outer(ID(rr), x+nxi, y+nxj, elements[t].HighPressureTransition);
 										else if (t == PT_BMTL) //@ DMG + BMTL -> BRMT
-											sim->part_change_type(ID(rr), x+nxi, y+nxj, PT_BRMT);
+											sim->part_change_type_outer(ID(rr), x+nxi, y+nxj, PT_BRMT);
 										else if (t == PT_GLAS) //@ DMG + GLAS -> BGLA
-											sim->part_change_type(ID(rr), x+nxi, y+nxj, PT_BGLA);
+											sim->part_change_type_outer(ID(rr), x+nxi, y+nxj, PT_BGLA);
 										else if (t == PT_COAL) //@ DMG + COAL -> BCOL
-											sim->part_change_type(ID(rr), x+nxi, y+nxj, PT_BCOL);
+											sim->part_change_type_outer(ID(rr), x+nxi, y+nxj, PT_BCOL);
 										else if (t == PT_QRTZ) //@ DMG + QRTZ -> PQRT
-											sim->part_change_type(ID(rr), x+nxi, y+nxj, PT_PQRT);
+											sim->part_change_type_outer(ID(rr), x+nxi, y+nxj, PT_PQRT);
 										else if (t == PT_TUNG) //@ DMG + TUNG -> BRMT(TUNG)
 										{
-											sim->part_change_type(ID(rr), x+nxi, y+nxj, PT_BRMT);
+											sim->part_change_type_outer(ID(rr), x+nxi, y+nxj, PT_BRMT);
 											parts[ID(rr)].ctype = PT_TUNG;
 										}
 										else if (t == PT_WOOD) //@ DMG + WOOD -> SAWD
-											sim->part_change_type(ID(rr), x+nxi, y+nxj, PT_SAWD);
+											sim->part_change_type_outer(ID(rr), x+nxi, y+nxj, PT_SAWD);
 									}
 								}
 							}

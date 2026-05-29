@@ -52,11 +52,11 @@ void Element::Element_COAL()
 int Element_COAL_update(UPDATE_FUNC_ARGS)
 {
 	if (parts[i].life<=0) {
-		sim->create_part(i, x, y, PT_FIRE);
+		sim->create_part_outer(i, x, y, PT_FIRE);
 		return 1;
 	} else if (parts[i].life < 100) {
 		parts[i].life--;
-		sim->create_part(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_FIRE);
+		sim->create_part_outer(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_FIRE);
 	}
 	if (parts[i].type == PT_COAL)
 	{
@@ -66,7 +66,7 @@ int Element_COAL_update(UPDATE_FUNC_ARGS)
 			parts[i].tmp--;
 		else if (parts[i].tmp<=0) {
 			//@ COAL -> BCOL
-			sim->part_change_type(i, x, y, PT_BCOL);
+			sim->part_change_type_outer(i, x, y, PT_BCOL);
 			return 1;
 		}
 	}

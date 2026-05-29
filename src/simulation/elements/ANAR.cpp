@@ -60,7 +60,7 @@ static int update(UPDATE_FUNC_ARGS)
 				if (TYP(r)==PT_CFLM && rng.chance(1, 4))
 				{
 					//@ ANAR + CFLM -> 2xCFLM
-					sim->part_change_type(i,x,y,PT_CFLM);
+					sim->part_change_type_outer(i,x,y,PT_CFLM);
 					parts[i].life = rng.between(50, 199);
 					parts[ID(r)].temp = parts[i].temp = 0;
 					sim->pv[y/CELL][x/CELL] -= 0.5;

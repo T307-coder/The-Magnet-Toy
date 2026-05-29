@@ -73,7 +73,7 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						if (x+rx+rrx>=0 && y+ry+rry>=0 && x+rx+rrx<XRES && y+ry+rry<YRES) {
 							//@ ELEC + GLAS -> EMBR + GLAS
-							auto nb = sim->create_part(-1, x+rx+rrx, y+ry+rry, PT_EMBR);
+							auto nb = sim->create_part_outer(-1, x+rx+rrx, y+ry+rry, PT_EMBR);
 							if (nb!=-1) {
 								parts[nb].tmp = 0;
 								parts[nb].life = 50;
@@ -84,7 +84,7 @@ static int update(UPDATE_FUNC_ARGS)
 						}
 					}
 				}
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 				return 1;
 			case PT_LCRY:
 				parts[ID(r)].tmp2 = rng.between(5, 9);
@@ -95,26 +95,26 @@ static int update(UPDATE_FUNC_ARGS)
 			case PT_CBNW:
 				//@ ELEC + WATR/DSTW/SLTW/CBNW -> O2/H2
 				if (rng.chance(1, 3))
-					sim->create_part(ID(r), x+rx, y+ry, PT_O2);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_O2);
 				else
-					sim->create_part(ID(r), x+rx, y+ry, PT_H2);
-				sim->kill_part(i);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_H2);
+				sim->kill_part_outer(i);
 				return 1;
 			case PT_PROT: // this is the correct reaction, not NEUT, but leaving NEUT in anyway
 				if (parts[ID(r)].tmp2 & 0x1)
 					break;
 			case PT_NEUT:
 				//@ ELEC + PROT/NEUT -> H2
-				sim->part_change_type(ID(r), x+rx, y+ry, PT_H2);
+				sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_H2);
 				parts[ID(r)].life = 0;
 				parts[ID(r)].ctype = 0;
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 				break;
 			case PT_DEUT:
 				if(parts[ID(r)].life < 6000)
 					parts[ID(r)].life += 1;
 				parts[ID(r)].temp = 0;
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 				return 1;
 			case PT_EXOT:
 				parts[ID(r)].tmp2 += 5;
@@ -123,8 +123,8 @@ static int update(UPDATE_FUNC_ARGS)
 			case PT_RSST: //Destroy RSST
 				if(!rx && !ry)
 				{
-					sim->kill_part(ID(r));
-					sim->kill_part(i);
+					sim->kill_part_outer(ID(r));
+					sim->kill_part_outer(i);
 
 					return 1;
 				}
@@ -134,8 +134,8 @@ static int update(UPDATE_FUNC_ARGS)
 			default:
 				if ((elements[rt].Properties & PROP_CONDUCTS) && (rt!=PT_NBLE||parts[i].temp<2273.15))
 				{
-					sim->create_part(-1, x+rx, y+ry, PT_SPRK);
-					sim->kill_part(i);
+					sim->create_part_outer(-1, x+rx, y+ry, PT_SPRK);
+					sim->kill_part_outer(i);
 					return 1;
 				}
 				break;

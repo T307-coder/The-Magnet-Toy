@@ -95,7 +95,7 @@ static int update(UPDATE_FUNC_ARGS)
 				Particle &neighbour = parts[ID(n)];
 				if (neighbour.life != 0 && neighbour.life < 4)
 				{
-					sim->part_change_type(i, x, y, PT_SPRK);
+					sim->part_change_type_outer(i, x, y, PT_SPRK);
 					parts[i].life = 4;
 					parts[i].ctype = PT_SLCN;
 				}
@@ -160,7 +160,7 @@ static int update(UPDATE_FUNC_ARGS)
 	// Charge diffusion: equalize between conductors (DEUT-style)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

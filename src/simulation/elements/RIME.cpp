@@ -60,18 +60,18 @@ static int update(UPDATE_FUNC_ARGS)
 				if (TYP(r)==PT_SPRK)
 				{
 					//@ RIME -> FOG
-					sim->part_change_type(i,x,y,PT_FOG);
+					sim->part_change_type_outer(i,x,y,PT_FOG);
 					parts[i].life = rng.between(60, 119);
 				}
 				else if (TYP(r) == PT_GAS && parts[i].tmp < 10)
 				{
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 					parts[i].tmp++;
 				}
 				else if (TYP(r)==PT_FOG&&parts[ID(r)].life>0)
 				{
 					//@ RIME + FOG -> 2xFOG
-					sim->part_change_type(i,x,y,PT_FOG);
+					sim->part_change_type_outer(i,x,y,PT_FOG);
 					parts[i].life = parts[ID(r)].life;
 				}
 			}

@@ -46,7 +46,7 @@ void Element::Element_EBFM()
 
 	DefaultProperties.life = 10;
 
-	Update = &update;
+	ASSIGN_SIM_CALLBACK(Update, update)
 	Graphics = &graphics;
 }
 

@@ -64,7 +64,7 @@ static int update(UPDATE_FUNC_ARGS)
 	if (temp > 320.0f && sim->pv[y/CELL][x/CELL] > 50.0f && rng.chance(1, 150))
 	{
 		//@ SEED -> MWAX
-		sim->create_part(i, x, y, PT_MWAX);
+		sim->create_part_outer(i, x, y, PT_MWAX);
 
 		parts[i].ctype = 0;
 		parts[i].life = 0;
@@ -105,7 +105,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				// Start growth
 				//@ SEED -> PLNT
-				sim->part_change_type(i, x, y, PT_PLNT);
+				sim->part_change_type_outer(i, x, y, PT_PLNT);
 
 				parts[i].ctype &= ~((7 << PLNT_DIR) | (3 << PLNT_PHASE)); // Clear direction and phase
 				parts[i].ctype |= ((up & 7) << PLNT_DIR) | 1; // Set initial growth direction and growth bit
@@ -131,7 +131,7 @@ static int update(UPDATE_FUNC_ARGS)
 					case PT_WATR: // Drink water
 						if (water < 31)
 						{
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 							water++;
 							parts[i].life = 0;
 						}
@@ -139,7 +139,7 @@ static int update(UPDATE_FUNC_ARGS)
 					case PT_DEUT: // Heavy water allows extra growth
 						if (water < 255)
 						{
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 							water++;
 							parts[i].life = 0;
 						}
@@ -148,7 +148,7 @@ static int update(UPDATE_FUNC_ARGS)
 					case PT_DSTW: // Distilled or carbonated water is allowed only in very limited amount
 						if (water < 3)
 						{
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 							water++;
 							parts[i].life = 0;
 						}
@@ -156,7 +156,7 @@ static int update(UPDATE_FUNC_ARGS)
 					case PT_SLTW: // Salty water is harmful
 						if (water > 0)
 						{
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 							water--;
 							parts[i].life = 0;
 						}

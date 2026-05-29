@@ -81,7 +81,7 @@ static int update(UPDATE_FUNC_ARGS)
 					parts[i].tmp2 = parts[ID(r)].life;
 					parts[i].tmp3 = parts[ID(r)].tmp;
 					parts[i].tmp4 = parts[ID(r)].ctype;
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 				}
 				if(parts[i].tmp && TYP(r)==PT_SPRK && parts[ID(r)].ctype==PT_PSCN && parts[ID(r)].life>0 && parts[ID(r)].life<4)
 				{
@@ -89,7 +89,7 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						for(auto rx1 = 0; rx1 >= -1 && rx1 <= 1; rx1 = -rx1-rx1+1) // Oscillate the X starting at 0, 1, -1, 3, -5, etc (Though stop at -1)
 						{
-							auto np = sim->create_part(-1,x+rx1,y+ry1,TYP(parts[i].tmp));
+							auto np = sim->create_part_outer(-1,x+rx1,y+ry1,TYP(parts[i].tmp));
 							if (np!=-1)
 							{
 								parts[np].temp = parts[i].temp;

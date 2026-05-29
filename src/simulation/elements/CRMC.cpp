@@ -54,7 +54,7 @@ static int update(UPDATE_FUNC_ARGS)
 	float origTemp = parts[i].temp;
 	//@ CRMC -> CLST
 	if (sim->pv[y/CELL][x/CELL] < -30.0f)
-		sim->create_part(i, x, y, PT_CLST);
+		sim->create_part_outer(i, x, y, PT_CLST);
 	parts[i].temp = origTemp;
 	return 0;
 }

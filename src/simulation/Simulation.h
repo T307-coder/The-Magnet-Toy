@@ -138,7 +138,9 @@ struct CopiableSimulation : public RenderableSimulation
 	int etrd_life0_count = 0;
 	int lightningRecreate = 0;
 	bool gravWallChanged = false;
-	
+
+	CopiableSimulation &operator =(const CopiableSimulation &other);
+
 	struct MagFFT;
 	std::unique_ptr<MagFFT> magFFT;
 	void InitMagFFT();

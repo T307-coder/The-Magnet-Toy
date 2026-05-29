@@ -57,7 +57,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		float temp = parts[i].temp;
 		//@ WOOD -> BCOL
-		sim->create_part(i, x, y, PT_BCOL);
+		sim->create_part_outer(i, x, y, PT_BCOL);
 		parts[i].temp = temp;
 	}
 

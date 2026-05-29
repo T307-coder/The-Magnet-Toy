@@ -54,7 +54,7 @@ static int update(UPDATE_FUNC_ARGS)
 			if (parts[i].temp>9000 && sim->pv[y/CELL][x/CELL]>30.0f && rng.chance(1, 200))
 			{
 				//@ BREC -> EXOT
-				sim->part_change_type(i, x, y, PT_EXOT);
+				sim->part_change_type_outer(i, x, y, PT_EXOT);
 				parts[i].life = 1000;
 			}
 			parts[i].temp += (sim->pv[y/CELL][x/CELL])/8;
@@ -70,9 +70,9 @@ static int update(UPDATE_FUNC_ARGS)
 		if (sim->prevBFieldValid)
 		{
 			float dBdt = fabsf(Bnow - Bprev);
-			if (dBdt > 0.5f && sim->rng.chance(1, 8))
+			if (dBdt > 0.5f && rng.chance(1, 8))
 			{
-				sim->part_change_type(i, x, y, PT_SPRK);
+				sim->part_change_type_outer(i, x, y, PT_SPRK);
 				parts[i].ctype = PT_BREC;
 				parts[i].life = 4;
 				return 1;
@@ -144,7 +144,7 @@ static int update(UPDATE_FUNC_ARGS)
 	// Charge diffusion: equalize between conductors (DEUT-style)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

@@ -245,7 +245,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 					r = sim->photons[y+ry][x+rx];
 				if (surround_space && !r && TYP(parts[i].ctype))  //creating at end
 				{
-					auto np = sim->create_part(-1, x+rx, y+ry, TYP(parts[i].ctype));
+					auto np = sim->create_part_outer(-1, x+rx, y+ry, TYP(parts[i].ctype));
 					if (np!=-1)
 					{
 						Element_PIPE_transfer_pipe_to_part(sim, parts+i, parts+np, false);
@@ -257,7 +257,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 					if (TYP(r)==PT_SOAP)
 						Element_SOAP_detach(sim, ID(r));
 					Element_PIPE_transfer_part_to_pipe(parts+(ID(r)), parts+i);
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 				}
 				else if (!TYP(parts[i].ctype) && TYP(r)==PT_STOR && sd.IsElement(parts[ID(r)].tmp) && (elements[parts[ID(r)].tmp].Properties & (TYPE_PART | TYPE_LIQUID | TYPE_GAS | TYPE_ENERGY)))
 				{
@@ -281,7 +281,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 					{
 						// BRCK border
 						//@ PIPE -> PIPE + BRCK
-						int index = sim->create_part(-1,x+rx,y+ry,PT_BRCK);
+						int index = sim->create_part_outer(-1,x+rx,y+ry,PT_BRCK);
 						if (parts[i].type == PT_PPIP && index != -1)
 							parts[index].tmp = 1;
 					}
@@ -619,7 +619,7 @@ static void pushParticle(auto *sim, RNG &rng, int i, int count, int original)
 		{
 			auto rx = Element_PIPE_offsets[coords].X;
 			auto ry = Element_PIPE_offsets[coords].Y;
-			auto np = sim->create_part(-1,x+rx,y+ry,TYP(sim->parts[i].ctype));
+			auto np = sim->create_part_outer(-1,x+rx,y+ry,TYP(sim->parts[i].ctype));
 			if (np!=-1)
 			{
 				Element_PIPE_transfer_pipe_to_part(sim, sim->parts+i, sim->parts+np, false);

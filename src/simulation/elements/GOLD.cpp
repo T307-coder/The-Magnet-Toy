@@ -69,7 +69,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				//@ GOLD + BMTL -> GOLD + IRON
 				parts[ID(r)].tmp = 0;
-				sim->part_change_type(ID(r), x+rx, y+ry, PT_IRON);
+				sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_IRON);
 			}
 		}
 	}
@@ -84,7 +84,7 @@ static int update(UPDATE_FUNC_ARGS)
 			if(!r) continue;
 			if(TYP(r)==PT_SPRK && parts[ID(r)].life && parts[ID(r)].life<4)
 			{
-				sim->part_change_type(i, x, y, PT_SPRK);
+				sim->part_change_type_outer(i, x, y, PT_SPRK);
 				parts[i].life = 4;
 				parts[i].ctype = PT_GOLD;
 			}
@@ -94,7 +94,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		if (rng.chance(1, 7))
 		{
-			sim->kill_part(ID(sim->photons[y][x]));
+			sim->kill_part_outer(ID(sim->photons[y][x]));
 		}
 	}
 	int cx = x/CELL, cy = y/CELL;
@@ -138,7 +138,7 @@ static int update(UPDATE_FUNC_ARGS)
 	// Charge diffusion: equalize between conductors (DEUT-style)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

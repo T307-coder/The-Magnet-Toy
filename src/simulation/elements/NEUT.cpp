@@ -68,7 +68,7 @@ static int update(UPDATE_FUNC_ARGS)
 			case PT_WATR:
 				//@ NEUT + WATR -> NEUT + DSTW
 				if (rng.chance(3, 20))
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_DSTW);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_DSTW);
 			case PT_ICEI:
 			case PT_SNOW:
 				parts[i].vx *= 0.995f;
@@ -80,7 +80,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if (rng.chance(1, 3))
 					{
 						//@ NEUT + PLUT -> NEUT + URAN/LAVA(PLUT)
-						sim->create_part(ID(r), x+rx, y+ry, rng.chance(2, 3) ? PT_LAVA : PT_URAN);
+						sim->create_part_outer(ID(r), x+rx, y+ry, rng.chance(2, 3) ? PT_LAVA : PT_URAN);
 						parts[ID(r)].temp = MAX_TEMP;
 						if (parts[ID(r)].type==PT_LAVA) {
 							parts[ID(r)].tmp = 100;
@@ -90,7 +90,7 @@ static int update(UPDATE_FUNC_ARGS)
 					else
 					{
 						//@ NEUT + PLUT -> 2xNEUT
-						sim->create_part(ID(r), x+rx, y+ry, PT_NEUT);
+						sim->create_part_outer(ID(r), x+rx, y+ry, PT_NEUT);
 						parts[ID(r)].vx = 0.25f*parts[ID(r)].vx + parts[i].vx;
 						parts[ID(r)].vy = 0.25f*parts[ID(r)].vy + parts[i].vy;
 					}
@@ -103,58 +103,58 @@ static int update(UPDATE_FUNC_ARGS)
 				{
 					//@ NEUT + DEUT -> 2xNEUT
 					DeutExplosion(sim, parts[ID(r)].life, x+rx, y+ry, restrict_flt(parts[ID(r)].temp + parts[ID(r)].life*500.0f, MIN_TEMP, MAX_TEMP), PT_NEUT);
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 				}
 				break;
 			case PT_GUNP:
 				//@ NEUT + GUNP -> NEUT + DUST
 				if (rng.chance(3, 200))
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_DUST);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_DUST);
 				break;
 			case PT_DYST:
 				//@ NEUT + DYST -> NEUT + YEST
 				if (rng.chance(3, 200))
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_YEST);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_YEST);
 				break;
 			case PT_YEST:
 				//@ NEUT + YEST -> NEUT + DYST
-				sim->part_change_type(ID(r),x+rx,y+ry,PT_DYST);
+				sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_DYST);
 				break;
 			case PT_PLEX:
 				//@ NEUT + PLEX -> NEUT + GOO
 				if (rng.chance(3, 200))
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_GOO);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_GOO);
 				break;
 			case PT_NITR:
 				//@ NEUT + NITR -> NEUT + DESL
 				if (rng.chance(3, 200))
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_DESL);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_DESL);
 				break;
 			case PT_PLNT:
 				//@ NEUT + PLNT -> NEUT + WOOD
 				if (rng.chance(1, 20))
-					sim->create_part(ID(r), x+rx, y+ry, PT_WOOD);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_WOOD);
 				break;
 			case PT_DESL:
 			case PT_OIL:
 				//@ NEUT + DESL/OIL -> NEUT + GAS
 				if (rng.chance(3, 200))
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_GAS);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_GAS);
 				break;
 			case PT_COAL:
 				//@ NEUT + COAL -> NEUT + WOOD
 				if (rng.chance(1, 20))
-					sim->create_part(ID(r), x+rx, y+ry, PT_WOOD);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_WOOD);
 				break;
 			case PT_BCOL:
 				//@ NEUT + BCOL -> NEUT + SAWD
 				if (rng.chance(1, 20))
-					sim->create_part(ID(r), x+rx, y+ry, PT_SAWD);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_SAWD);
 				break;
 			case PT_DUST:
 				//@ NEUT + DUST -> NEUT + FWRK
 				if (rng.chance(1, 20))
-					sim->part_change_type(ID(r), x+rx, y+ry, PT_FWRK);
+					sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_FWRK);
 				break;
 			case PT_FWRK:
 				if (rng.chance(1, 20))
@@ -163,12 +163,12 @@ static int update(UPDATE_FUNC_ARGS)
 			case PT_ACID:
 				//@ NEUT + ACID -> NEUT + ISOZ
 				if (rng.chance(1, 20))
-					sim->create_part(ID(r), x+rx, y+ry, PT_ISOZ);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_ISOZ);
 				break;
 			case PT_TTAN:
 				if (rng.chance(1, 20))
 				{
-					sim->kill_part(i);
+					sim->kill_part_outer(i);
 					return 1;
 				}
 				break;
@@ -179,9 +179,9 @@ static int update(UPDATE_FUNC_ARGS)
 			case PT_RFRG:
 				//@ NEUT + RFRG -> NEUT + GAS/CAUS
 				if (rng.chance(1, 2))
-					sim->create_part(ID(r), x+rx, y+ry, PT_GAS);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_GAS);
 				else
-					sim->create_part(ID(r), x+rx, y+ry, PT_CAUS);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_CAUS);
 				break;
 			case PT_RSSS:
 				if(!rx && !ry)
@@ -195,16 +195,16 @@ static int update(UPDATE_FUNC_ARGS)
 					if(ct_under > 0 && ct_under < PT_NUM)
 					{
 						//@ NEUT + RSSS(ctype) -> ctype
-						sim->create_part(ID(r), x, y, ct_under);
+						sim->create_part_outer(ID(r), x, y, ct_under);
 
 						//If there's a correct tmp set, use it for ctype
 						if((tmp_under > 0) && (tmp_under < PT_NUM) && (elements[ct_under].CarriesTypeIn & (1U << FIELD_CTYPE)))
 							parts[ID(r)].ctype = tmp_under;
 					}
 					else //@ NEUT + RSSS -> RSST
-						sim->part_change_type(ID(r), x, y, PT_RSST); //Default to RSST if no ctype
+						sim->part_change_type_outer(ID(r), x, y, PT_RSST); //Default to RSST if no ctype
 
-					sim->kill_part(i);
+					sim->kill_part_outer(i);
 
 					return 1;
 				}
@@ -212,7 +212,7 @@ static int update(UPDATE_FUNC_ARGS)
 			case PT_BASE:
 				//@ NEUT + BASE -> NEUT + LRBD
 				if (parts[ID(r)].temp > (50 + 273.15) && rng.chance(1, 35))
-					sim->create_part(ID(r), x+rx, y+ry, PT_LRBD);
+					sim->create_part_outer(ID(r), x+rx, y+ry, PT_LRBD);
 				break;
 			case PT_SEED:
 				if(!rx && !ry)
@@ -279,7 +279,7 @@ static int DeutExplosion(auto * sim, int n, int x, int y, float temp, int t)//te
 
 	for (int c = 0; c < n; c++)
 	{
-		i = sim->create_part(-3, x, y, t);
+		i = sim->create_part_outer(-3, x, y, t);
 		if (i >= 0)
 			sim->parts[i].temp = temp;
 		else if (sim->MaxPartsReached())

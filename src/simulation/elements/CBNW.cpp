@@ -58,7 +58,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (sim->pv[y/CELL][x/CELL] <= -0.5 || rng.chance(1, 4000))
 		{
 			//@ CBNW -> CO2
-			sim->part_change_type(i,x,y,PT_CO2);
+			sim->part_change_type_outer(i,x,y,PT_CO2);
 			parts[i].ctype = 5;
 			sim->pv[y/CELL][x/CELL] += 0.5f;
 		}
@@ -77,7 +77,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if(parts[i].tmp==1 && rng.chance(3, 4))
 		{
 			//@ CBNW -> CO2
-			sim->part_change_type(i,x,y,PT_CO2);
+			sim->part_change_type_outer(i,x,y,PT_CO2);
 			parts[i].ctype = 5;
 			sim->pv[y/CELL][x/CELL] += 0.2f;
 		}
@@ -100,7 +100,7 @@ static int update(UPDATE_FUNC_ARGS)
 				else if((elements[TYP(r)].Properties&TYPE_SOLID) && TYP(r)!=PT_DMND && TYP(r)!=PT_GLAS && parts[i].tmp == 0 && rng.chance(int(2 - sim->pv[y/CELL][x/CELL]), 6667))
 				{
 					//@ CBNW -> CO2
-					sim->part_change_type(i,x,y,PT_CO2);
+					sim->part_change_type_outer(i,x,y,PT_CO2);
 					parts[i].ctype = 5;
 					sim->pv[y/CELL][x/CELL] += 0.2f;
 				}
@@ -127,16 +127,16 @@ static int update(UPDATE_FUNC_ARGS)
 					if ((sim->legacy_enable||parts[i].temp>(273.15f+12.0f)) && rng.chance(1, 166))
 					{
 						//@ CBNW + RBDM/LRBD -> CBNW + FIRE
-						sim->part_change_type(i,x,y,PT_FIRE);
+						sim->part_change_type_outer(i,x,y,PT_FIRE);
 						parts[i].life = 4;
 						parts[i].ctype = PT_WATR;
 					}
 				}
 				else if (TYP(r)==PT_FIRE && parts[ID(r)].ctype!=PT_WATR){
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 					if (rng.chance(1, 50))
 					{
-						sim->kill_part(i);
+						sim->kill_part_outer(i);
 						return 1;
 					}
 				}

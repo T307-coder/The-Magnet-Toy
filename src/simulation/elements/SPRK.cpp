@@ -79,11 +79,11 @@ static int update(UPDATE_FUNC_ARGS)
 			parts[i].life = 14;
 		else if (ct == PT_RSST) //RSST disappears at the end of its spark cycle
 		{
-			sim->kill_part(i);
+			sim->kill_part_outer(i);
 			return 1;
 		}
 
-		if (sim->part_change_type(i,x,y,ct))
+		if (sim->part_change_type_outer(i,x,y,ct))
 			return 1;
 		// Induced SPRK (magnetic induction): give element long cooldown, reset magnetization
 		if (parts[i].tmp3 == 1)
@@ -97,7 +97,7 @@ static int update(UPDATE_FUNC_ARGS)
 	switch(ct)
 	{
 	case PT_SPRK:
-		sim->kill_part(i);
+		sim->kill_part_outer(i);
 		return 1;
 	case PT_NTCT:
 	case PT_PTCT:
@@ -115,9 +115,9 @@ static int update(UPDATE_FUNC_ARGS)
 				//@ ETRD -> ETRD + PLSM
 				sim->CreateLine(x, y, (int)(parts[nearp].x+0.5f), (int)(parts[nearp].y+0.5f), PT_PLSM);
 				parts[i].life = 20;
-				sim->part_change_type(i,x,y,ct);
+				sim->part_change_type_outer(i,x,y,ct);
 				ct = parts[i].ctype = PT_NONE;
-				sim->part_change_type(nearp,(int)(parts[nearp].x+0.5f),(int)(parts[nearp].y+0.5f),PT_SPRK);
+				sim->part_change_type_outer(nearp,(int)(parts[nearp].x+0.5f),(int)(parts[nearp].y+0.5f),PT_SPRK);
 				parts[nearp].life = 9;
 				parts[nearp].ctype = PT_ETRD;
 			}
@@ -128,7 +128,7 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			//@ NBLE -> PLSM(NBLE)
 			parts[i].life = rng.between(50, 199);
-			sim->part_change_type(i,x,y,PT_PLSM);
+			sim->part_change_type_outer(i,x,y,PT_PLSM);
 			parts[i].ctype = PT_NBLE;
 			if (parts[i].temp > 5273.15)
 				parts[i].tmp |= 0x4;
@@ -151,7 +151,7 @@ static int update(UPDATE_FUNC_ARGS)
 					if (parts[i].tmp>4 && rng.chance(1, parts[i].tmp*parts[i].tmp/20+6))
 					{
 						//@ TESC -> TESC + LIGH
-						int p = sim->create_part(-1, x+rx*2, y+ry*2, PT_LIGH);
+						int p = sim->create_part_outer(-1, x+rx*2, y+ry*2, PT_LIGH);
 						if (p!=-1)
 						{
 							parts[p].life = rng.between(0, 2+parts[i].tmp/15) + parts[i].tmp/7;
@@ -190,9 +190,9 @@ static int update(UPDATE_FUNC_ARGS)
 						int rndstore = rng.gen()%100;
 						//@ IRON + DSTW/SLTW/WATR -> IRON + O2/H2
 						if (!rndstore)
-							sim->part_change_type(ID(r),x+rx,y+ry,PT_O2);
+							sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_O2);
 						else if (3 > rndstore)
-							sim->part_change_type(ID(r),x+rx,y+ry,PT_H2);
+							sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_H2);
 					}
 				}
 			}
@@ -242,7 +242,7 @@ static int update(UPDATE_FUNC_ARGS)
 						{
 							if (sender==PT_NSCN)
 							{
-								sim->part_change_type(ID(r),x+rx,y+ry,PT_SWCH);
+								sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SWCH);
 								parts[ID(r)].ctype = PT_NONE;
 								parts[ID(r)].life = 9;
 							}
@@ -377,7 +377,7 @@ static int update(UPDATE_FUNC_ARGS)
 				if (receiver==PT_WATR||receiver==PT_SLTW) {
 					if (parts[ID(r)].life==0 && parts[i].life<3)
 					{
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SPRK);
 						if (receiver==PT_WATR) parts[ID(r)].life = 6;
 						else parts[ID(r)].life = 5;
 						parts[ID(r)].ctype = receiver;
@@ -393,7 +393,7 @@ static int update(UPDATE_FUNC_ARGS)
 				else if (receiver==PT_RSST) {
 					if (parts[ID(r)].life==0 && parts[i].life<4)
 					{
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SPRK);
 						parts[ID(r)].life = 5;
 						parts[ID(r)].ctype = receiver;
 						if (parts[i].tmp3 == 1) parts[ID(r)].tmp3 = 1;
@@ -402,7 +402,7 @@ static int update(UPDATE_FUNC_ARGS)
 				else if (parts[ID(r)].life==0 && parts[i].life<4) {
 					parts[ID(r)].life = 4;
 					parts[ID(r)].ctype = receiver;
-				sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+				sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SPRK);
 				// Propagate induced-flag: if source SPRK was induced, new SPRK is too
 				if (parts[i].tmp3 == 1)
 					parts[ID(r)].tmp3 = 1;
@@ -421,12 +421,12 @@ static int update(UPDATE_FUNC_ARGS)
 				}
 				else if (!parts[ID(r)].life && sender==PT_ETRD && parts[i].life==5) //ETRD is odd and conducts to others only at life 5, this could probably be somewhere else
 				{
-					sim->part_change_type(i,x,y,sender);
+					sim->part_change_type_outer(i,x,y,sender);
 					parts[i].ctype = PT_NONE;
 					parts[i].life = 20;
 					parts[ID(r)].life = 4;
 					parts[ID(r)].ctype = receiver;
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SPRK);
 				}
 			}
 		}

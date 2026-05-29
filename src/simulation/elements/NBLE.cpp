@@ -59,18 +59,18 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			int j;
 			float temp = parts[i].temp;
-			sim->create_part(i,x,y,PT_CO2);
+			sim->create_part_outer(i,x,y,PT_CO2);
 
-			j = sim->create_part(-3,x,y,PT_NEUT);
+			j = sim->create_part_outer(-3,x,y,PT_NEUT);
 			if (j != -1)
 				parts[j].temp = temp;
 			if (rng.chance(1, 25))
 			{
-				j = sim->create_part(-3,x,y,PT_ELEC);
+				j = sim->create_part_outer(-3,x,y,PT_ELEC);
 				if (j != -1)
 					parts[j].temp = temp;
 			}
-			j = sim->create_part(-3,x,y,PT_PHOT);
+			j = sim->create_part_outer(-3,x,y,PT_PHOT);
 			if (j != -1)
 			{
 				parts[j].ctype = 0xF800000;
@@ -80,7 +80,7 @@ static int update(UPDATE_FUNC_ARGS)
 			int rx = x + rng.between(-1, 1), ry = y + rng.between(-1, 1), rt = TYP(pmap[ry][rx]);
 			if (can_move[PT_PLSM][rt] || rt == PT_NBLE)
 			{
-				j = sim->create_part(-3,rx,ry,PT_PLSM);
+				j = sim->create_part_outer(-3,rx,ry,PT_PLSM);
 				if (j != -1)
 				{
 					parts[j].temp = temp;

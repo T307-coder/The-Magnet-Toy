@@ -71,7 +71,7 @@ static void create(ELEMENT_CREATE_FUNC_ARGS)
 	constexpr auto Parallel = std::is_same_v<decltype(sim), SimVariant<ParallelVariant> *>;
 	if constexpr (!Parallel)
 	{
-		int spawnID = sim->create_part(-3, x, y, PT_SPAWN2);
+		int spawnID = sim->create_part_outer(-3, x, y, PT_SPAWN2);
 		if (spawnID >= 0)
 			sim->player2.spawnID = spawnID;
 	}

@@ -52,7 +52,7 @@ static int update(UPDATE_FUNC_ARGS)
 {
 	//@ FUSE -> FUSE + PLSM
 	if (parts[i].life<=0) {
-		auto r = sim->create_part(i, x, y, PT_PLSM);
+		auto r = sim->create_part_outer(i, x, y, PT_PLSM);
 		if (r>-1)
 			parts[r].life = 50;
 		return 1;
@@ -60,7 +60,7 @@ static int update(UPDATE_FUNC_ARGS)
 	else if (parts[i].life < 40) {
 		parts[i].life--;
 		if (rng.chance(1, 100)) {
-			auto r = sim->create_part(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_PLSM);
+			auto r = sim->create_part_outer(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_PLSM);
 			if (r>-1)
 				parts[r].life = 50;
 		}
@@ -69,7 +69,7 @@ static int update(UPDATE_FUNC_ARGS)
 		parts[i].tmp=39;
 	else if (parts[i].tmp<=0) {
 		//@ FUSE -> FSEP
-		sim->create_part(i, x, y, PT_FSEP);
+		sim->create_part_outer(i, x, y, PT_FSEP);
 		return 1;
 	}
 	else if (parts[i].tmp<40)

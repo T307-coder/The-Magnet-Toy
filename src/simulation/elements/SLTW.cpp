@@ -60,18 +60,18 @@ static int update(UPDATE_FUNC_ARGS)
 				case PT_SALT:
 					//@ SLTW + SALT -> 2xSLTW
 					if (rng.chance(1, 2000))
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_SLTW);
+						sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SLTW);
 					break;
 				case PT_PLNT:
 					if (rng.chance(1, 40))
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 					break;
 				case PT_RBDM:
 				case PT_LRBD:
 					//@ SLTW + RBDM/LRBD -> FIRE + RBDM/LRBD
 					if ((sim->legacy_enable||parts[i].temp>(273.15f+12.0f)) && rng.chance(1, 100))
 					{
-						sim->part_change_type(i,x,y,PT_FIRE);
+						sim->part_change_type_outer(i,x,y,PT_FIRE);
 						parts[i].life = 4;
 						parts[i].ctype = PT_WATR;
 					}
@@ -79,10 +79,10 @@ static int update(UPDATE_FUNC_ARGS)
 				case PT_FIRE:
 					if (parts[ID(r)].ctype!=PT_WATR)
 					{
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 						if (rng.chance(1, 30))
 						{
-							sim->kill_part(i);
+							sim->kill_part_outer(i);
 							return 1;
 						}
 					}

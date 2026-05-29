@@ -79,7 +79,7 @@ static int update(UPDATE_FUNC_ARGS)
 						r = ID(r);
 						if (!rt)
 						{
-							int nr = sim->create_part(-1, x+nxi+nxx, y+nyi+nyy, PT_BRAY);
+							int nr = sim->create_part_outer(-1, x+nxi+nxx, y+nyi+nyy, PT_BRAY);
 							if (nr != -1)
 							{
 								// if it came from PSCN
@@ -149,7 +149,7 @@ static int update(UPDATE_FUNC_ARGS)
 									{
 										for (int rx1 = 0; rx1 >= -1 && rx1 <= 1; rx1 = -rx1 - rx1 + 1)
 										{
-											int np = sim->create_part(-1, x + nxi + nxx + rx1, y + nyi + nyy + ry1, TYP(parts[r].tmp));
+											int np = sim->create_part_outer(-1, x + nxi + nxx + rx1, y + nyi + nyy + ry1, TYP(parts[r].tmp));
 											if (np != -1)
 											{
 												parts[np].temp = parts[r].temp;
@@ -172,7 +172,7 @@ static int update(UPDATE_FUNC_ARGS)
 							else if (rt != PT_INWR && (rt != PT_SPRK || parts[r].ctype != PT_INWR) && rt != PT_ARAY && rt != PT_WIFI && !(rt == PT_SWCH && parts[r].life >= 10))
 							{
 								if (nyy!=0 || nxx!=0)
-									sim->create_part(-1, x+nxi+nxx, y+nyi+nyy, PT_SPRK);
+									sim->create_part_outer(-1, x+nxi+nxx, y+nyi+nyy, PT_SPRK);
 
 								if (!(nostop && parts[r].type==PT_SPRK && parts[r].ctype >= 0 && parts[r].ctype < PT_NUM && (elements[parts[r].ctype].Properties&PROP_CONDUCTS)))
 									docontinue = 0;

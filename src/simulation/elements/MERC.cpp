@@ -83,7 +83,7 @@ static int update(UPDATE_FUNC_ARGS)
 						if ((parts[i].tmp + parts[ID(r)].tmp + 1) <= maxtmp)
 						{
 							parts[i].tmp += parts[ID(r)].tmp + 1;
-							sim->kill_part(ID(r));
+							sim->kill_part_outer(ID(r));
 						}
 					}
 				}
@@ -103,7 +103,7 @@ static int update(UPDATE_FUNC_ARGS)
 						continue;
 					if ((!r)&&parts[i].tmp>=1)//if nothing then create MERC
 					{
-						auto np = sim->create_part(-1,x+rx,y+ry,PT_MERC);
+						auto np = sim->create_part_outer(-1,x+rx,y+ry,PT_MERC);
 						if (np<0) continue;
 						parts[i].tmp--;
 						parts[np].temp = parts[i].temp;
@@ -148,9 +148,9 @@ static int update(UPDATE_FUNC_ARGS)
 		if (sim->prevBFieldValid)
 		{
 			float dBdt = fabsf(Bnow - Bprev);
-			if (dBdt > 0.5f && sim->rng.chance(1, 8))
+			if (dBdt > 0.5f && rng.chance(1, 8))
 			{
-				sim->part_change_type(i, x, y, PT_SPRK);
+				sim->part_change_type_outer(i, x, y, PT_SPRK);
 				parts[i].ctype = PT_MERC;
 				parts[i].life = 4;
 				return 1;
@@ -221,7 +221,7 @@ static int update(UPDATE_FUNC_ARGS)
 	}	// Charge diffusion: equalize between conductors (DEUT-style)
 	for (auto trade = 0; trade < 4; trade++)
 	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
+		auto rx = rng.between(-2,2), ry = rng.between(-2,2);
 		if (!rx && !ry) continue;
 		auto r = pmap[y+ry][x+rx];
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))

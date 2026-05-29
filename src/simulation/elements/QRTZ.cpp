@@ -58,7 +58,7 @@ int Element_QRTZ_update(UPDATE_FUNC_ARGS)
 		if (press - parts[i].tmp3 > diffTolerance || press - parts[i].tmp3 < -diffTolerance)
 		{
 			//@ QRTZ -> PQRT
-			sim->part_change_type(i,x,y,PT_PQRT);
+			sim->part_change_type_outer(i,x,y,PT_PQRT);
 			parts[i].life = 5; //timer before it can grow or diffuse again
 		}
 		parts[i].tmp3 = press;
@@ -79,7 +79,7 @@ int Element_QRTZ_update(UPDATE_FUNC_ARGS)
 						continue;
 					else if (TYP(r)==PT_SLTW && rng.chance(1, 500))
 					{
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 						parts[i].tmp++;
 					}
 				}
@@ -105,7 +105,7 @@ int Element_QRTZ_update(UPDATE_FUNC_ARGS)
 					if (!pmap[y+sry][x+srx] && parts[i].tmp!=0)
 					{
 						//@ PQRT/QRTZ -> 2xQRTZ
-						auto np = sim->create_part(-1,x+srx,y+sry,PT_QRTZ);
+						auto np = sim->create_part_outer(-1,x+srx,y+sry,PT_QRTZ);
 						if (np>-1)
 						{
 							parts[np].temp = parts[i].temp;
@@ -118,7 +118,7 @@ int Element_QRTZ_update(UPDATE_FUNC_ARGS)
 							if (t == PT_PQRT)
 							{
 								// If PQRT is stationary and has started growing particles of QRTZ, the PQRT is basically part of a new QRTZ crystal. So turn it back into QRTZ so that it behaves more like part of the crystal.
-								sim->part_change_type(i,x,y,PT_QRTZ);
+								sim->part_change_type_outer(i,x,y,PT_QRTZ);
 							}
 							if (rng.chance(1, 2))
 							{

@@ -59,7 +59,7 @@ static int update(UPDATE_FUNC_ARGS)
 	if (diff > strength || diff < -1 * strength)
 	{
 		//@ GLAS -> BGLA
-		sim->part_change_type(i, x, y, PT_BGLA);
+		sim->part_change_type_outer(i, x, y, PT_BGLA);
 	}
 	parts[i].tmp3 = press;
 
@@ -77,7 +77,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (!r)
 		{
 			//@ GLAS -> GLAS + LNTG
-			auto np = sim->create_part(-1, x+rx, y+ry, PT_LNTG);
+			auto np = sim->create_part_outer(-1, x+rx, y+ry, PT_LNTG);
 			if (np>-1)
 			{
 				sim->pv[y/CELL][x/CELL] -= 1.0f;

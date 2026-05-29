@@ -69,10 +69,10 @@ static int update(UPDATE_FUNC_ARGS)
 						if (rng.chance(1, 2))
 						{
 							//@ BRMT + BREC -> BRMT + THRM
-							sim->create_part(ID(r), x+rx, y+ry, PT_THRM);
+							sim->create_part_outer(ID(r), x+rx, y+ry, PT_THRM);
 						}
 						else //@ BRMT + BREC -> THRM + BREC
-							sim->create_part(i, x, y, PT_THRM);
+							sim->create_part_outer(i, x, y, PT_THRM);
 					}
 				}
 			}
@@ -106,9 +106,9 @@ static int update(UPDATE_FUNC_ARGS)
 		if (sim->prevBFieldValid)
 		{
 			float dBdt = fabsf(Bnow - Bprev);
-			if (dBdt > 1.5f && sim->rng.chance(1, 8))
+			if (dBdt > 1.5f && rng.chance(1, 8))
 			{
-				sim->part_change_type(i, x, y, PT_SPRK);
+				sim->part_change_type_outer(i, x, y, PT_SPRK);
 				parts[i].ctype = PT_BRMT;
 				parts[i].life = 4;
 				return 1;

@@ -97,7 +97,7 @@ static int update(UPDATE_FUNC_ARGS)
 		for (int n=0; n<40; n++)
 		{
 			//@ FIRW -> EMBR
-			auto np = sim->create_part(-3, x, y, PT_EMBR);
+			auto np = sim->create_part_outer(-3, x, y, PT_EMBR);
 			if (np>-1)
 			{
 				auto magnitude = rng.between(40, 99) * 0.05f;
@@ -112,7 +112,7 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 		}
 		sim->pv[y/CELL][x/CELL] += 8.0f;
-		sim->kill_part(i);
+		sim->kill_part_outer(i);
 		return 1;
 	}
 	return 0;

@@ -94,12 +94,12 @@ static int update(UPDATE_FUNC_ARGS)
 			if (rng.chance(1, 2))
 			{
 				//@ BANG -> FIRE
-				sim->create_part(i, x, y, PT_FIRE);
+				sim->create_part_outer(i, x, y, PT_FIRE);
 			}
 			else
 			{
 				//@ BANG -> SMKE
-				sim->create_part(i, x, y, PT_SMKE);
+				sim->create_part_outer(i, x, y, PT_SMKE);
 				parts[i].life = rng.between(500, 549);
 			}
 			parts[i].temp = restrict_flt((MAX_TEMP/4)+otemp, MIN_TEMP, MAX_TEMP);
@@ -109,7 +109,7 @@ static int update(UPDATE_FUNC_ARGS)
 			if (rng.chance(1, 15))
 			{
 				//@ BANG -> EMBR
-				sim->create_part(i, x, y, PT_EMBR);
+				sim->create_part_outer(i, x, y, PT_EMBR);
 				parts[i].tmp = 0;
 				parts[i].life = 50;
 				parts[i].temp = restrict_flt((MAX_TEMP/3)+otemp, MIN_TEMP, MAX_TEMP);
@@ -118,7 +118,7 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 			else
 			{
-				sim->kill_part(i);
+				sim->kill_part_outer(i);
 			}
 		}
 		return 1;

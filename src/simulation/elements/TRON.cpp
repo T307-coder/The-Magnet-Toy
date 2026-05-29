@@ -204,7 +204,7 @@ static void create(ELEMENT_CREATE_FUNC_ARGS)
 
 static int new_tronhead(auto *sim, int x, int y, int i, int direction)
 {
-	int np = sim->create_part(-1, x , y ,PT_TRON);
+	int np = sim->create_part_outer(-1, x , y ,PT_TRON);
 	if (np==-1)
 		return -1;
 	if (sim->parts[i].life >= 100) // increase tail length

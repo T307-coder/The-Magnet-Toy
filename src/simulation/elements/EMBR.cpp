@@ -65,7 +65,7 @@ static int update(UPDATE_FUNC_ARGS)
 					continue;
 				if ((elements[TYP(r)].Properties & (TYPE_SOLID | TYPE_PART | TYPE_LIQUID)) && !(elements[TYP(r)].Properties & PROP_SPARKSETTLE))
 				{
-					sim->kill_part(i);
+					sim->kill_part_outer(i);
 					return 1;
 				}
 			}

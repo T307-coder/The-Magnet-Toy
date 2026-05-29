@@ -60,7 +60,7 @@ static int update(UPDATE_FUNC_ARGS)
 				{
 					if (rng.chance(11, 40))
 					{
-						sim->part_change_type(i,x,y,PT_SHLD2);
+						sim->part_change_type_outer(i,x,y,PT_SHLD2);
 						parts[i].life = 7;
 					}
 					for (auto nnx = -1; nnx <= 1; nnx++)
@@ -69,7 +69,7 @@ static int update(UPDATE_FUNC_ARGS)
 						{
 							if (!pmap[y+ry+nny][x+rx+nnx])
 							{
-								sim->create_part(-1,x+rx+nnx,y+ry+nny,PT_SHLD1);
+								sim->create_part_outer(-1,x+rx+nnx,y+ry+nny,PT_SHLD1);
 								//parts[ID(pmap[y+ny+nny][x+nx+nnx])].life=7;
 							}
 						}
@@ -77,7 +77,7 @@ static int update(UPDATE_FUNC_ARGS)
 				}
 				else if (TYP(r) == PT_SHLD3 && rng.chance(2, 5))
 				{
-					sim->part_change_type(i,x,y,PT_SHLD2);
+					sim->part_change_type_outer(i,x,y,PT_SHLD2);
 					parts[i].life = 7;
 				}
 			}

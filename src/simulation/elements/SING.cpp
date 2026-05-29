@@ -85,15 +85,15 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				case 0:
 					//@ SING -> PHOT
-					nb = sim->create_part(-3, x, y, PT_PHOT);
+					nb = sim->create_part_outer(-3, x, y, PT_PHOT);
 					break;
 				case 1:
 					//@ SING -> NEUT
-					nb = sim->create_part(-3, x, y, PT_NEUT);
+					nb = sim->create_part_outer(-3, x, y, PT_NEUT);
 					break;
 				case 2:
 					//@ SING -> ELEC
-					nb = sim->create_part(-3, x, y, PT_ELEC);
+					nb = sim->create_part_outer(-3, x, y, PT_ELEC);
 					break;
 			}
 			if (nb!=-1) {
@@ -107,7 +107,7 @@ static int update(UPDATE_FUNC_ARGS)
 			else if (sim->MaxPartsReached())
 				break;//if we've run out of particles, stop trying to create them - saves a lot of lag on "sing bomb" saves
 		}
-		sim->kill_part(i);
+		sim->kill_part_outer(i);
 		return 1;
 	}
 	for (auto rx = -1; rx <= 1; rx++)
@@ -134,7 +134,7 @@ static int update(UPDATE_FUNC_ARGS)
 							if (parts[ID(r)].type!=PT_SING && rng.chance(1, 1000))
 							{
 								int np;
-								np = sim->create_part(ID(r),x+rx,y+ry,PT_SING);
+								np = sim->create_part_outer(ID(r),x+rx,y+ry,PT_SING);
 								parts[np].life = rng.between(60, 109);
 							}
 							continue;
@@ -143,7 +143,7 @@ static int update(UPDATE_FUNC_ARGS)
 						parts[i].tmp++;
 					}
 					parts[i].temp = restrict_flt(parts[ID(r)].temp+parts[i].temp, MIN_TEMP, MAX_TEMP);
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 				}
 			}
 		}

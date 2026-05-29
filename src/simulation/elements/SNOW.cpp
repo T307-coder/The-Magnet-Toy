@@ -66,8 +66,8 @@ static int update(UPDATE_FUNC_ARGS)
 				//@ SNOW + SALT/SLTW -> 2xSLTW
 				if ((TYP(r)==PT_SALT || TYP(r)==PT_SLTW) && rng.chance(1, 333))
 				{
-					sim->part_change_type(i,x,y,PT_SLTW);
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_SLTW);
+					sim->part_change_type_outer(i,x,y,PT_SLTW);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SLTW);
 				}
 			}
 		}

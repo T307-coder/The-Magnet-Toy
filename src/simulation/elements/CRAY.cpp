@@ -104,7 +104,7 @@ static int update(UPDATE_FUNC_ARGS)
 							}
 							r = pmap[y+nyi+nyy][x+nxi+nxx];
 							if (!sim->IsWallBlocking(x+nxi+nxx, y+nyi+nyy, TYP(parts[i].ctype)) && (!sim->pmap[y+nyi+nyy][x+nxi+nxx] || createSpark)) { // create, also set color if it has passed through FILT
-								int nr = sim->create_part(-1, x+nxi+nxx, y+nyi+nyy, TYP(parts[i].ctype), ID(parts[i].ctype));
+								int nr = sim->create_part_outer(-1, x+nxi+nxx, y+nyi+nyy, TYP(parts[i].ctype), ID(parts[i].ctype));
 								if (nr!=-1) {
 									if (colored)
 										parts[nr].dcolour = colored;
@@ -127,7 +127,7 @@ static int update(UPDATE_FUNC_ARGS)
 							} else if (TYP(r) == PT_CRAY || nostop) {
 								docontinue = 1;
 							} else if(destroy && r && (TYP(r) != PT_DMND)) {
-								sim->kill_part(ID(r));
+								sim->kill_part_outer(ID(r));
 								if(!--partsRemaining)
 									docontinue = 0;
 							}

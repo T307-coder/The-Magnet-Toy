@@ -82,7 +82,7 @@ static int update(UPDATE_FUNC_ARGS)
 					return 0;
 				}
 				else if (TYP(r)==PT_NSCN && parts[i].tmp==1)
-					sim->create_part(-1, x+rx, y+ry, PT_SPRK);
+					sim->create_part_outer(-1, x+rx, y+ry, PT_SPRK);
 				else if (TYP(r)==PT_WIRE && parts[ID(r)].tmp==1 && !parts[i].tmp)
 					count++;
 			}

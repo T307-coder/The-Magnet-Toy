@@ -87,7 +87,7 @@ static int update(UPDATE_FUNC_ARGS)
 						{
 							//@ EXOT + LAVA(TTAN/GOLD) -> LAVA(VIBR)
 							parts[ID(r)].ctype = PT_VIBR;
-							sim->kill_part(i);
+							sim->kill_part_outer(i);
 							return 1;
 						}
 					}
@@ -96,7 +96,7 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						if (rng.chance(1, 1000))
 						{
-							sim->kill_part(i);
+							sim->kill_part_outer(i);
 							return 1;
 						}
 					}
@@ -104,7 +104,7 @@ static int update(UPDATE_FUNC_ARGS)
 				if (parts[i].tmp > 245 && parts[i].life > 1337)
 					if (rt!=PT_EXOT && rt!=PT_BREC && rt!=PT_DMND && rt!=PT_CLNE && rt!=PT_PRTI && rt!=PT_PRTO && rt!=PT_PCLN && rt!=PT_VOID && rt!=PT_NBHL && rt!=PT_WARP)
 					{
-						if (sim->create_part(i, x, y, rt) != -1)
+						if (sim->create_part_outer(i, x, y, rt) != -1)
 						{
 							return 1;
 						}
@@ -127,7 +127,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (parts[i].life < 1001)
 		{
 			//@ EXOT -> WARP
-			sim->part_change_type(i, x, y, PT_WARP);
+			sim->part_change_type_outer(i, x, y, PT_WARP);
 			return 1;
 		}
 	}
@@ -138,7 +138,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		parts[i].tmp2 = 6000;
 		//@ EXOT -> WARP
-		sim->part_change_type(i, x, y, PT_WARP);
+		sim->part_change_type_outer(i, x, y, PT_WARP);
 		return 1;
 	}
 	if (parts[i].tmp2 > 100)
@@ -176,7 +176,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (parts[i].temp < 50.0f)
 		{
 			//@ EXOT(PROT) -> CFLM
-			if (sim->create_part(i, x, y, PT_CFLM) != -1) // I don't see how this could fail but whatever
+			if (sim->create_part_outer(i, x, y, PT_CFLM) != -1) // I don't see how this could fail but whatever
 			{
 				return 1;
 			}

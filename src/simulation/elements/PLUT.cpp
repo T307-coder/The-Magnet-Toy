@@ -52,7 +52,7 @@ static int update(UPDATE_FUNC_ARGS)
 	if (rng.chance(1, 100) && rng.chance(int(5.0f*sim->pv[y/CELL][x/CELL]), 1000))
 	{
 		//@ PLUT -> NEUT
-		sim->create_part(i, x, y, PT_NEUT);
+		sim->create_part_outer(i, x, y, PT_NEUT);
 	}
 	return 0;
 }

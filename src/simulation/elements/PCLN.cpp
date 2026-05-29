@@ -119,7 +119,7 @@ static int update(UPDATE_FUNC_ARGS)
 				{
 					if (rx || ry)
 					{
-						int r = sim->create_part(-1, x + rx, y + ry, PT_PHOT);
+						int r = sim->create_part_outer(-1, x + rx, y + ry, PT_PHOT);
 						if (r != -1)
 						{
 							parts[r].vx = float(rx * 3);
@@ -140,13 +140,13 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				for (auto ry = -1; ry <= 1; ry++)
 				{
-					sim->create_part(-1, x+rx, y+ry, PT_LIFE, parts[i].tmp);
+					sim->create_part_outer(-1, x+rx, y+ry, PT_LIFE, parts[i].tmp);
 				}
 			}
 		}
 		else if (parts[i].ctype != PT_LIGH || rng.chance(1, 30))
 		{
-			int np = sim->create_part(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), TYP(parts[i].ctype));
+			int np = sim->create_part_outer(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), TYP(parts[i].ctype));
 			if (np>=0)
 			{
 				if (parts[i].ctype==PT_LAVA && parts[i].tmp>0 && parts[i].tmp<PT_NUM && elements[parts[i].tmp].HighTemperatureTransition==PT_LAVA)

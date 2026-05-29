@@ -62,7 +62,7 @@ static int update(UPDATE_FUNC_ARGS)
 				if (TYP(r)==PT_WATR && rng.chance(1, 14))
 				{
 					//@ FRZW + WATR -> 2xFRZW
-					sim->part_change_type(ID(r),x+rx,y+ry,PT_FRZW);
+					sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_FRZW);
 				}
 			}
 		}
@@ -70,7 +70,7 @@ static int update(UPDATE_FUNC_ARGS)
 	if ((parts[i].life==0 && rng.chance(1, 192)) || rng.chance(100-parts[i].life, 50000))
 	{
 		//@ FRZW -> ICEI(FRZW)
-		sim->part_change_type(i,x,y,PT_ICEI);
+		sim->part_change_type_outer(i,x,y,PT_ICEI);
 		parts[i].ctype=PT_FRZW;
 		parts[i].temp = restrict_flt(parts[i].temp-200.0f, MIN_TEMP, MAX_TEMP);
 	}

@@ -71,7 +71,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (rng.chance(1, 2))
 		{
 			//@ DEST + PLUT/DEUT -> DEST + NEUT
-			sim->create_part(ID(r), x+rx, y+ry, PT_NEUT);
+			sim->create_part_outer(ID(r), x+rx, y+ry, PT_NEUT);
 			parts[ID(r)].temp = MAX_TEMP;
 			sim->pv[y/CELL][x/CELL] += 10.0f;
 			parts[i].life-=4;
@@ -80,11 +80,11 @@ static int update(UPDATE_FUNC_ARGS)
 	else if (rt == PT_INSL)
 	{
 		//@ DEST + INSL -> DEST + PLSM
-		sim->create_part(ID(r), x+rx, y+ry, PT_PLSM);
+		sim->create_part_outer(ID(r), x+rx, y+ry, PT_PLSM);
 	}
 	else if (rng.chance(1, 3))
 	{
-		sim->kill_part(ID(r));
+		sim->kill_part_outer(ID(r));
 		parts[i].life -= 4*((elements[rt].Properties&TYPE_SOLID)?3:1);
 		if (parts[i].life<=0)
 			parts[i].life=1;

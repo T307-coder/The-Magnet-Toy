@@ -61,8 +61,8 @@ static inline void electricity_diffuseCharge(Simulation *sim, Particle &p, int x
 {
 	for (int trade = 0; trade < 4; trade++)
 	{
-		int rx = sim->rng.between(-2, 2);
-		int ry = sim->rng.between(-2, 2);
+		int rx = sim->sharedRng.between(-2, 2);
+		int ry = sim->sharedRng.between(-2, 2);
 		if (!rx && !ry) continue;
 		auto r = sim->pmap[y + ry][x + rx];
 		if (!r) continue;

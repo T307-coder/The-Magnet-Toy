@@ -74,7 +74,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (rng.chance(2, 3))
 		{
 			//@ IGNT -> IGNT + EMBR
-			int nb = sim->create_part(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_EMBR);
+			int nb = sim->create_part_outer(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_EMBR);
 			if (nb!=-1) {
 				parts[nb].tmp = 0;
 				parts[nb].life = 30;
@@ -86,7 +86,7 @@ static int update(UPDATE_FUNC_ARGS)
 		else
 		{
 			//@ IGNT -> IGNT + FIRE
-			sim->create_part(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_FIRE);
+			sim->create_part_outer(-1, x + rng.between(-1, 1), y + rng.between(-1, 1), PT_FIRE);
 		}
 		parts[i].life--;
 	}

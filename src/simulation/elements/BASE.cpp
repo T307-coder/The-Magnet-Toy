@@ -93,7 +93,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		//@ BASE -> ICE(BASE)
 		//We don't save base's concentration, so ICEI(BASE) will unfreeze into life = 0
-		sim->part_change_type(i, x, y, PT_ICEI);
+		sim->part_change_type_outer(i, x, y, PT_ICEI);
 		parts[i].ctype = PT_BASE;
 		parts[i].life = 0;
 		return 1;
@@ -125,7 +125,7 @@ static int update(UPDATE_FUNC_ARGS)
 							int saturh = parts[i].life/2;
 
 							//@ BASE + WATR/DSTW/CBNW -> 2xBASE
-							sim->part_change_type(ID(r), x+rx, y+ry, PT_BASE);
+							sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_BASE);
 							parts[ID(r)].life = saturh;
 							parts[ID(r)].temp += ((float)saturh)/10.0f;
 							parts[i].life -= saturh;
@@ -134,22 +134,22 @@ static int update(UPDATE_FUNC_ARGS)
 					else if (rt == PT_ACID && parts[i].life >= parts[ID(r)].life)
 					{
 						//@ BASE + ACID -> 2xSLTW
-						sim->part_change_type(i, x, y, PT_SLTW);
-						sim->part_change_type(ID(r), x+rx, y+ry, PT_SLTW);
+						sim->part_change_type_outer(i, x, y, PT_SLTW);
+						sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_SLTW);
 						return 1;
 					} //Base neutralizes CAUS
 					else if (rt == PT_CAUS && parts[i].life >= parts[ID(r)].life)
 					{
 						//@ BASE + CAUS -> SLTW
-						sim->part_change_type(i, x, y, PT_SLTW);
-						sim->kill_part(ID(r));
+						sim->part_change_type_outer(i, x, y, PT_SLTW);
+						sim->kill_part_outer(ID(r));
 						return 1;
 					} //@ BASE + OIL -> SOAP
 					else if (parts[i].life >= 70 && rt == PT_OIL)
 					{
-						sim->part_change_type(i, x, y, PT_SOAP);
+						sim->part_change_type_outer(i, x, y, PT_SOAP);
 						parts[i].tmp = parts[i].tmp2 = parts[i].ctype = 0;
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 						return 1;
 					} //@ BASE + GOO -> BASE + GEL
 					else if (parts[i].life > 1 && rt == PT_GOO)
@@ -164,18 +164,18 @@ static int update(UPDATE_FUNC_ARGS)
 					} //@ BASE + LAVA(ROCK) -> MERC
 				        else if (rt == PT_LAVA && parts[ID(r)].ctype == PT_ROCK && pres >= 10.0f && rng.chance(1, 1000))
 					{
-						sim->part_change_type(i, x, y, PT_MERC);
+						sim->part_change_type_outer(i, x, y, PT_MERC);
 						parts[i].life = 0;
 						parts[i].tmp = 10;
 
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 						return 1;
 					} //Base rusts conductive solids
 					else if (parts[i].life >= 10 &&
 						       	(elements[rt].Properties & (TYPE_SOLID|PROP_CONDUCTS)) == (TYPE_SOLID|PROP_CONDUCTS) && rng.chance(1, 10))
 					{
 						//@ BASE + conductive solid -> BASE + BMTL
-						sim->part_change_type(ID(r), x+rx, y+ry, PT_BMTL);
+						sim->part_change_type_outer(ID(r), x+rx, y+ry, PT_BMTL);
 						parts[ID(r)].tmp = rng.between(20, 29);
 						parts[i].life--;
 						//Draw a spark effect
@@ -184,7 +184,7 @@ static int update(UPDATE_FUNC_ARGS)
 					else if (elements[rt].Hardness > 0 && elements[rt].Hardness < 50 &&
 							parts[i].life >= (2*elements[rt].Hardness) && rng.chance(50-elements[rt].Hardness, 1000))
 					{
-						sim->kill_part(ID(r));
+						sim->kill_part_outer(ID(r));
 						parts[i].life -= 2;
 						//Draw a spark
 						parts[i].tmp = 1;

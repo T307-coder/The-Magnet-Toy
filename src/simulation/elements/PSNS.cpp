@@ -71,7 +71,7 @@ static int update(UPDATE_FUNC_ARGS)
 						{
 							parts[ID(r)].life = 4;
 							parts[ID(r)].ctype = rt;
-							sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+							sim->part_change_type_outer(ID(r),x+rx,y+ry,PT_SPRK);
 						}
 					}
 				}

@@ -47,9 +47,9 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 		return false;
 
 	float dBdt = fabsf(Bnow - Bprev);
-	if (dBdt > threshold && sim->rng.chance(1, chanceDenom))
+	if (dBdt > threshold && sim->sharedRng.chance(1, chanceDenom))
 	{
-		sim->part_change_type(i, x, y, PT_SPRK);
+		sim->part_change_type_outer(i, x, y, PT_SPRK);
 		sim->parts[i].ctype = ctype;
 		sim->parts[i].life = 4;
 		sim->parts[i].tmp3 = 1;  // mark as induced SPRK → element gets life=100 on death
@@ -97,7 +97,7 @@ static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, 
 					if (dist <= reach)
 					{
 						int chance = dist * dist;
-						if (dist <= 1 || sim->rng.chance(1, chance))
+						if (dist <= 1 || sim->sharedRng.chance(1, chance))
 						{
 							if (tmp3Ref < target) tmp3Ref++;
 							else if (tmp3Ref > target) tmp3Ref--;
@@ -113,7 +113,7 @@ static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, 
 				if (dist <= reach)
 				{
 					int chance = dist * dist;
-					if (dist <= 1 || sim->rng.chance(1, chance))
+					if (dist <= 1 || sim->sharedRng.chance(1, chance))
 					{
 						if (tmp3Ref < target) tmp3Ref++;
 						else if (tmp3Ref > target) tmp3Ref--;
@@ -135,8 +135,8 @@ static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, 
 	if (numTrades < 4) numTrades = 4;
 	for (int trade = 0; trade < numTrades; trade++)
 	{
-		int rx = sim->rng.between(-reach, reach);
-		int ry = sim->rng.between(-reach, reach);
+		int rx = sim->sharedRng.between(-reach, reach);
+		int ry = sim->sharedRng.between(-reach, reach);
 		if (!rx && !ry) continue;
 		int nx = x + rx, ny = y + ry;
 		if (nx < 0 || ny < 0 || nx >= XRES || ny >= YRES) continue;

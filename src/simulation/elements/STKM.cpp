@@ -78,7 +78,7 @@ static void create(ELEMENT_CREATE_FUNC_ARGS)
 	constexpr auto Parallel = std::is_same_v<decltype(sim), SimVariant<ParallelVariant> *>;
 	if constexpr (!Parallel)
 	{
-		int spawnID = sim->create_part(-3, x, y, PT_SPAWN);
+		int spawnID = sim->create_part_outer(-3, x, y, PT_SPAWN);
 		if (spawnID >= 0)
 			sim->player.spawnID = spawnID;
 	}
@@ -114,13 +114,13 @@ void die(auto *sim, playerst *playerp, int i)
 		int y = (int)(sim->parts[i].y + 0.5f);
 		for (int r = -2; r <= 1; r++)
 		{
-			sim->create_part(-1, x + r, y - 2, playerp->elem);
-			sim->create_part(-1, x + r + 1, y + 2, playerp->elem);
-			sim->create_part(-1, x - 2, y + r + 1, playerp->elem);
-			sim->create_part(-1, x + 2, y + r, playerp->elem);
+			sim->create_part_outer(-1, x + r, y - 2, playerp->elem);
+			sim->create_part_outer(-1, x + r + 1, y + 2, playerp->elem);
+			sim->create_part_outer(-1, x - 2, y + r + 1, playerp->elem);
+			sim->create_part_outer(-1, x + 2, y + r, playerp->elem);
 		}
 	}
-	sim->kill_part(i);  //Kill him
+	sim->kill_part_outer(i);  //Kill him
 }
 
 int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
@@ -299,7 +299,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 				if (leg==1 && (((int)(playerp->comm)&0x02) == 0x02))
 					continue;
 				int footX = int(playerp->legs[leg*8+4]), footY = int(playerp->legs[leg*8+5]);
-				int np = sim->create_part(-1, footX, footY, PT_PLSM);
+				int np = sim->create_part_outer(-1, footX, footY, PT_PLSM);
 				if (np>=0)
 				{
 					parts[np].vx = parts[i].vx+mvy*25;
@@ -349,7 +349,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 				if (leg==0 && (((int)(playerp->comm)&0x01) == 0x01))
 					continue;
 				int footX = int(playerp->legs[leg*8+4]), footY = int(playerp->legs[leg*8+5]);
-				int np = sim->create_part(-1, footX, footY, PT_PLSM);
+				int np = sim->create_part_outer(-1, footX, footY, PT_PLSM);
 				if (np>=0)
 				{
 					parts[np].vx = parts[i].vx-mvy*25;
@@ -384,7 +384,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 			for (int leg=0; leg<2; leg++)
 			{
 				int footX = int(playerp->legs[leg*8+4]), footY = int(playerp->legs[leg*8+5]);
-				int np = sim->create_part(-1, footX, footY+1, PT_PLSM);
+				int np = sim->create_part_outer(-1, footX, footY+1, PT_PLSM);
 				if (np>=0)
 				{
 					parts[np].vx = parts[i].vx+mvx*30;
@@ -408,10 +408,10 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 	//Charge detector wall if foot inside
 	if (InCellBounds(int(playerp->legs[4]+0.5)/CELL, int(playerp->legs[5]+0.5)/CELL) &&
 	       sim->bmap[(int)(playerp->legs[5]+0.5)/CELL][(int)(playerp->legs[4]+0.5)/CELL]==WL_DETECT)
-		sim->set_emap((int)playerp->legs[4]/CELL, (int)playerp->legs[5]/CELL);
+		sim->set_emap_outer((int)playerp->legs[4]/CELL, (int)playerp->legs[5]/CELL);
 	if (InCellBounds(int(playerp->legs[12]+0.5)/CELL, int(playerp->legs[13]+0.5)/CELL) &&
 	        sim->bmap[(int)(playerp->legs[13]+0.5)/CELL][(int)(playerp->legs[12]+0.5)/CELL]==WL_DETECT)
-		sim->set_emap((int)(playerp->legs[12]+0.5)/CELL, (int)(playerp->legs[13]+0.5)/CELL);
+		sim->set_emap_outer((int)(playerp->legs[12]+0.5)/CELL, (int)(playerp->legs[13]+0.5)/CELL);
 
 	//Searching for particles near head
 	for (rx=-2; rx<3; rx++)
@@ -432,14 +432,14 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 						parts[i].life += 5;
 					else
 						parts[i].life = 100;
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 				}
 
 				if (TYP(r) == PT_NEUT)
 				{
 					if (parts[i].life<=100) parts[i].life -= (102-parts[i].life)/2;
 					else parts[i].life = int(parts[i].life * 0.9f);
-					sim->kill_part(ID(r));
+					sim->kill_part_outer(ID(r));
 				}
 				if (sim->bmap[(ry+y)/CELL][(rx+x)/CELL]==WL_FAN)
 					playerp->fan = true;
@@ -464,7 +464,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 		r = pmap[ry][rx];
 		if (elements[TYP(r)].Properties&TYPE_SOLID)
 		{
-			sim->create_part(-1, rx, ry, PT_SPRK);
+			sim->create_part_outer(-1, rx, ry, PT_SPRK);
 			playerp->frames = 0;
 		}
 		else
@@ -491,7 +491,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 			else if (playerp->elem==PT_LIGH && playerp->frames<30)//limit lightning creation rate
 				np = -1;
 			else
-				np = sim->create_part(-1, rx, ry, playerp->elem);
+				np = sim->create_part_outer(-1, rx, ry, playerp->elem);
 			if ( (np < NPART) && np>=0)
 			{
 				if (playerp->elem == PT_PHOT)
@@ -499,7 +499,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 					int random = abs((rng.between(-1, 1)))*3;
 					if (random==0)
 					{
-						sim->kill_part(np);
+						sim->kill_part_outer(np);
 					}
 					else
 					{
@@ -698,7 +698,7 @@ void Element_STKM_interact(auto *sim, RNG &rng, playerst *playerp, int i, int x,
 				if (!sim->portalp[sim->parts[ID(r)].tmp][count][nnx].type)
 				{
 					sim->portalp[sim->parts[ID(r)].tmp][count][nnx] = sim->parts[i];
-					sim->kill_part(i);
+					sim->kill_part_outer(i);
 					//stop new STKM/fighters being created to replace the ones in the portal:
 					playerp->spwn = 1;
 					if (sim->portalp[sim->parts[ID(r)].tmp][count][nnx].type==PT_FIGH)
@@ -712,11 +712,11 @@ void Element_STKM_interact(auto *sim, RNG &rng, playerst *playerp, int i, int x,
 			{
 				sim->parts[ID(r)].temp = restrict_flt(sim->parts[ID(r)].temp+sim->parts[i].temp/2, MIN_TEMP, MAX_TEMP);
 			}
-			sim->kill_part(i);
+			sim->kill_part_outer(i);
 		}
 		if ((TYP(r)==PT_VOID || (TYP(r)==PT_PVOD && sim->parts[ID(r)].life==10)) && (!sim->parts[ID(r)].ctype || (sim->parts[ID(r)].ctype==sim->parts[i].type)!=(sim->parts[ID(r)].tmp&1)) && sim->parts[i].type)
 		{
-			sim->kill_part(i);
+			sim->kill_part_outer(i);
 		}
 	}
 }
