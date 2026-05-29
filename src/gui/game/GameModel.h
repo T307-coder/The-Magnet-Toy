@@ -273,6 +273,12 @@ public:
 	bool GetElectricField();
 	void SetMagnetismEnabled(bool enable);
 	bool GetMagnetismEnabled();
+	void SetInductionEnabled(bool enable);
+	bool GetInductionEnabled();
+	void SetCurrentBFieldEnabled(bool enable);
+	bool GetCurrentBFieldEnabled();
+	void SetRealisticPstnEnabled(bool enable);
+	bool GetRealisticPstnEnabled();
 	void SetElectricityEnabled(bool enable);
 	bool GetElectricityEnabled();
 	void ClearSimulation();

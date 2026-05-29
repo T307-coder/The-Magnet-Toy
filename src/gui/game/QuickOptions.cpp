@@ -162,3 +162,45 @@ void ConsoleShowOption::perform()
 {
 	c->ShowConsole();
 }
+
+InductionEnableOption::InductionEnableOption(GameModel * m):
+QuickOption("I", "Magnetic induction \bg(dB/dt sparking)", m, Toggle)
+{
+
+}
+bool InductionEnableOption::GetToggle()
+{
+	return m->GetInductionEnabled();
+}
+void InductionEnableOption::perform()
+{
+	m->SetInductionEnabled(!m->GetInductionEnabled());
+}
+
+CurrentBFieldOption::CurrentBFieldOption(GameModel * m):
+QuickOption("J", "Current magnetic field \bg(Biot-Savart)", m, Toggle)
+{
+
+}
+bool CurrentBFieldOption::GetToggle()
+{
+	return m->GetCurrentBFieldEnabled();
+}
+void CurrentBFieldOption::perform()
+{
+	m->SetCurrentBFieldEnabled(!m->GetCurrentBFieldEnabled());
+}
+
+RealisticPstnOption::RealisticPstnOption(GameModel * m):
+QuickOption("R", "Realistic PSTN \bg(gives velocity)", m, Toggle)
+{
+
+}
+bool RealisticPstnOption::GetToggle()
+{
+	return m->GetRealisticPstnEnabled();
+}
+void RealisticPstnOption::perform()
+{
+	m->SetRealisticPstnEnabled(!m->GetRealisticPstnEnabled());
+}

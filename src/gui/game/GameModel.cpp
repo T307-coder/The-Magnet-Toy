@@ -269,8 +269,11 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	// New magnet mod options — second row
 	quickOptions.push_back(new DrawMagneticOption(this));
 	quickOptions.push_back(new MagnetismEnableOption(this));
+	quickOptions.push_back(new InductionEnableOption(this));
 	quickOptions.push_back(new DrawElectricOption(this));
 	quickOptions.push_back(new ElectricityEnableOption(this));
+	quickOptions.push_back(new CurrentBFieldOption(this));
+	quickOptions.push_back(new RealisticPstnOption(this));
 
 	notifyQuickOptionsChanged();
 	UpdateQuickOptions();
@@ -1232,6 +1235,51 @@ void GameModel::SetMagnetismEnabled(bool enable)
 bool GameModel::GetMagnetismEnabled()
 {
 	return sim->magnetismEnabled;
+}
+
+void GameModel::SetInductionEnabled(bool enable)
+{
+	sim->EnableInduction(enable);
+	if (enable)
+		SetInfoTip("Magnetic Induction: On");
+	else
+		SetInfoTip("Magnetic Induction: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetInductionEnabled()
+{
+	return sim->inductionEnabled;
+}
+
+void GameModel::SetCurrentBFieldEnabled(bool enable)
+{
+	sim->EnableCurrentBField(enable);
+	if (enable)
+		SetInfoTip("Current B-Field: On");
+	else
+		SetInfoTip("Current B-Field: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetCurrentBFieldEnabled()
+{
+	return sim->currentBFieldEnabled;
+}
+
+void GameModel::SetRealisticPstnEnabled(bool enable)
+{
+	sim->realisticPstnEnabled = enable;
+	if (enable)
+		SetInfoTip("Realistic PSTN: On");
+	else
+		SetInfoTip("Realistic PSTN: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetRealisticPstnEnabled()
+{
+	return sim->realisticPstnEnabled;
 }
 
 void GameModel::ShowElectricField(bool show)

@@ -28,7 +28,7 @@ static inline void magnetism_ferromagneticPull(Simulation *sim, Particle &p, int
 // Cooldown: element life acts as cooldown timer (set to 100 when induced SPRK dies).
 static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, int cx, int cy, int &tmp2Ref, int ctype, float threshold, int chanceDenom)
 {
-	if (!sim->magnetismEnabled || cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS)
+	if (!sim->magnetismEnabled || !sim->inductionEnabled || cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS)
 		return false;
 
 	// Cooldown: element life > 0 means recently induced (PROP_LIFE_DEC counts it down)

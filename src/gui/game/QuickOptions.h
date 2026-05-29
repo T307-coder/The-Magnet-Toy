@@ -82,3 +82,27 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+
+class InductionEnableOption: public QuickOption
+{
+public:
+	InductionEnableOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class CurrentBFieldOption: public QuickOption
+{
+public:
+	CurrentBFieldOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class RealisticPstnOption: public QuickOption
+{
+public:
+	RealisticPstnOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

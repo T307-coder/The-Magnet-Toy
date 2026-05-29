@@ -871,6 +871,21 @@ void GameController::ToggleMagnetism()
 	gameModel->SetMagnetismEnabled(!gameModel->GetMagnetismEnabled());
 }
 
+void GameController::ToggleInduction()
+{
+	gameModel->SetInductionEnabled(!gameModel->GetInductionEnabled());
+}
+
+void GameController::ToggleCurrentBField()
+{
+	gameModel->SetCurrentBFieldEnabled(!gameModel->GetCurrentBFieldEnabled());
+}
+
+void GameController::ToggleRealisticPstn()
+{
+	gameModel->SetRealisticPstnEnabled(!gameModel->GetRealisticPstnEnabled());
+}
+
 void GameController::ToggleNewtonianGravity()
 {
 	gameModel->SetNewtonianGravity(!gameModel->GetNewtonianGrvity());

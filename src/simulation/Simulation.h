@@ -93,6 +93,9 @@ struct RenderableSimulation
 	int currentTick = 0;
 	int emp_decor = 0;
 	bool magnetismEnabled = true;
+	bool inductionEnabled = true;
+	bool currentBFieldEnabled = true;
+	bool realisticPstnEnabled = false;
 	bool electricityEnabled = true;
 
 	playerst player;
@@ -290,6 +293,8 @@ public:
 
 	void EnableNewtonianGravity(bool enable);
 	void EnableMagnetism(bool enable);
+	void EnableInduction(bool enable);
+	void EnableCurrentBField(bool enable);
 	void EnableElectricity(bool enable);
 
 	FrameTime *frameTime = nullptr;

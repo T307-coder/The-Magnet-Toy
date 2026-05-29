@@ -316,6 +316,11 @@ static int MoveStack(Simulation * sim, int stackX, int stackY, int directionX, i
 				sim->pmap[srcY][srcX] = 0;
 				sim->parts[jP].x = float(destX);
 				sim->parts[jP].y = float(destY);
+				if (sim->realisticPstnEnabled)
+				{
+					sim->parts[jP].tmp5 = -directionX * amount;
+					sim->parts[jP].tmp6 = -directionY * amount;
+				}
 				sim->pmap[destY][destX] = PMAP(jP, sim->parts[jP].type);
 			}
 			return amount;
@@ -339,6 +344,11 @@ static int MoveStack(Simulation * sim, int stackX, int stackY, int directionX, i
 				sim->pmap[srcY][srcX] = 0;
 				sim->parts[jP].x = float(destX);
 				sim->parts[jP].y = float(destY);
+				if (sim->realisticPstnEnabled)
+				{
+					sim->parts[jP].tmp5 = directionX * possibleMovement;
+					sim->parts[jP].tmp6 = directionY * possibleMovement;
+				}
 				sim->pmap[destY][destX] = PMAP(jP, sim->parts[jP].type);
 			}
 			return possibleMovement;

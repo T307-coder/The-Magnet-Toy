@@ -161,6 +161,16 @@ void Simulation::EnableMagnetism(bool enable)
 	magnetismEnabled = enable;
 }
 
+void Simulation::EnableInduction(bool enable)
+{
+	inductionEnabled = enable;
+}
+
+void Simulation::EnableCurrentBField(bool enable)
+{
+	currentBFieldEnabled = enable;
+}
+
 // Electric FFT Poisson solver for E-field computation (identical to MagFFT)
 struct Simulation::ElecFFT
 {
@@ -2195,6 +2205,8 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].type = t;
 	parts[i].x = (float)x;
 	parts[i].y = (float)y;
+	parts[i].tmp5 = 0;
+	parts[i].tmp6 = 0;
 
 	//and finally set the pmap/photon maps to the newly created particle
 	if (elements[t].Properties & TYPE_ENERGY)
@@ -4012,6 +4024,57 @@ void Simulation::BeforeSim(bool willUpdate)
 		{
 			memcpy(prevBField, bField, sizeof(bField));
 			prevBFieldValid = true;
+			// Biot-Savart: moving charges produce magnetic field circling around velocity
+			if (currentBFieldEnabled)
+			{
+			constexpr float BIOT_SCALE = 2.0f;
+			constexpr float BIOT_SCALE_SOLID = 200.0f;
+			constexpr int BIOT_RADIUS = 8;
+			auto &sd = SimulationData::CRef();
+			auto &elements = sd.elements;
+			for (int i = 0; i < NPART; i++)
+			{
+				if (!parts[i].type) continue;
+				float q = 0.0f;
+				int type = parts[i].type;
+				if (type == PT_ELEC) q = -1.0f;
+				else if (type == PT_PROT) q = 1.0f;
+				else if (electricityEnabled && (elements[type].Properties & PROP_CONDUCTS))
+					q = parts[i].tmp4 * 0.01f; // [-100,100] → [-1,1]
+				if (q == 0.0f) continue;
+				bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
+				float vx, vy;
+				if (isSolid)
+				{
+					vx = (float)parts[i].tmp5;
+					vy = (float)parts[i].tmp6;
+				}
+				else
+				{
+					vx = parts[i].vx;
+					vy = parts[i].vy;
+				}
+				if (vx == 0.0f && vy == 0.0f) continue;
+				float scale = isSolid ? BIOT_SCALE_SOLID : BIOT_SCALE;
+				int pcx = (int)(parts[i].x) / CELL;
+				int pcy = (int)(parts[i].y) / CELL;
+				float px = parts[i].x, py = parts[i].y;
+				for (int dy = -BIOT_RADIUS; dy <= BIOT_RADIUS; dy++)
+				{
+					for (int dx = -BIOT_RADIUS; dx <= BIOT_RADIUS; dx++)
+					{
+						int cx = pcx + dx, cy = pcy + dy;
+						if (cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS) continue;
+						float rx = cx * CELL + CELL * 0.5f - px;
+						float ry = cy * CELL + CELL * 0.5f - py;
+						float r2 = rx * rx + ry * ry + 1.0f;
+						float r = sqrtf(r2);
+						float dB = scale * q * (vx * ry - vy * rx) / (r2 * r);
+						magSrc[cy][cx] += dB;
+					}
+				}
+			}
+			}
 			ComputeBField();
 			memset(magSrc, 0, sizeof(magSrc));
 		}

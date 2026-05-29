@@ -128,6 +128,9 @@ public:
 	void ShowGravityGrid();
 	void ShowMagneticField();
 	void ToggleMagnetism();
+	void ToggleInduction();
+	void ToggleCurrentBField();
+	void ToggleRealisticPstn();
 	void SetHudEnable(bool hudState);
 	bool GetHudEnable();
 	void SetBrushEnable(bool brushState);
