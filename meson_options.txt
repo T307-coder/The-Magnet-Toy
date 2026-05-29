@@ -299,3 +299,10 @@ option(
 	value: false,
 	description: 'Run clang-tidy to lint programming issues'
 )
+
+option(
+'use_cuda',
+type: 'boolean',
+value: false,
+description: 'Enable CUDA GPU acceleration for FFT-based field computations (requires CUDA Toolkit)'
+)

@@ -23,6 +23,10 @@
 #include <set>
 #include <stack>
 #include <fftw3.h>
+#ifdef USE_CUDA
+#include <cuda_runtime.h>
+#include <cufft.h>
+#endif
 
 namespace
 {
@@ -121,6 +125,198 @@ struct Simulation::MagFFT
 	}
 };
 
+// GPUFFT: GPU-accelerated FFT Poisson solver (CPU fallback uses FFTW).
+// Interface matches MagFFT/ElecFFT: Init(w,h) + Solve(src,result,w,h)
+struct Simulation::GPUFFT
+{
+	bool available = true; // true if any path (CPU or GPU) is usable
+
+	void Init(int w, int h)
+	{
+		paddedW = 3 * w; paddedH = 3 * h;
+		totalSize = size_t(paddedW) * paddedH;
+
+#ifdef USE_CUDA
+		// Try GPU path first
+		cudaError_t err = cudaMalloc(&d_src, totalSize * sizeof(float));
+		if (err == cudaSuccess)
+		{
+			cudaMalloc(&d_result, totalSize * sizeof(float));
+			cudaMalloc(&d_data, totalSize * sizeof(cufftComplex));
+			cudaMalloc(&d_kernel, totalSize * sizeof(cufftComplex));
+
+			// Build kernel on CPU, upload to GPU
+			std::vector<float> kernelReal(totalSize);
+			for (int j = 0; j < paddedH; j++)
+				for (int i = 0; i < paddedW; i++) {
+					auto dx = float(std::min(i, paddedW - i));
+					auto dy = float(std::min(j, paddedH - j));
+					kernelReal[j * paddedW + i] = 1.0f / (dx*dx + dy*dy + 1.0f);
+				}
+			// FFT kernel on CPU first, then upload as complex
+			auto *kr = fftwf_alloc_real(totalSize);
+			auto *kc = fftwf_alloc_complex(totalSize);
+			std::copy(kernelReal.begin(), kernelReal.end(), kr);
+			auto planK = fftwf_plan_dft_r2c_2d(paddedH, paddedW, kr, kc, FFTW_ESTIMATE);
+			fftwf_execute(planK);
+			std::vector<cufftComplex> kernelCplx(totalSize);
+			for (size_t i = 0; i < totalSize; i++) {
+				kernelCplx[i].x = kc[i][0];
+				kernelCplx[i].y = kc[i][1];
+			}
+			fftwf_destroy_plan(planK); fftwf_free(kr); fftwf_free(kc);
+
+			cudaMemcpy(d_kernel, kernelCplx.data(), totalSize * sizeof(cufftComplex), cudaMemcpyHostToDevice);
+
+			if (cufftPlan2d(&planFwdGPU, paddedH, paddedW, CUFFT_R2C) == CUFFT_SUCCESS &&
+			    cufftPlan2d(&planInvGPU, paddedH, paddedW, CUFFT_C2R) == CUFFT_SUCCESS)
+			{
+				gpuAvailable = true;
+				return;
+			}
+			// GPU plan failed, clean up GPU resources
+			FreeGPU();
+		}
+		gpuAvailable = false;
+#endif
+
+		// CPU fallback (always works)
+		srcRealCPU = fftwf_alloc_real(totalSize);
+		outRealCPU = fftwf_alloc_real(totalSize);
+		dataCPU = fftwf_alloc_complex(totalSize);
+		auto *kf = fftwf_alloc_complex(totalSize);
+
+		auto *kernelReal = fftwf_alloc_real(totalSize);
+		for (int j = 0; j < paddedH; j++)
+			for (int i = 0; i < paddedW; i++) {
+				auto dx = float(std::min(i, paddedW - i));
+				auto dy = float(std::min(j, paddedH - j));
+				kernelReal[j * paddedW + i] = 1.0f / (dx*dx + dy*dy + 1.0f);
+			}
+		planFwdCPU = fftwf_plan_dft_r2c_2d(paddedH, paddedW, kernelReal, (fftwf_complex*)kf, FFTW_ESTIMATE);
+		fftwf_execute((fftwf_plan)planFwdCPU);
+		fftwf_free(kernelReal);
+		kernelCPU.resize(totalSize * 2);
+		for (size_t i = 0; i < totalSize; i++) {
+			kernelCPU[2*i] = ((fftwf_complex*)kf)[i][0];
+			kernelCPU[2*i+1] = ((fftwf_complex*)kf)[i][1];
+		}
+		kernelFFTCPU = kf;
+		auto *tmpReal = fftwf_alloc_real(totalSize);
+		planFwdCPU = fftwf_plan_dft_r2c_2d(paddedH, paddedW, tmpReal, (fftwf_complex*)dataCPU, FFTW_ESTIMATE);
+		planInvCPU = fftwf_plan_dft_c2r_2d(paddedH, paddedW, (fftwf_complex*)dataCPU, tmpReal, FFTW_ESTIMATE);
+		fftwf_free(tmpReal);
+	}
+
+	void Solve(float *src, float *result, int w, int h)
+	{
+#ifdef USE_CUDA
+		if (gpuAvailable)
+		{
+			// Zero-pad src on host, then upload
+			std::vector<float> padded(totalSize, 0.0f);
+			for (int j = 0; j < h; j++)
+				for (int i = 0; i < w; i++)
+					padded[(j + h) * paddedW + (i + w)] = src[j * w + i];
+
+			cudaMemcpy(d_src, padded.data(), totalSize * sizeof(float), cudaMemcpyHostToDevice);
+
+			cufftExecR2C(planFwdGPU, d_src, d_data);
+
+			// Complex multiply
+			GpuComplexMultiply(totalSize);
+
+			cufftExecC2R(planInvGPU, d_data, d_result);
+
+			cudaMemcpy(padded.data(), d_result, totalSize * sizeof(float), cudaMemcpyDeviceToHost);
+
+			for (int j = 0; j < h; j++)
+				for (int i = 0; i < w; i++)
+					result[j * w + i] = padded[(j + h) * paddedW + (i + w)];
+			return;
+		}
+#endif
+
+		// CPU path
+		std::fill_n(srcRealCPU, totalSize, 0.0f);
+		for (int j = 0; j < h; j++)
+			for (int i = 0; i < w; i++)
+				srcRealCPU[(j + h) * paddedW + (i + w)] = src[j * w + i];
+		fftwf_execute_dft_r2c((fftwf_plan)planFwdCPU, srcRealCPU, (fftwf_complex*)dataCPU);
+		auto N = float(totalSize);
+		auto *d = (fftwf_complex*)dataCPU;
+		for (size_t k = 0; k < totalSize; k++) {
+			auto a = d[k][0], b = d[k][1];
+			auto c = kernelCPU[2*k], dk = kernelCPU[2*k+1];
+			d[k][0] = (a*c - b*dk) / N;
+			d[k][1] = (a*dk + b*c) / N;
+		}
+		fftwf_execute_dft_c2r((fftwf_plan)planInvCPU, (fftwf_complex*)dataCPU, outRealCPU);
+		for (int j = 0; j < h; j++)
+			for (int i = 0; i < w; i++)
+				result[j * w + i] = outRealCPU[(j + h) * paddedW + (i + w)];
+	}
+
+	~GPUFFT()
+	{
+#ifdef USE_CUDA
+		FreeGPU();
+#endif
+		if (srcRealCPU) fftwf_free(srcRealCPU);
+		if (outRealCPU) fftwf_free(outRealCPU);
+		if (dataCPU) fftwf_free(dataCPU);
+		if (kernelFFTCPU) fftwf_free(kernelFFTCPU);
+		if (planFwdCPU) fftwf_destroy_plan((fftwf_plan)planFwdCPU);
+		if (planInvCPU) fftwf_destroy_plan((fftwf_plan)planInvCPU);
+	}
+
+	int paddedW = 0, paddedH = 0;
+	size_t totalSize = 0;
+
+	// CPU fallback
+	void *planFwdCPU = nullptr, *planInvCPU = nullptr;
+	float *srcRealCPU = nullptr, *outRealCPU = nullptr;
+	void *dataCPU = nullptr, *kernelFFTCPU = nullptr;
+	std::vector<float> kernelCPU;
+
+#ifdef USE_CUDA
+	bool gpuAvailable = false;
+	cufftHandle planFwdGPU = 0, planInvGPU = 0;
+	float *d_src = nullptr, *d_result = nullptr;
+	cufftComplex *d_data = nullptr, *d_kernel = nullptr;
+
+	void FreeGPU()
+	{
+		if (d_src)    cudaFree(d_src);
+		if (d_result) cudaFree(d_result);
+		if (d_data)   cudaFree(d_data);
+		if (d_kernel) cudaFree(d_kernel);
+		if (planFwdGPU) cufftDestroy(planFwdGPU);
+		if (planInvGPU) cufftDestroy(planInvGPU);
+		d_src = d_result = nullptr;
+		d_data = d_kernel = nullptr;
+		planFwdGPU = planInvGPU = 0;
+	}
+
+	// Complex multiply on host: d_data *= d_kernel / N
+	// (GPU kernel approach requires .cu file; using host round-trip for now)
+	void GpuComplexMultiply(size_t N)
+	{
+		std::vector<cufftComplex> data(N), kernel(N);
+		cudaMemcpy(data.data(), d_data, N * sizeof(cufftComplex), cudaMemcpyDeviceToHost);
+		cudaMemcpy(kernel.data(), d_kernel, N * sizeof(cufftComplex), cudaMemcpyDeviceToHost);
+		float scale = 1.0f / float(N);
+		for (size_t i = 0; i < N; i++) {
+			float a = data[i].x, b = data[i].y;
+			float c = kernel[i].x, d = kernel[i].y;
+			data[i].x = (a*c - b*d) * scale;
+			data[i].y = (a*d + b*c) * scale;
+		}
+		cudaMemcpy(d_data, data.data(), N * sizeof(cufftComplex), cudaMemcpyHostToDevice);
+	}
+#endif
+};
+
 void Simulation::InitMagFFT()
 {
 	if (!magFFT)
@@ -130,8 +326,7 @@ void Simulation::InitMagFFT()
 
 void Simulation::ComputeBField()
 {
-	if (!magFFT || !magnetismEnabled)
-		return;
+	if (!magnetismEnabled) return;
 
 	// Flatten magSrc into 1D array
 	std::vector<float> src(XCELLS * YCELLS);
@@ -140,9 +335,18 @@ void Simulation::ComputeBField()
 			src[j * XCELLS + i] = magSrc[j][i];
 
 	std::vector<float> result(XCELLS * YCELLS);
-	magFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
 
-	// Copy result to bField, scale appropriately
+	if (gpuFFTEnabled && gpuFFT && gpuFFT->available)
+	{
+		gpuFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+	}
+	else if (magFFT)
+	{
+		magFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+	}
+	else return;
+
+	// Copy result to bField
 	for (int j = 0; j < YCELLS; j++)
 		for (int i = 0; i < XCELLS; i++)
 			bField[j][i] = result[j * XCELLS + i];
@@ -263,8 +467,7 @@ void Simulation::InitElecFFT()
 
 void Simulation::ComputeEField()
 {
-	if (!elecFFT || !electricityEnabled)
-		return;
+	if (!electricityEnabled) return;
 
 	std::vector<float> src(XCELLS * YCELLS);
 	for (int j = 0; j < YCELLS; j++)
@@ -272,11 +475,36 @@ void Simulation::ComputeEField()
 			src[j * XCELLS + i] = eSrc[j][i];
 
 	std::vector<float> result(XCELLS * YCELLS);
-	elecFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+
+	if (gpuFFTEnabled && gpuFFT && gpuFFT->available)
+	{
+		gpuFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+	}
+	else if (elecFFT)
+	{
+		elecFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+	}
+	else return;
 
 	for (int j = 0; j < YCELLS; j++)
 		for (int i = 0; i < XCELLS; i++)
 			eField[j][i] = result[j * XCELLS + i];
+}
+
+void Simulation::InitGPUFFT()
+{
+	if (!gpuFFT)
+		gpuFFT = std::make_unique<GPUFFT>();
+	gpuFFT->Init(XCELLS, YCELLS);
+}
+
+void Simulation::EnableGPUFFT(bool enable)
+{
+	if (enable && !gpuFFT)
+		InitGPUFFT();
+	gpuFFTEnabled = enable;
+	if (!enable && gpuFFT)
+		gpuFFT.reset();
 }
 
 void Simulation::EnableElectricity(bool enable)

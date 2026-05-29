@@ -160,6 +160,12 @@ public:
 	void InitElecFFT();
 	void ComputeEField();
 
+	struct GPUFFT;
+	std::unique_ptr<GPUFFT> gpuFFT;
+	bool gpuFFTEnabled = false;
+	void InitGPUFFT();
+	void EnableGPUFFT(bool enable);
+
 	Particle portalp[CHANNELS][8][80];
 	int wireless[CHANNELS][2];
 

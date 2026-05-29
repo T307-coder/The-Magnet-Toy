@@ -246,6 +246,18 @@ else
 endif
 json_dep = dependency('jsoncpp', static: is_static)
 
+use_cuda = get_option('use_cuda')
+if use_cuda
+	cuda_path = run_command('cmd', '/c', 'echo %CUDA_PATH%', check: false).stdout().strip()
+	if cuda_path == '' or cuda_path == '%CUDA_PATH%'
+		cuda_path = 'C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9'
+	endif
+	add_project_arguments('-DUSE_CUDA', language: 'cpp')
+	add_project_arguments('-I' + cuda_path + '/include', language: 'cpp')
+	add_project_link_arguments('-LIBPATH:' + cuda_path + '/lib/x64', language: 'cpp')
+	add_project_link_arguments('cudart.lib', 'cufft.lib', language: 'cpp')
+endif
+
 if not is_debug
 	args_ccomp_opt = []
 	if cpp_compiler.get_argument_syntax() == 'msvc'
