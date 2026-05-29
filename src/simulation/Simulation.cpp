@@ -4065,6 +4065,13 @@ void Simulation::BeforeSim(bool willUpdate)
 		{
 			memcpy(prevEField, eField, sizeof(eField));
 			prevEFieldValid = true;
+			// Add global uniform B-field
+			if (uniformBField != 0.0f)
+			{
+				for (int y = 0; y < YCELLS; y++)
+					for (int x = 0; x < XCELLS; x++)
+						bField[y][x] += uniformBField;
+			}
 			ComputeEField();
 			memset(eSrc, 0, sizeof(eSrc));
 		}

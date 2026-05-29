@@ -283,6 +283,8 @@ public:
 	bool GetSprkCurrentEnabled();
 	void SetElectricityEnabled(bool enable);
 	bool GetElectricityEnabled();
+	void SetUniformBField(float value);
+	float GetUniformBField();
 	void ClearSimulation();
 	std::vector<Menu*> GetMenuList();
 	std::vector<QuickOption*> GetQuickOptions();

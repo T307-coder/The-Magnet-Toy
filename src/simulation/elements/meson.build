@@ -200,6 +200,8 @@ simulation_elem_names = [
 	'ELMG',
 	'POSC',
 	'FIXC',
+	'UBFM',
+	'EBFM',
 ]
 
 simulation_elem_src = []

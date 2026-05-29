@@ -1327,6 +1327,16 @@ bool GameModel::GetElectricityEnabled()
 	return sim->electricityEnabled;
 }
 
+void GameModel::SetUniformBField(float value)
+{
+	sim->uniformBField = value;
+}
+
+float GameModel::GetUniformBField()
+{
+	return sim->uniformBField;
+}
+
 void GameModel::FrameStep(int frames)
 {
 	queuedFrames += frames;
