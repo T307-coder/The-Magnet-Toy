@@ -407,7 +407,7 @@ static int update(UPDATE_FUNC_ARGS)
 				// Biot-Savart: SPRK current element (weaker than induction, material-dependent via life)
 				if (sim->magnetismEnabled && sim->sprkCurrentEnabled)
 				{
-					constexpr float SPRK_BIOT_BASE = 12.0f;
+					constexpr float SPRK_BIOT_BASE = 4.0f;
 					constexpr int SPRK_BIOT_R = 5;
 					float scale = SPRK_BIOT_BASE * (parts[i].life / 4.0f);
 					float dx = (float)(rx * CELL);
