@@ -6,18 +6,29 @@
 
 ## Overview
 
-This mod adds a complete **classical electromagnetism simulation** to The Powder Toy: magnetic fields, electric fields, magnetizable materials, chargeable conductors, Lorentz force, and dielectrophoresis. Both fields are computed via FFT-based Poisson solvers in real time, with visual overlays and sidebar controls.
+This mod adds a complete **classical electromagnetism simulation** to The Powder Toy: magnetic fields, electric fields, magnetizable materials, chargeable conductors, Lorentz force, and dielectrophoresis. Both fields are computed via FFT-based Poisson solvers in real time, with **GPU acceleration (CUDA cuFFT)** and **multi-threaded particle updates** for high-performance large-scale simulations.
+
+| Feature | Status |
+|---|---|
+| Magnetic & Electric fields (FFT Poisson) | ✅ |
+| GPU FFT acceleration (CUDA cuFFT) | ✅ |
+| CPU FFT fallback (FFTW3) | ✅ |
+| Multi-threaded particle updates | ✅ |
+| Sidebar toggles for all features | ✅ |
+| Static standalone .exe | ✅ |
 
 ---
 
 ## New Elements
 
-### Magnetic (3 new elements)
+### Magnetic (5 new elements)
 | Element | Menu | Description |
 |---|---|---|
 | **MAGN** | `SC_SPECIAL` | Permanent magnet. `tmp` = polarity/strength (positive=N/red, negative=S/blue). |
 | **ELMG** | `SC_POWERED` | Electromagnet. SPRK to activate (PSCN=on, NSCN=off). Field strength ∝ temperature. |
 | **MGPN** | `SC_NUCLEAR` | Magnetic monopole. `tmp` = polarity. Same polarity repels, opposites attract. |
+| **UBFM** | `SC_SPECIAL` | Uniform B-field source. `tmp` = radius, `tmp2` = strength. Adds constant B-field in circular range. |
+| **EBFM** | `SC_POWERED` | Electric uniform B-field. SPRK-activated (PSCN/NSCN). `life` = 10 when on, temp determines strength. |
 
 ### Electric (2 new elements)
 | Element | Menu | Description |
@@ -77,6 +88,7 @@ Sidebar buttons (right column):
 | **R** | Toggle realistic PSTN (gives velocity to pushed particles) |
 | **E** | Toggle electric field display |
 | **Y** | Toggle electricity simulation |
+| **U** | Toggle GPU FFT acceleration (CUDA cuFFT / CPU fallback) |
 
 Keyboard shortcuts:
 | Key | Action |
@@ -91,6 +103,8 @@ Keyboard shortcuts:
 ## Technical Notes
 
 - **FFT Solvers**: `MagFFT` and `ElecFFT` use `fftw3f` with 3x zero-padded grids. Poisson equation `∇²φ = -source` solved in frequency domain with `1/(k²+1)` kernel.
+- **GPU Acceleration**: Optional CUDA cuFFT path (`U` key toggle). When enabled and CUDA is available, FFT compute runs on GPU via `cufftExecR2C`/`cufftExecC2R`. Falls back transparently to FFTW3 CPU path when CUDA is unavailable or GPU FFT is disabled.
+- **Multi-threading**: Ported from LBPHacker's [parallel-tiles](https://github.com/LBPHacker/The-Parallel-Toy) architecture. 16x16 cell tiles dispatched across CPU threads with per-thread RNG, element counts, and free particle lists. `CopiableSimulation` → `SimVariant<LegacyVariant|ParallelVariant>` hierarchy. Toggle via `sim.threadCount` setting.
 - **Biot-Savart**: All three current-to-field paths (moving charges, solids via PSTN, SPRK conduction) share a single `magnetism_addBiotSavart()` function in `MagnetismCommon.h`.
 - **Particle fields**: `tmp2` = B-field history, `tmp3` = magnetization / induced-flag, `tmp4` = electric charge, `tmp5`/`tmp6` = solid effective velocity (PSTN).
 - **Force Separation**: Charged particles (`tmp4 ≠ 0`) → pure Coulomb. Uncharged → pure dielectrophoresis. No mixing.
@@ -101,16 +115,32 @@ Keyboard shortcuts:
 
 ## Build
 
+### Standard (CPU only)
 ```bash
 meson setup build-debug --buildtype=debug
 ninja -C build-debug
+```
 
-# Portable static exe:
-meson setup build-static -Dstatic=prebuilt
+### GPU Accelerated (CUDA cuFFT)
+```bash
+# Requires: CUDA Toolkit 12.x+ installed at %CUDA_PATH%
+meson setup build-cuda -Duse_cuda=true --buildtype=debug
+ninja -C build-cuda
+```
+
+### GPU + Multi-threading (recommended)
+```bash
+meson setup build-cuda-parallel -Duse_cuda=true --buildtype=debug
+ninja -C build-cuda-parallel
+```
+
+### Portable Static .exe (standalone, no DLL dependencies)
+```bash
+meson setup build-static -Duse_cuda=true -Dstatic=prebuilt -Dresolve_vcs_tag=static_release_only --buildtype=release
 ninja -C build-static
 ```
 
-Requires: `fftw3f`, meson + ninja, MSVC or GCC.
+**Requirements**: meson + ninja, MSVC 19.x+ or GCC 13+, CUDA Toolkit 12.x+ (optional), `fftw3f` (bundled via tpt-libs-prebuilt).
 
 ---
 
