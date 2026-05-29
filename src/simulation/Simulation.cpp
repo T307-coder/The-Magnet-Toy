@@ -25,6 +25,9 @@
 #include <numbers>
 #include <set>
 #include <stack>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <fftw3.h>
 #ifdef USE_CUDA
 #include <cuda_runtime.h>
@@ -223,6 +226,9 @@ namespace
 		using Simulation::uniformBField;
 		using Simulation::ComputeBField;
 		using Simulation::ComputeEField;
+		using Simulation::asyncFieldsEnabled;
+		using Simulation::asyncFields;
+		using Simulation::DispatchAsyncFields;
 		using Simulation::signs;
 		using Simulation::useLuaCallbacks;
 		using Simulation::gravForceRecalc;
@@ -876,6 +882,195 @@ void CopiableSimulation::EnableGPUFFT(bool enable)
 	gpuFFTEnabled = enable;
 	if (!enable && gpuFFT)
 		gpuFFT.reset();
+}
+
+// ============================================================================
+// AsyncFieldSolver: runs B/E-field FFT on a persistent worker thread
+// Pattern: same as DispatchNewtonianGravity — Exchange() swaps in/out buffers
+// Main thread: copies magSrc/eSrc to workBuf, calls Exchange(), gets results back
+// Worker thread: computes FFT on workBuf → resultBuf, waits for next Exchange()
+// 1-frame pipeline latency (matching gravity), main thread never blocks on FFT
+// ============================================================================
+struct CopiableSimulation::AsyncFieldSolver
+{
+	static constexpr int N = XCELLS * YCELLS;
+
+	// Worker thread
+	std::thread worker;
+	std::mutex mx;
+	std::condition_variable cv;
+	bool hasWork = false;
+	bool shouldStop = false;
+	bool firstFrame = true; // first Exchange() returns zero results
+
+	// Work buffers: main thread writes sources here, worker reads
+	std::vector<float> magSrcBuf;
+	std::vector<float> eSrcBuf;
+
+	// Result buffers: worker writes here, main thread reads
+	std::vector<float> bFieldResult;
+	std::vector<float> eFieldResult;
+
+	// Worker thread's own FFT objects (independent copy, no mutex needed)
+	std::unique_ptr<CopiableSimulation::MagFFT> workerMagFFT;
+	std::unique_ptr<CopiableSimulation::ElecFFT> workerElecFFT;
+
+	~AsyncFieldSolver()
+	{
+		Stop();
+	}
+
+	void Start()
+	{
+		magSrcBuf.resize(N, 0.0f);
+		eSrcBuf.resize(N, 0.0f);
+		bFieldResult.resize(N, 0.0f);
+		eFieldResult.resize(N, 0.0f);
+
+		// Initialize worker's own FFT objects
+		workerMagFFT = std::make_unique<CopiableSimulation::MagFFT>();
+		workerMagFFT->Init(XCELLS, YCELLS);
+		workerElecFFT = std::make_unique<CopiableSimulation::ElecFFT>();
+		workerElecFFT->Init(XCELLS, YCELLS);
+
+		shouldStop = false;
+		firstFrame = true;
+		worker = std::thread([this]() { Run(); });
+	}
+
+	void Stop()
+	{
+		if (worker.joinable())
+		{
+			{
+				std::lock_guard lk(mx);
+				shouldStop = true;
+				hasWork = true;
+			}
+			cv.notify_one();
+			worker.join();
+		}
+	}
+
+	// Main thread: copy sources in, get results out, signal worker (non-blocking)
+	// Call once per frame. First call returns zero results (1-frame pipeline).
+	void Exchange(const float *magSrcFlat, const float *eSrcFlat,
+	              float *bFieldOut, float *eFieldOut)
+	{
+		// Wait for previous work to be done (should already be done from last frame)
+		{
+			std::unique_lock lk(mx);
+			cv.wait(lk, [this]() { return !hasWork || shouldStop; });
+		}
+
+		// Read out results from last frame
+		if (!firstFrame)
+		{
+			std::copy(bFieldResult.begin(), bFieldResult.end(), bFieldOut);
+			std::copy(eFieldResult.begin(), eFieldResult.end(), eFieldOut);
+		}
+		else
+		{
+			// First frame: zero results
+			std::fill_n(bFieldOut, N, 0.0f);
+			std::fill_n(eFieldOut, N, 0.0f);
+			firstFrame = false;
+		}
+
+		// Copy in new sources
+		std::copy_n(magSrcFlat, N, magSrcBuf.begin());
+		std::copy_n(eSrcFlat, N, eSrcBuf.begin());
+
+		// Signal worker
+		{
+			std::lock_guard lk(mx);
+			hasWork = true;
+		}
+		cv.notify_one();
+	}
+
+private:
+	void Run()
+	{
+		while (true)
+		{
+			// Wait for work
+			{
+				std::unique_lock lk(mx);
+				cv.wait(lk, [this]() { return hasWork || shouldStop; });
+				if (shouldStop) return;
+				hasWork = false;
+			}
+
+			// Compute B-field (CPU FFTW always in worker thread)
+			if (workerMagFFT)
+			{
+				std::vector<float> resultB(N);
+				workerMagFFT->Solve(magSrcBuf.data(), resultB.data(), XCELLS, YCELLS);
+				bFieldResult = std::move(resultB);
+			}
+
+			// Compute E-field
+			if (workerElecFFT)
+			{
+				std::vector<float> resultE(N);
+				workerElecFFT->Solve(eSrcBuf.data(), resultE.data(), XCELLS, YCELLS);
+				eFieldResult = std::move(resultE);
+			}
+		}
+	}
+};
+
+void CopiableSimulation::InitAsyncFields()
+{
+	if (!asyncFields)
+		asyncFields = std::make_unique<AsyncFieldSolver>();
+	asyncFields->Start();
+}
+
+void CopiableSimulation::EnableAsyncFields(bool enable)
+{
+	if (enable && !asyncFields)
+		InitAsyncFields();
+	asyncFieldsEnabled = enable;
+	if (!enable && asyncFields)
+	{
+		asyncFields->Stop();
+		asyncFields.reset();
+	}
+}
+
+void CopiableSimulation::DispatchAsyncFields()
+{
+	// Flatten magSrc and eSrc to 1D, exchange with worker
+	std::vector<float> magSrcFlat(XCELLS * YCELLS);
+	std::vector<float> eSrcFlat(XCELLS * YCELLS);
+	std::vector<float> bFieldFlat(XCELLS * YCELLS);
+	std::vector<float> eFieldFlat(XCELLS * YCELLS);
+
+	for (int j = 0; j < YCELLS; j++)
+		for (int i = 0; i < XCELLS; i++)
+		{
+			magSrcFlat[j * XCELLS + i] = magSrc[j][i];
+			eSrcFlat[j * XCELLS + i] = eSrc[j][i];
+		}
+
+	asyncFields->Exchange(magSrcFlat.data(), eSrcFlat.data(),
+	                      bFieldFlat.data(), eFieldFlat.data());
+
+	// Unflatten results back to 2D arrays
+	for (int j = 0; j < YCELLS; j++)
+		for (int i = 0; i < XCELLS; i++)
+		{
+			bField[j][i] = bFieldFlat[j * XCELLS + i];
+			eField[j][i] = eFieldFlat[j * XCELLS + i];
+		}
+}
+
+void CopiableSimulation::WaitAsyncFields()
+{
+	// No-op: Exchange() already waits for previous work.
+	// Results were already copied out in Exchange().
 }
 
 CopiableSimulation &CopiableSimulation::operator =(const CopiableSimulation &other)
@@ -5195,24 +5390,53 @@ void SimVariantImpl<Variant>::BeforeSim(bool willUpdate)
 					magnetism_addBiotSavart(this, parts[i].x, parts[i].y, vx, vy, scale, BIOT_RADIUS);
 				}
 			}
-			ComputeBField();
-			// Add global uniform B-field to all cells
-			if (uniformBField != 0.0f)
+		}
+
+		// Electric field: save previous frame
+		if (electricityEnabled)
+		{
+			memcpy(prevEField, eField, sizeof(eField));
+			prevEFieldValid = true;
+		}
+
+		// Compute B-field and E-field: async (worker thread) or sync (main thread)
+		if (asyncFieldsEnabled && asyncFields && (magnetismEnabled || electricityEnabled))
+		{
+			// Dispatch to worker thread (non-blocking Exchange like gravity)
+			DispatchAsyncFields();
+
+			// Add global uniform B-field to the async-computed result
+			if (magnetismEnabled && uniformBField != 0.0f)
 			{
 				for (int y = 0; y < YCELLS; y++)
 					for (int x = 0; x < XCELLS; x++)
 						bField[y][x] += uniformBField;
 			}
-			memset(magSrc, 0, sizeof(magSrc));
-		}
 
-		// Electric field: save previous frame, compute new
-		if (electricityEnabled)
+			// Clear sources for next frame
+			if (magnetismEnabled) memset(magSrc, 0, sizeof(magSrc));
+			if (electricityEnabled) memset(eSrc, 0, sizeof(eSrc));
+		}
+		else
 		{
-			memcpy(prevEField, eField, sizeof(eField));
-			prevEFieldValid = true;
-			ComputeEField();
-			memset(eSrc, 0, sizeof(eSrc));
+			// Synchronous fallback: compute on main thread
+			if (magnetismEnabled)
+			{
+				ComputeBField();
+				if (uniformBField != 0.0f)
+				{
+					for (int y = 0; y < YCELLS; y++)
+						for (int x = 0; x < XCELLS; x++)
+							bField[y][x] += uniformBField;
+				}
+				memset(magSrc, 0, sizeof(magSrc));
+			}
+
+			if (electricityEnabled)
+			{
+				ComputeEField();
+				memset(eSrc, 0, sizeof(eSrc));
+			}
 		}
 
 		if(emp_decor>0)
@@ -5491,6 +5715,8 @@ void Simulation::CopyFrom(const Simulation &other)
 		InitElecFFT();
 	if (gpuFFTEnabled)
 		InitGPUFFT();
+	if (asyncFieldsEnabled)
+		InitAsyncFields();
 }
 
 template<>
