@@ -490,6 +490,7 @@ foreach sta_info : [
 	] ],
 	[ 'simulation', simulation_files, [
 		json_dep,
+		fftw_dep,
 	] ],
 ]
 	sta_name = sta_info[0]
