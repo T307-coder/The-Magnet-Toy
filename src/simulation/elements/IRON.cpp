@@ -171,24 +171,9 @@ static int update(UPDATE_FUNC_ARGS)
 		if (parts[i].tmp3 != 0)
 			sim->magSrc[cy][cx] += parts[i].tmp3 * 0.02f;
 	}
-	// Induction: only when completely unmagnetized
-	if (sim->magnetismEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS && parts[i].tmp3 == 0)
-	{
-		float Bnow = sim->bField[cy][cx];
-		float Bprev = (parts[i].tmp2 == 0) ? Bnow : parts[i].tmp2 / 10000.0f;
-		parts[i].tmp2 = (int)(Bnow * 10000.0f);
-		if (sim->prevBFieldValid)
-		{
-			float dBdt = fabsf(Bnow - Bprev);
-			if (dBdt > 1.5f && sim->rng.chance(1, 5) && !magnetism_hasNearbySPRK(sim, x, y, 4))
-			{
-				sim->part_change_type(i, x, y, PT_SPRK);
-				parts[i].ctype = PT_IRON;
-				parts[i].life = 4;
-				return 1;
-			}
-		}
-	}
+	// Induction: only when completely unmagnetized (shared function, 30-frame cooldown)
+	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_IRON, 1.5f, 5, 30))
+		return 1;
 	if (parts[i].tmp3 != 0) parts[i].life = 100;
 	// Electric charging and diffusion (shared functions)
 	electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);

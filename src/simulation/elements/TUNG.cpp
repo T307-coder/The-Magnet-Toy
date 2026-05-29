@@ -115,23 +115,8 @@ static int update(UPDATE_FUNC_ARGS)
 	}
 	parts[i].tmp3 = press;
 	int cx = x/CELL, cy = y/CELL;
-	if (sim->magnetismEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
-	{
-		float Bnow = sim->bField[cy][cx];
-		float Bprev = parts[i].tmp2 / 10000.0f;
-		parts[i].tmp2 = (int)(Bnow * 10000.0f);
-		if (sim->prevBFieldValid)
-		{
-			float dBdt = fabsf(Bnow - Bprev);
-			if (dBdt > 0.5f && sim->rng.chance(1, 4) && !magnetism_hasNearbySPRK(sim, x, y, 4))
-			{
-				sim->part_change_type(i, x, y, PT_SPRK);
-				parts[i].ctype = PT_TUNG;
-				parts[i].life = 4;
-				return 1;
-			}
-		}
-	}
+	if (magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_TUNG, 0.5f, 4, 30))
+		return 1;
 	// Electric charging: contact POSC, store charge in tmp4
 	if (sim->electricityEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
 	{

@@ -407,17 +407,6 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 		}
 	}
-	// Current magnetic effect: SPRK flow creates B-field (Biot-Savart simplified)
-	if (sim->magnetismEnabled && parts[i].life > 0)
-	{
-		int cx = x / CELL, cy = y / CELL;
-		if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
-		{
-			// Current direction ~ propagation direction, use alternating sign based on position
-			float sign = ((x + y) & 2) ? 1.0f : -1.0f;
-			sim->magSrc[cy][cx] += sign * 0.5f;
-		}
-	}
 	return 0;
 }
 
