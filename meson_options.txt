@@ -306,3 +306,9 @@ type: 'boolean',
 value: false,
 description: 'Enable CUDA GPU acceleration for FFT-based field computations (requires CUDA Toolkit)'
 )
+option(
+'use_vkfft',
+type: 'boolean',
+value: false,
+description: 'Enable VkFFT GPU acceleration (cross-vendor: NVIDIA/AMD/Intel via Vulkan). Requires Vulkan SDK and VkFFT header.'
+)

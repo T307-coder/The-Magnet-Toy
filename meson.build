@@ -258,6 +258,19 @@ if use_cuda
 	add_project_link_arguments('cudart.lib', 'cufft.lib', language: 'cpp')
 endif
 
+use_vkfft = get_option('use_vkfft')
+if use_vkfft
+	vulkan_sdk = run_command('cmd', '/c', 'echo %VULKAN_SDK%', check: false).stdout().strip()
+	if vulkan_sdk == '' or vulkan_sdk == '%VULKAN_SDK%'
+		vulkan_sdk = 'C:/VulkanSDK/1.4.304.1'
+	endif
+	add_project_arguments('-DUSE_VKFFT', language: 'cpp')
+	add_project_arguments('-I' + vulkan_sdk + '/Include', language: 'cpp')
+	add_project_arguments('-I' + meson.project_source_root() + '/subprojects/vkfft', language: 'cpp')
+	add_project_link_arguments('-LIBPATH:' + vulkan_sdk + '/Lib', language: 'cpp')
+	add_project_link_arguments('vulkan-1.lib', language: 'cpp')
+endif
+
 if not is_debug
 	args_ccomp_opt = []
 	if cpp_compiler.get_argument_syntax() == 'msvc'
