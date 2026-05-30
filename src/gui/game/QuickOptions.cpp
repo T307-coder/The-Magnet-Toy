@@ -219,16 +219,4 @@ void SprkCurrentOption::perform()
 	m->SetSprkCurrentEnabled(!m->GetSprkCurrentEnabled());
 }
 
-GPUFFTEnableOption::GPUFFTEnableOption(GameModel * m):
-QuickOption("U", "GPU FFT acceleration (experimental)", m, Toggle)
-{
 
-}
-bool GPUFFTEnableOption::GetToggle()
-{
-	return m->GetGPUFFTEnabled();
-}
-void GPUFFTEnableOption::perform()
-{
-	m->SetGPUFFTEnabled(!m->GetGPUFFTEnabled());
-}
