@@ -30,6 +30,7 @@ static int g_viewMode = 0;
 static float g_brushPX = 0, g_brushPY = 0, g_brushPZ = 0;
 static int g_activeToolType = 0; // current tool element type for 3D clicks
 static bool g_placing = false;   // left button held → continuous placement
+static const int ZMAX = 384;     // Z extent (matches YRES for cubic volume)
 // Cached matrices for gluUnProject
 static double g_proj[16], g_modelview[16];
 static int    g_viewport[4];
@@ -84,8 +85,9 @@ void CubeTest_Render()
 	glTranslatef(0, 0, -g_dist);
 	glRotatef(g_rotX, 1, 0, 0);
 	glRotatef(g_rotY, 0, 1, 0);
-	// Pivot rotation around active area, then flip Y (TPT Y=0 at screen top)
-	glTranslatef(-300.0f, 100.0f, 0);
+	// Pivot to center the 3D volume (X:0..XRES, Y:0..YRES, Z:0..ZMAX)
+	// Y flipped so TPT Y=0 is at screen top
+	glTranslatef(-XRES / 2.0f, YRES / 2.0f, -ZMAX / 2.0f);
 	glScalef(1, -1, 1);
 
 	// Cache matrices for gluUnProject (3D window mouse → world coords)
@@ -93,13 +95,26 @@ void CubeTest_Render()
 	glGetDoublev(GL_MODELVIEW_MATRIX, g_modelview);
 	glGetIntegerv(GL_VIEWPORT, g_viewport);
 
-	// Grid on XY plane: X→right, Y→down (TPT native)
-	glColor3f(0.25f, 0.25f, 0.35f);
+	// ---- Three orthogonal grid planes (XY floor, XZ back, YZ left) ----
 	glBegin(GL_LINES);
+	// XY plane (floor): Z=0
+	glColor3f(0.25f, 0.25f, 0.35f);
 	for (int x = 0; x <= XRES; x += 50)
 	{ glVertex3f((float)x, 0, 0); glVertex3f((float)x, (float)YRES, 0); }
 	for (int y = 0; y <= YRES; y += 50)
 	{ glVertex3f(0, (float)y, 0); glVertex3f((float)XRES, (float)y, 0); }
+	// XZ plane (back wall): Y=0
+	glColor3f(0.20f, 0.28f, 0.28f);
+	for (int x = 0; x <= XRES; x += 50)
+	{ glVertex3f((float)x, 0, 0); glVertex3f((float)x, 0, (float)ZMAX); }
+	for (int z = 0; z <= ZMAX; z += 50)
+	{ glVertex3f(0, 0, (float)z); glVertex3f((float)XRES, 0, (float)z); }
+	// YZ plane (left wall): X=0
+	glColor3f(0.28f, 0.20f, 0.28f);
+	for (int y = 0; y <= YRES; y += 50)
+	{ glVertex3f(0, (float)y, 0); glVertex3f(0, (float)y, (float)ZMAX); }
+	for (int z = 0; z <= ZMAX; z += 50)
+	{ glVertex3f(0, 0, (float)z); glVertex3f(0, (float)YRES, (float)z); }
 	glEnd();
 
 	// XYZ axes from origin. X→right, Y→up (3D up = -TPT Y), Z→out of screen
@@ -150,7 +165,7 @@ void CubeTest_Render()
 	{
 		glColor3f(0.15f, 0.25f, 0.15f);
 		glBegin(GL_LINES);
-		for (int z = -20; z <= 20; z += 2)
+		for (int z = 0; z <= ZMAX; z += 50)
 		{
 			float fz = (float)z;
 			for (int x = 0; x <= XRES; x += 50)
@@ -454,8 +469,8 @@ static void UpdateBrushFrom3DWindow(int mx, int my)
 		g_brushPZ = (float)(wz + rz * t);
 		if (g_brushPX < 0) g_brushPX = 0;
 		if (g_brushPX >= XRES) g_brushPX = (float)(XRES - 1);
-		if (g_brushPZ < -200) g_brushPZ = -200;
-		if (g_brushPZ > 200) g_brushPZ = 200;
+		if (g_brushPZ < 0) g_brushPZ = 0;
+		if (g_brushPZ >= ZMAX) g_brushPZ = (float)(ZMAX - 1);
 		break;
 	default: // YZ plane (Right 2, Left 5): X locked at g_brushPX
 		if (fabs(rx) < 1e-9) return;
@@ -465,8 +480,8 @@ static void UpdateBrushFrom3DWindow(int mx, int my)
 		g_brushPZ = (float)(wz + rz * t);
 		if (g_brushPY < 0) g_brushPY = 0;
 		if (g_brushPY >= YRES) g_brushPY = (float)(YRES - 1);
-		if (g_brushPZ < -200) g_brushPZ = -200;
-		if (g_brushPZ > 200) g_brushPZ = 200;
+		if (g_brushPZ < 0) g_brushPZ = 0;
+		if (g_brushPZ >= ZMAX) g_brushPZ = (float)(ZMAX - 1);
 		break;
 	}
 	// Sync g_brushX/Y for compatibility (used by brush render guard)
