@@ -71,8 +71,12 @@ static int update(UPDATE_FUNC_ARGS)
 							//@ BRMT + BREC -> BRMT + THRM
 							sim->create_part_outer(ID(r), x+rx, y+ry, PT_THRM);
 						}
-						else //@ BRMT + BREC -> THRM + BREC
+						else
+						{
+							//@ BRMT + BREC -> THRM + BREC
 							sim->create_part_outer(i, x, y, PT_THRM);
+							return 1;
+						}
 					}
 				}
 			}
