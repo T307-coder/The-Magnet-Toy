@@ -414,6 +414,32 @@ void CubeTest_SetActiveTool(int toolType)
 	g_activeToolType = toolType;
 }
 
+// Create a 3D particle bypassing pmap — allows multiple particles per (x,y)
+static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
+{
+	if (x<0 || y<0 || x>=XRES || y>=YRES) return -1;
+	if (t<=0 || t>=PT_NUM) return -1;
+	auto &sd = SimulationData::CRef();
+	if (!sd.elements[t].Enabled) return -1;
+
+	if (sim->parts.active >= NPART) return -1;
+	int i = sim->parts.active++;
+	auto &p = sim->parts[i];
+	p = sd.elements[t].DefaultProperties;
+	p.type = t;
+	p.x = (float)x;
+	p.y = (float)y;
+	p.z = (float)z;
+	p.tmp5 = 0;
+	p.tmp6 = 0;
+
+	if (sd.elements[t].Create)
+		(*(sd.elements[t].Create))(sim, i, x, y, t, -1);
+
+	sim->elementCount[t]++;
+	return i;
+}
+
 // Place particles at (cx,cy,cz) using current brush shape and radius
 static void FillBrushAt(int cx, int cy, int cz)
 {
@@ -426,10 +452,7 @@ static void FillBrushAt(int cx, int cy, int cz)
 		for (int dx = -r; dx <= r; dx++)
 			for (int dy = -r; dy <= r; dy++)
 				for (int dz = -r; dz <= r; dz++)
-				{
-					int i = sim->create_part(-1, cx + dx, cy + dy, g_activeToolType);
-					if (i >= 0) sim->parts[i].z = (float)(cz + dz);
-				}
+					CreatePart3D(sim, cx + dx, cy + dy, cz + dz, g_activeToolType);
 	}
 	else // Sphere fill
 	{
@@ -439,8 +462,7 @@ static void FillBrushAt(int cx, int cy, int cz)
 				for (int dz = -r; dz <= r; dz++)
 				{
 					if (dx*dx + dy*dy + dz*dz > r2) continue;
-					int i = sim->create_part(-1, cx + dx, cy + dy, g_activeToolType);
-					if (i >= 0) sim->parts[i].z = (float)(cz + dz);
+					CreatePart3D(sim, cx + dx, cy + dy, cz + dz, g_activeToolType);
 				}
 	}
 }
