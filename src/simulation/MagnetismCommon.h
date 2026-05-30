@@ -72,8 +72,10 @@ static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, 
 		for (int ry = -scanR; ry <= scanR; ry++)
 		{
 			if (!rx && !ry) continue;
+			int nx = x + rx, ny = y + ry;
+			if (nx < 0 || ny < 0 || nx >= XRES || ny >= YRES) continue; // bounds check
 			int dist = std::max(abs(rx), abs(ry));
-			auto r = sim->pmap[y + ry][x + rx];
+			auto r = sim->pmap[ny][nx];
 			if (r)
 			{
 				int rt = TYP(r);
@@ -105,7 +107,7 @@ static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, 
 					}
 				}
 			}
-			auto pr = sim->photons[y + ry][x + rx];
+			auto pr = sim->photons[ny][nx];
 			if (pr && TYP(pr) == PT_MGPN)
 			{
 				int target = sim->parts[ID(pr)].tmp;
