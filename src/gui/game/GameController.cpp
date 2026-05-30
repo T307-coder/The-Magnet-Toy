@@ -12,6 +12,7 @@
 #include "RenderPreset.h"
 #include "tool/PropertyTool.h"
 #include "tool/GOLTool.h"
+#include "graphics/CubeTest.h"
 
 #include "GameControllerEvents.h"
 #include "lua/CommandInterface.h"
@@ -725,6 +726,15 @@ void GameController::InitCommandInterface()
 void GameController::Tick()
 {
 	gameModel->Tick();
+	// Update 3D brush radius from current brush
+	{
+		Brush &b = gameModel->GetBrush();
+		auto r = b.GetRadius();
+		CubeTest_SetBrushRadius(r.X, r.Y);
+		// Also update active tool type for 3D-window clicks
+		Tool *t = gameModel->GetActiveTool(0);
+		if (t) CubeTest_SetActiveTool(t->ToolID);
+	}
 	if(firstTick)
 	{
 		if constexpr (INSTALL_CHECK)

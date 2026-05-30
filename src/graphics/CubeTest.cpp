@@ -1,0 +1,401 @@
+// SDL2+OpenGL 3D particle viewport
+#include "CubeTest.h"
+#include "SimulationConfig.h"
+#include "simulation/Simulation.h"
+#include "simulation/SimulationData.h"
+#ifdef _WIN32
+#include <windows.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+#endif
+#include <cmath>
+#include <cstdio>
+
+static SDL_Window *g_win = nullptr;
+static SDL_GLContext g_gl = nullptr;
+static const Simulation *g_sim = nullptr;
+bool g_camControl = false;
+static int g_w = 640, g_h = 480;
+static float g_rotX = 0.0f, g_rotY = 0.0f, g_dist = 800.0f;
+static bool g_mouseDown = false;
+static int g_mx = 0, g_my = 0;
+#ifdef _WIN32
+static GLuint g_fontBase = 0;
+#endif
+static int g_brushX = -1, g_brushY = -1;
+static int g_brushRX = 4, g_brushRY = 4;
+static bool g_showZGrid = false;
+// View mode and full 3D brush position
+static int g_viewMode = 0;
+static float g_brushPX = 0, g_brushPY = 0, g_brushPZ = 0;
+static int g_activeToolType = 0; // current tool element type for 3D clicks
+
+#ifdef _WIN32
+bool CubeTest_Init()
+{
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
+	g_win = SDL_CreateWindow("3D TPT View",
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		g_w, g_h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	if (!g_win) return false;
+	g_gl = SDL_GL_CreateContext(g_win);
+	if (!g_gl) return false;
+	glClearColor(0.08f, 0.08f, 0.12f, 1.0f);
+	glEnable(GL_DEPTH_TEST);
+	glPointSize(3.0f);
+	HDC hdc = wglGetCurrentDC();
+	HFONT hFont = CreateFontA(28, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+		ANSI_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+		FF_DONTCARE | DEFAULT_PITCH, "Arial");
+	SelectObject(hdc, hFont);
+	g_fontBase = glGenLists(128);
+	wglUseFontBitmaps(hdc, 0, 128, g_fontBase);
+	DeleteObject(hFont);
+	printf("3D Viewport: OpenGL %s ready\n", glGetString(GL_VERSION));
+	return true;
+}
+#else
+bool CubeTest_Init() { return false; }
+#endif
+
+void CubeTest_SetSimulation(const Simulation *sim) { g_sim = sim; }
+
+void CubeTest_Render()
+{
+	if (!g_win) return;
+	const Simulation *sim = g_sim;
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glViewport(0, 0, g_w, g_h);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	float aspect = (float)g_w / (float)g_h;
+	gluPerspective(45.0, aspect, 10.0, 10000.0);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glTranslatef(0, 0, -g_dist);
+	glRotatef(g_rotX, 1, 0, 0);
+	glRotatef(g_rotY, 0, 1, 0);
+	// Pivot rotation around active area, then flip Y (TPT Y=0 at screen top)
+	glTranslatef(-300.0f, 100.0f, 0);
+	glScalef(1, -1, 1);
+
+	// Grid on XY plane: Xâ†’right, Yâ†’down (TPT native)
+	glColor3f(0.2f, 0.2f, 0.3f);
+	glBegin(GL_LINES);
+	for (int x = 0; x <= XRES; x += 50)
+	{ glVertex3f((float)x, 0, 0); glVertex3f((float)x, (float)YRES, 0); }
+	for (int y = 0; y <= YRES; y += 50)
+	{ glVertex3f(0, (float)y, 0); glVertex3f((float)XRES, (float)y, 0); }
+	glEnd();
+
+	// XYZ axes from origin. Xâ†’right, Yâ†’up (3D up = -TPT Y), Zâ†’out of screen
+	const float axLen = 60.0f;
+	const float headLen = 10.0f;
+	const float headW = 4.0f;
+	glBegin(GL_LINES);
+	// X axis â€?red â†?+X (right)
+	glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f( axLen, 0, 0);
+	glVertex3f(axLen, 0, 0); glVertex3f(axLen-headLen,  headW, 0);
+	glVertex3f(axLen, 0, 0); glVertex3f(axLen-headLen, -headW, 0);
+	glVertex3f(axLen, 0, 0); glVertex3f(axLen-headLen, 0,  headW);
+	glVertex3f(axLen, 0, 0); glVertex3f(axLen-headLen, 0, -headW);
+	// Y axis â€?green â†?+Y (down, same direction as TPT Y)
+	glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, axLen, 0);
+	glVertex3f(0, axLen, 0); glVertex3f( headW, axLen-headLen, 0);
+	glVertex3f(0, axLen, 0); glVertex3f(-headW, axLen-headLen, 0);
+	glVertex3f(0, axLen, 0); glVertex3f(0, axLen-headLen,  headW);
+	glVertex3f(0, axLen, 0); glVertex3f(0, axLen-headLen, -headW);
+	// Z axis â€?blue â†?+Z (out of screen)
+	glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, axLen);
+	glVertex3f(0, 0, axLen); glVertex3f( headW, 0, axLen-headLen);
+	glVertex3f(0, 0, axLen); glVertex3f(-headW, 0, axLen-headLen);
+	glVertex3f(0, 0, axLen); glVertex3f(0,  headW, axLen-headLen);
+	glVertex3f(0, 0, axLen); glVertex3f(0, -headW, axLen-headLen);
+	glEnd();
+
+	// Axis labels at arrow tips
+	if (g_fontBase)
+	{
+		float lblOff = axLen + 8.0f;
+		glListBase(g_fontBase);
+		glColor3f(1, 0, 0); glRasterPos3f( lblOff, 2, 0);
+		glCallLists(1, GL_UNSIGNED_BYTE, "X");
+		glColor3f(0, 1, 0); glRasterPos3f(2, lblOff, 0);
+		glCallLists(1, GL_UNSIGNED_BYTE, "Y");
+		glColor3f(0, 0, 1); glRasterPos3f(2, 0, lblOff);
+		glCallLists(1, GL_UNSIGNED_BYTE, "Z");
+	}
+
+	if (!sim) { SDL_GL_SwapWindow(g_win); return; }
+
+	auto &sd = SimulationData::CRef();
+	auto &elements = sd.elements;
+
+	// ---- Z-axis grid (optional, toggled with G) ----
+	if (g_showZGrid)
+	{
+		glColor3f(0.15f, 0.25f, 0.15f);
+		glBegin(GL_LINES);
+		for (int z = -20; z <= 20; z += 2)
+		{
+			float fz = (float)z;
+			for (int x = 0; x <= XRES; x += 50)
+			{ glVertex3f((float)x, 0, fz); glVertex3f((float)x, (float)YRES, fz); }
+			for (int y = 0; y <= YRES; y += 50)
+			{ glVertex3f(0, (float)y, fz); glVertex3f((float)XRES, (float)y, fz); }
+		}
+		glEnd();
+	}
+
+	// ---- Brush preview: rectangle + crosshair in the active plane ----
+	if (g_brushX >= 0 && g_brushY >= 0)
+	{
+		float bx = g_brushPX, by = g_brushPY, bz = g_brushPZ;
+		float rx = (float)g_brushRX, ry = (float)g_brushRY;
+		int vm = g_viewMode;
+
+		// Yellow wireframe rectangle on the active plane
+		glColor3f(1.0f, 1.0f, 0.3f);
+		glBegin(GL_LINE_LOOP);
+		if (vm <= 3) { // XY plane (Front 0, Back 3)
+			glVertex3f(bx-rx, by-ry, bz); glVertex3f(bx+rx, by-ry, bz);
+			glVertex3f(bx+rx, by+ry, bz); glVertex3f(bx-rx, by+ry, bz);
+		} else if (vm == 1 || vm == 4) { // XZ plane (Top 1, Bottom 4)
+			glVertex3f(bx-rx, by, bz-ry); glVertex3f(bx+rx, by, bz-ry);
+			glVertex3f(bx+rx, by, bz+ry); glVertex3f(bx-rx, by, bz+ry);
+		} else { // YZ plane (Right 2, Left 5)
+			glVertex3f(bx, by-ry, bz-rx); glVertex3f(bx, by+ry, bz-rx);
+			glVertex3f(bx, by+ry, bz+rx); glVertex3f(bx, by-ry, bz+rx);
+		}
+		glEnd();
+
+		// Crosshair: two lines in the active plane, perpendicular to each other
+		glBegin(GL_LINES);
+		glColor3f(1, 1, 0.3f);
+		float c = 6.0f; // crosshair half-length
+		switch (vm) {
+		case 0: case 3: // XY plane: cross in X and Y, lock Z
+			glVertex3f(bx-c, by, bz); glVertex3f(bx+c, by, bz);
+			glVertex3f(bx, by-c, bz); glVertex3f(bx, by+c, bz);
+			// Locked axis: blue stub pointing in Z
+			glColor3f(0.4f, 0.4f, 1.0f);
+			glVertex3f(bx, by, bz-c*2); glVertex3f(bx, by, bz+c*2);
+			break;
+		case 1: case 4: // XZ plane: cross in X and Z, lock Y
+			glVertex3f(bx-c, by, bz); glVertex3f(bx+c, by, bz);
+			glVertex3f(bx, by, bz-c); glVertex3f(bx, by, bz+c);
+			glColor3f(0.4f, 0.4f, 1.0f);
+			glVertex3f(bx, by-c*2, bz); glVertex3f(bx, by+c*2, bz);
+			break;
+		default: // YZ plane: cross in Y and Z, lock X
+			glVertex3f(bx, by-c, bz); glVertex3f(bx, by+c, bz);
+			glVertex3f(bx, by, bz-c); glVertex3f(bx, by, bz+c);
+			glColor3f(0.4f, 0.4f, 1.0f);
+			glVertex3f(bx-c*2, by, bz); glVertex3f(bx+c*2, by, bz);
+			break;
+		}
+		glEnd();
+	}
+
+	// Draw particles as small cubes
+	const float hs = 1.5f; // half-size of cube
+	for (int i = 0; i < sim->parts.active; i++)
+	{
+		if (!sim->parts[i].type) continue;
+		int t = sim->parts[i].type;
+		if (t <= 0 || t >= PT_NUM) continue;
+		auto col = elements[t].Colour;
+		glColor3ub(col.Red, col.Green, col.Blue);
+		float cx = sim->parts[i].x;
+		float cy = sim->parts[i].y;
+		float cz = sim->parts[i].z;
+		glBegin(GL_QUADS);
+		// front (+Z)
+		glVertex3f(cx-hs, cy-hs, cz+hs); glVertex3f(cx+hs, cy-hs, cz+hs);
+		glVertex3f(cx+hs, cy+hs, cz+hs); glVertex3f(cx-hs, cy+hs, cz+hs);
+		// back (-Z)
+		glVertex3f(cx-hs, cy-hs, cz-hs); glVertex3f(cx-hs, cy+hs, cz-hs);
+		glVertex3f(cx+hs, cy+hs, cz-hs); glVertex3f(cx+hs, cy-hs, cz-hs);
+		// top (+Y)
+		glVertex3f(cx-hs, cy+hs, cz-hs); glVertex3f(cx-hs, cy+hs, cz+hs);
+		glVertex3f(cx+hs, cy+hs, cz+hs); glVertex3f(cx+hs, cy+hs, cz-hs);
+		// bottom (-Y)
+		glVertex3f(cx-hs, cy-hs, cz-hs); glVertex3f(cx+hs, cy-hs, cz-hs);
+		glVertex3f(cx+hs, cy-hs, cz+hs); glVertex3f(cx-hs, cy-hs, cz+hs);
+		// right (+X)
+		glVertex3f(cx+hs, cy-hs, cz-hs); glVertex3f(cx+hs, cy+hs, cz-hs);
+		glVertex3f(cx+hs, cy+hs, cz+hs); glVertex3f(cx+hs, cy-hs, cz+hs);
+		// left (-X)
+		glVertex3f(cx-hs, cy-hs, cz-hs); glVertex3f(cx-hs, cy-hs, cz+hs);
+		glVertex3f(cx-hs, cy+hs, cz+hs); glVertex3f(cx-hs, cy+hs, cz-hs);
+		glEnd();
+	}
+
+	SDL_GL_SwapWindow(g_win);
+}
+
+void CubeTest_ToggleCamControl() { g_camControl = !g_camControl; }
+
+void CubeTest_Rotate(int dx, int dy)
+{
+	g_rotY += dx * 0.5f;
+	g_rotX += dy * 0.5f;
+}
+
+static void ApplyViewMode(int mode)
+{
+	g_viewMode = mode;
+	switch (mode) {
+		case 0: g_rotX=0;   g_rotY=0;   break; // Front  â€?face XY, +Z toward viewer
+		case 1: g_rotX=-90; g_rotY=0;   break; // Top    â€?face XZ, +Y toward viewer
+		case 2: g_rotX=0;   g_rotY=90;  break; // Right  â€?face YZ, +X toward viewer
+		case 3: g_rotX=0;   g_rotY=180; break; // Back   â€?face XY, -Z toward viewer
+		case 4: g_rotX=90;  g_rotY=0;   break; // Bottom â€?face XZ, -Y toward viewer
+		case 5: g_rotX=0;   g_rotY=-90; break; // Left   â€?face YZ, -X toward viewer
+	}
+}
+
+void CubeTest_RotateBy(float dRotX, float dRotY)
+{
+	// Snap to nearest 90Â° view based on rotation direction
+	if (dRotX > 0)      ApplyViewMode(1); // TOP
+	else if (dRotX < 0) ApplyViewMode(0); // FRONT
+	else if (dRotY > 0) ApplyViewMode(2); // RIGHT
+	else if (dRotY < 0) ApplyViewMode(5); // LEFT
+}
+
+void CubeTest_AdjustLayer(int delta)
+{
+	if (!g_sim) return;
+	const_cast<Simulation *>(g_sim)->selectedLayer += delta;
+}
+
+void CubeTest_SetBrush(int x, int y, int rx, int ry)
+{
+	g_brushX = x; g_brushY = y;
+	g_brushRX = rx; g_brushRY = ry;
+}
+
+void CubeTest_SetBrushPos(int x, int y)
+{
+	int sx = x, sy = y - 40; // MENUSIZE offset (windowâ†’simulation)
+	if (sx < 0) sx = 0; if (sx >= XRES) sx = XRES - 1;
+	if (sy < 0) sy = 0; if (sy >= YRES) sy = YRES - 1;
+	g_brushX = sx; g_brushY = sy;
+	int layer = g_sim ? g_sim->selectedLayer : 0;
+	switch (g_viewMode) {
+		case 0: case 3: // Front/Back: XY plane, Z locked
+			g_brushPX = (float)sx;
+			g_brushPY = (float)sy;
+			g_brushPZ = (float)layer;
+			break;
+		case 1: case 4: // Top/Bottom: XZ plane, Y locked. Mouse Xâ†’X, Mouse Yâ†’Z(inverted)
+			g_brushPX = (float)sx;
+			g_brushPY = (float)layer;
+			g_brushPZ = (float)(YRES - 1 - sy); // invert so mouse-up = +Z
+			break;
+		case 2: // Right: YZ plane, X locked. Mouse Xâ†’Z, Mouse Yâ†’Y
+			g_brushPX = (float)layer;
+			g_brushPY = (float)sy;
+			g_brushPZ = (float)sx;
+			break;
+		case 5: // Left: YZ plane, X locked. Mouse Xâ†?Z, Mouse Yâ†’Y
+			g_brushPX = (float)layer;
+			g_brushPY = (float)sy;
+			g_brushPZ = (float)(XRES - 1 - sx);
+			break;
+	}
+}
+
+void CubeTest_SetBrushRadius(int rx, int ry)
+{
+	g_brushRX = rx; g_brushRY = ry;
+}
+
+void CubeTest_ToggleZGrid()
+{
+	g_showZGrid = !g_showZGrid;
+}
+
+void CubeTest_ResetView()
+{
+	ApplyViewMode(0);
+	g_dist = 800.0f;
+}
+
+void CubeTest_ToggleFullscreen()
+{
+	if (!g_win) return;
+	Uint32 flags = SDL_GetWindowFlags(g_win);
+	if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP)
+		SDL_SetWindowFullscreen(g_win, 0);
+	else
+		SDL_SetWindowFullscreen(g_win, SDL_WINDOW_FULLSCREEN_DESKTOP);
+}
+
+void CubeTest_Zoom(int delta)
+{
+	g_dist -= (float)delta;
+	if (g_dist < 50) g_dist = 50;
+	if (g_dist > 5000) g_dist = 5000;
+}
+
+int CubeTest_GetPlacementZ()
+{
+	switch (g_viewMode) {
+		case 0: case 3: return g_sim ? g_sim->selectedLayer : 0;
+		case 1: case 4: return YRES - 1 - g_brushY;
+		case 5:         return XRES - 1 - g_brushX;
+		default:        return g_brushX;
+	}
+}
+
+void CubeTest_SetActiveTool(int toolType)
+{
+	g_activeToolType = toolType;
+}
+
+void CubeTest_HandleEvent(const SDL_Event &e)
+{
+	if (!g_win) return;
+	auto wid = SDL_GetWindowID(g_win);
+	if (e.type == SDL_WINDOWEVENT && e.window.windowID == wid)
+	{
+		if (e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
+		{ g_w = e.window.data1; g_h = e.window.data2; }
+		else if (e.window.event == SDL_WINDOWEVENT_CLOSE)
+		{ SDL_ShowCursor(SDL_ENABLE); CubeTest_Shutdown(); }
+		else if (e.window.event == SDL_WINDOWEVENT_ENTER)
+		{ SDL_ShowCursor(SDL_DISABLE); } // hide cursor over 3D window
+		else if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
+		{ SDL_ShowCursor(SDL_ENABLE);  } // show cursor when leaving
+	}
+	// Left click: place particle at brush position
+	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && e.button.windowID == wid)
+	{
+		if (g_sim && g_activeToolType > 0 && g_brushX >= 0)
+		{
+			int px = g_brushX, py = g_brushY;
+			int pz = CubeTest_GetPlacementZ();
+			// For non-front views, map (px, py) back to correct TPT coords
+			int tx = px, ty = py;
+			switch (g_viewMode) {
+			case 1: case 4: ty = g_sim->selectedLayer; break; // Top: Y=layer, Z=pz
+			case 2: case 5: tx = g_sim->selectedLayer; break; // Side: X=layer, Z=pz
+			}
+			const_cast<Simulation *>(g_sim)->create_part(-2, tx, ty, g_activeToolType);
+		}
+	}
+}
+
+void CubeTest_Shutdown()
+{
+	if (g_gl) { SDL_GL_DeleteContext(g_gl); g_gl = nullptr; }
+	if (g_win) { SDL_DestroyWindow(g_win); g_win = nullptr; }
+}
+
+bool CubeTest_IsOpen() { return g_win != nullptr; }

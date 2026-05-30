@@ -4,7 +4,12 @@
 #include "Config.h"
 #include "gui/interface/Engine.h"
 #include "graphics/Graphics.h"
+#include "graphics/CubeTest.h"
 #include "common/platform/Platform.h"
+
+extern bool g_camControl; // from CubeTest.cpp
+static bool g_layerSelect = false; // Z held: mouse Y draggs layer
+static int g_prevMouseY = 0;
 #include "common/clipboard/Clipboard.h"
 #include "FrameSchedule.h"
 #include <iostream>
@@ -290,6 +295,7 @@ void SDLSetScreen()
 		LoadWindowPosition();
 	}
 	ApplyFpsLimit();
+	CubeTest_Init(); // 3D viewport test
 	if (newFrameOpsNorm.fullscreen)
 	{
 		SDL_RaiseWindow(sdl_window);
@@ -310,20 +316,36 @@ static void EventProcess(const SDL_Event &event)
 		}
 		break;
 	case SDL_KEYDOWN:
-		if (SDL_GetModState() & KMOD_GUI)
-		{
-			break;
-		}
+		if (SDL_GetModState() & KMOD_GUI) break;
+		// Arrow keys: rotate 3D camera (5° per press)
+		if (event.key.keysym.scancode == SDL_SCANCODE_UP)    { CubeTest_RotateBy( 5, 0); break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_DOWN)  { CubeTest_RotateBy(-5, 0); break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_LEFT)  { CubeTest_RotateBy(0, -5); break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_RIGHT) { CubeTest_RotateBy(0,  5); break; }
+		// 'Z' held: mouse Y drags layer selector
+		if (event.key.keysym.scancode == SDL_SCANCODE_Z)
+			{ g_layerSelect = true; g_prevMouseY = mousey; break; }
+		// 'C' held: free-look 3D camera (mouse drag, brush disabled)
+		if (event.key.keysym.scancode == SDL_SCANCODE_C)
+			{ g_camControl = true; break; }
+		// 'G' toggles Z-axis grid in 3D view
+		if (event.key.keysym.scancode == SDL_SCANCODE_G)
+			{ CubeTest_ToggleZGrid(); break; }
+		// 'R' resets brush to current mouse position
+		if (event.key.keysym.scancode == SDL_SCANCODE_R)
+			{ CubeTest_SetBrushPos(mousex, mousey); break; }
+		// 'F' toggles 3D window fullscreen
+		if (event.key.keysym.scancode == SDL_SCANCODE_F)
+			{ CubeTest_ToggleFullscreen(); break; }
 		if (engine.GetGlobalQuit() && ALLOW_QUIT && !event.key.repeat && event.key.keysym.sym == 'q' && (event.key.keysym.mod&KMOD_CTRL) && !(event.key.keysym.mod&KMOD_ALT))
 			engine.ConfirmExit();
 		else
 			engine.onKeyPress(event.key.keysym.sym, event.key.keysym.scancode, event.key.repeat, event.key.keysym.mod&KMOD_SHIFT, event.key.keysym.mod&KMOD_CTRL, event.key.keysym.mod&KMOD_ALT);
 		break;
 	case SDL_KEYUP:
-		if (SDL_GetModState() & KMOD_GUI)
-		{
-			break;
-		}
+		if (SDL_GetModState() & KMOD_GUI) break;
+		if (event.key.keysym.scancode == SDL_SCANCODE_Z) { g_layerSelect = false; break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_C) { g_camControl = false; break; }
 		engine.onKeyRelease(event.key.keysym.sym, event.key.keysym.scancode, event.key.repeat, event.key.keysym.mod&KMOD_SHIFT, event.key.keysym.mod&KMOD_CTRL, event.key.keysym.mod&KMOD_ALT);
 		break;
 	case SDL_TEXTINPUT:
@@ -342,22 +364,38 @@ static void EventProcess(const SDL_Event &event)
 		break;
 	case SDL_MOUSEWHEEL:
 	{
-		// int x = event.wheel.x;
 		int y = event.wheel.y;
 		if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
-		{
-			// x *= -1;
 			y *= -1;
-		}
-
-		engine.onMouseWheel(mousex, mousey, y); // TODO: pass x?
+		// Ctrl+scroll: zoom 3D view, don't adjust brush
+		if (SDL_GetModState() & KMOD_CTRL)
+			CubeTest_Zoom(y * 30);
+		else
+			engine.onMouseWheel(mousex, mousey, y);
 		break;
 	}
 	case SDL_MOUSEMOTION:
 		mousex = event.motion.x;
 		mousey = event.motion.y;
-		engine.onMouseMove(mousex, mousey);
-
+		if (g_camControl)
+		{
+			static int clx = 0, cly = 0;
+			if (clx) CubeTest_Rotate(event.motion.x - clx, event.motion.y - cly);
+			clx = event.motion.x; cly = event.motion.y;
+		}
+		else
+		{
+			CubeTest_SetBrushPos(mousex, mousey);
+			if (g_layerSelect)
+			{
+				int dy = g_prevMouseY - event.motion.y;
+				if (dy) { CubeTest_AdjustLayer(dy / 5); g_prevMouseY = event.motion.y; }
+			}
+			else
+			{
+				engine.onMouseMove(mousex, mousey);
+			}
+		}
 		hasMouseMoved = true;
 		break;
 	case SDL_DROPFILE:
@@ -450,6 +488,7 @@ std::optional<uint64_t> EngineProcess()
 	while (SDL_PollEvent(&event))
 	{
 		EventProcess(event);
+		if (CubeTest_IsOpen()) CubeTest_HandleEvent(event);
 	}
 
 	std::optional<uint64_t> delay;
@@ -488,6 +527,7 @@ std::optional<uint64_t> EngineProcess()
 		drawSchedule.SetNow(nowNs);
 		SDLSetScreen();
 		blit(engine.g->Data());
+		if (CubeTest_IsOpen()) CubeTest_Render();
 	}
 	if (effectiveDrawLimit)
 	{

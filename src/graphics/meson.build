@@ -6,6 +6,7 @@ graphics_files = files(
 )
 powder_graphics_files = files(
 	'Renderer.cpp',
+	'CubeTest.cpp',
 )
 
 common_files += graphics_files

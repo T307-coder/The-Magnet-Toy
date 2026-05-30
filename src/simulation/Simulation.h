@@ -99,6 +99,7 @@ struct RenderableSimulation
 	bool realisticPstnEnabled = false;
 	bool electricityEnabled = true;
 	float uniformBField = 0.0f; // global uniform magnetic field added to bField
+	int selectedLayer = 0; // current Z layer (for 3D TPT viewport)
 
 	playerst player;
 	playerst player2;

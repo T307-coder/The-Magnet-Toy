@@ -14,6 +14,7 @@ struct Particle
 	int tmp;
 	int tmp2;
 	unsigned int dcolour;
+	float z, vz;
 	int tmp5;
 	int tmp6;
 	/** Returns a list of properties, their type and offset within the structure that can be changed

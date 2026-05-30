@@ -270,6 +270,8 @@ void Renderer::render_parts()
 	stats.foundParticles = 0;
 	for(i = 0; i < sim->parts.active; i++) {
 		if (sim->parts[i].type && sim->parts[i].type >= 0 && sim->parts[i].type < PT_NUM) {
+			// Layer filter: only render particles on the selected Z layer
+			if (int(sim->parts[i].z + 0.5f) != sim->selectedLayer) continue;
 			t = sim->parts[i].type;
 
 			nx = (int)(sim->parts[i].x+0.5f);
