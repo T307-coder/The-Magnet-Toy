@@ -58,73 +58,73 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 	return false;
 }
 
+// Build cached list of magnetic source positions (MAGN, active ELMG, MGPN).
+// Call once per frame in BeforeSim. Thread-safe: only writes during setup phase.
+static inline void magnetism_buildSourceList(Simulation *sim)
+{
+	sim->magSourceCount = 0;
+	constexpr int maxSources = RenderableSimulation::MAX_MAG_SOURCES;
+	auto &parts = sim->parts;
+	for (int i = 0; i < parts.active && sim->magSourceCount < maxSources; i++)
+	{
+		if (!parts[i].type) continue;
+		int t = parts[i].type;
+		int x = (int)(parts[i].x + 0.5f);
+		int y = (int)(parts[i].y + 0.5f);
+		int target = 0;
+		if (t == PT_MAGN)
+		{
+			target = parts[i].tmp;
+		}
+		else if (t == PT_ELMG && parts[i].life == 10)
+		{
+			target = (int)((parts[i].temp - 273.15f) / 5.0f);
+			if (target > 100) target = 100;
+			if (target < -100) target = -100;
+		}
+		else if (t == PT_MGPN)
+		{
+			target = parts[i].tmp;
+		}
+		else continue;
+		if (target == 0) continue;
+		int idx = sim->magSourceCount++;
+		sim->magSourceX[idx] = x;
+		sim->magSourceY[idx] = y;
+		sim->magSourceTarget[idx] = target;
+	}
+}
+
 // Range-based magnetization: ferromagnets receive magnetization from nearby MAGN/ELMG/MGPN.
-// reach = 1 + |source_strength| / 25 (stronger sources reach further).
-// Distance² falloff via rng.chance.
+// Uses cached source list (push model) to avoid O(N×R²) pmap scanning.
+// Source list is rebuilt once per frame in magnetism_buildSourceList.
 static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref)
 {
 	int cx = x / CELL, cy = y / CELL;
 	if (!sim->magnetismEnabled || cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS) return;
-	if (p.temp >= 773.15f) return; // above Curie temperature, doesn't magnetize
+	if (p.temp >= 773.15f) return;
 
-	constexpr int scanR = 30;
-	for (int rx = -scanR; rx <= scanR; rx++)
-		for (int ry = -scanR; ry <= scanR; ry++)
+	// Iterate magnetic sources (cached, not full grid scan)
+	// Sources are stored as flat arrays in sim: magSourceX/Y[], magSourceTarget[], magSourceCount
+	// Rebuilt each frame in BeforeSim via magnetism_buildSourceList.
+	// Type: 0=MAGN, 1=ELMG, 2=MGPN
+	for (int si = 0; si < sim->magSourceCount; si++)
+	{
+		int sx = sim->magSourceX[si], sy = sim->magSourceY[si];
+		int dist = std::max(abs(x - sx), abs(y - sy));
+		int reach = 1 + std::abs(sim->magSourceTarget[si]) / 25;
+		if (dist <= reach)
 		{
-			if (!rx && !ry) continue;
-			int nx = x + rx, ny = y + ry;
-			if (nx < 0 || ny < 0 || nx >= XRES || ny >= YRES) continue; // bounds check
-			int dist = std::max(abs(rx), abs(ry));
-			auto r = sim->pmap[ny][nx];
-			if (r)
+			int target = sim->magSourceTarget[si];
+			int chance = dist * dist;
+			if (dist <= 1 || sim->sharedRng.chance(1, chance))
 			{
-				int rt = TYP(r);
-				int target = 0;
-				bool hasTarget = false;
-				if (rt == PT_MAGN)
-				{
-					target = sim->parts[ID(r)].tmp;
-					hasTarget = true;
-				}
-				else if (rt == PT_ELMG && sim->parts[ID(r)].life == 10)
-				{
-					target = (int)((sim->parts[ID(r)].temp - 273.15f) / 5.0f);
-					if (target > 100) target = 100;
-					if (target < -100) target = -100;
-					hasTarget = true;
-				}
-				if (hasTarget)
-				{
-					int reach = 1 + std::abs(target) / 25;
-					if (dist <= reach)
-					{
-						int chance = dist * dist;
-						if (dist <= 1 || sim->sharedRng.chance(1, chance))
-						{
-							if (tmp3Ref < target) tmp3Ref++;
-							else if (tmp3Ref > target) tmp3Ref--;
-						}
-					}
-				}
-			}
-			auto pr = sim->photons[ny][nx];
-			if (pr && TYP(pr) == PT_MGPN)
-			{
-				int target = sim->parts[ID(pr)].tmp;
-				int reach = 1 + std::abs(target) / 25;
-				if (dist <= reach)
-				{
-					int chance = dist * dist;
-					if (dist <= 1 || sim->sharedRng.chance(1, chance))
-					{
-						if (tmp3Ref < target) tmp3Ref++;
-						else if (tmp3Ref > target) tmp3Ref--;
-					}
-				}
+				if (tmp3Ref < target) tmp3Ref++;
+				else if (tmp3Ref > target) tmp3Ref--;
 			}
 		}
+	}
 }
-
 // DEUT-style magnetization diffusion between ferromagnets in range.
 // reach = 1 + |strength|/25; stronger magnets spread further.
 // Probe count scales with reach² to maintain hit rate.

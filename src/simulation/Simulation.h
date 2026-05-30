@@ -117,6 +117,13 @@ struct RenderableSimulation
 	alignas(64) int pmap[YRES][XRES_ALIGNED];
 	alignas(64) int photons[YRES][XRES_ALIGNED];
 
+	// Magnetic source cache: rebuilt each frame in BeforeSim, read-only by elements
+	static constexpr int MAX_MAG_SOURCES = 4096;
+	int magSourceCount = 0;
+	int magSourceX[MAX_MAG_SOURCES];
+	int magSourceY[MAX_MAG_SOURCES];
+	int magSourceTarget[MAX_MAG_SOURCES]; // polarity/strength
+
 	int aheat_enable = 0;
 
 	bool useLuaCallbacks = false;
