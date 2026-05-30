@@ -395,7 +395,7 @@ void CubeTest_Zoom(int delta)
 void CubeTest_ResizeBrush(int delta)
 {
 	g_brushR += (float)delta;
-	if (g_brushR < 2) g_brushR = 2;
+	if (g_brushR < 1) g_brushR = 1;
 	if (g_brushR > 100) g_brushR = 100;
 }
 
@@ -441,57 +441,54 @@ static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 	return i;
 }
 
-// Place particles at (cx,cy,cz) using current brush shape and radius
-static void FillBrushAt(int cx, int cy, int cz)
+// Unified brush action: mode 0=place, 1=delete
+static void BrushAction(int cx, int cy, int cz, int mode)
 {
 	auto *sim = const_cast<Simulation *>(g_sim);
 	int r = (int)(g_brushR + 0.5f);
-	if (r <= 0) r = 1;
-
-	if (g_brushShape == 0) // Cube fill
-	{
-		for (int dx = -r; dx <= r; dx++)
-			for (int dy = -r; dy <= r; dy++)
-				for (int dz = -r; dz <= r; dz++)
-					CreatePart3D(sim, cx + dx, cy + dy, cz + dz, g_activeToolType);
-	}
-	else // Sphere fill
-	{
-		int r2 = r * r;
-		for (int dx = -r; dx <= r; dx++)
-			for (int dy = -r; dy <= r; dy++)
-				for (int dz = -r; dz <= r; dz++)
-				{
-					if (dx*dx + dy*dy + dz*dz > r2) continue;
-					CreatePart3D(sim, cx + dx, cy + dy, cz + dz, g_activeToolType);
-				}
-	}
-}
-// Delete particles within brush volume at (cx,cy,cz)
-static void DeleteBrushAt(int cx, int cy, int cz)
-{
-	auto *sim = const_cast<Simulation *>(g_sim);
-	int r = (int)(g_brushR + 0.5f);
-	if (r <= 0) r = 1;
+	if (r < 1) r = 1;
 	int r2 = r * r;
 
-	for (int i = 0; i < sim->parts.active; i++)
+	if (mode == 0) // Place
 	{
-		if (!sim->parts[i].type) continue;
-		int dx = (int)(sim->parts[i].x + 0.5f) - cx;
-		int dy = (int)(sim->parts[i].y + 0.5f) - cy;
-		int dz = (int)(sim->parts[i].z + 0.5f) - cz;
+		if (g_brushShape == 0) // Cube
+		{
+			for (int dx = -r; dx <= r; dx++)
+				for (int dy = -r; dy <= r; dy++)
+					for (int dz = -r; dz <= r; dz++)
+						CreatePart3D(sim, cx + dx, cy + dy, cz + dz, g_activeToolType);
+		}
+		else // Sphere
+		{
+			for (int dx = -r; dx <= r; dx++)
+				for (int dy = -r; dy <= r; dy++)
+					for (int dz = -r; dz <= r; dz++)
+					{
+						if (dx*dx + dy*dy + dz*dz > r2) continue;
+						CreatePart3D(sim, cx + dx, cy + dy, cz + dz, g_activeToolType);
+					}
+		}
+	}
+	else // Delete
+	{
+		for (int i = 0; i < sim->parts.active; i++)
+		{
+			if (!sim->parts[i].type) continue;
+			int dx = (int)(sim->parts[i].x + 0.5f) - cx;
+			int dy = (int)(sim->parts[i].y + 0.5f) - cy;
+			int dz = (int)(sim->parts[i].z + 0.5f) - cz;
 
-		bool hit = false;
-		if (g_brushShape == 0)
-			hit = (abs(dx) <= r && abs(dy) <= r && abs(dz) <= r);
-		else
-			hit = (dx*dx + dy*dy + dz*dz <= r2);
+			bool hit;
+			if (g_brushShape == 0)
+				hit = (abs(dx) <= r && abs(dy) <= r && abs(dz) <= r);
+			else
+				hit = (dx*dx + dy*dy + dz*dz <= r2);
 
-		if (hit)
-			sim->kill_part(i);
+			if (hit) sim->kill_part(i);
+		}
 	}
 }
+
 // Place particles along the 3D line from previous to current brush position
 static float g_prevPX = 0, g_prevPY = 0, g_prevPZ = 0;
 static bool g_havePrev = false;
@@ -506,7 +503,7 @@ static void PlaceParticleAtBrush()
 	int steps = g_havePrev ? (int)ceilf(sqrtf(dx*dx + dy*dy + dz*dz) * 2.0f) : 0;
 	if (steps <= 0)
 	{
-		FillBrushAt((int)(cx + 0.5f), (int)(cy + 0.5f), (int)(cz + 0.5f));
+		BrushAction((int)(cx + 0.5f), (int)(cy + 0.5f), (int)(cz + 0.5f), 0);
 	}
 	else
 	{
@@ -516,7 +513,7 @@ static void PlaceParticleAtBrush()
 			int px = (int)(g_prevPX + dx * t + 0.5f);
 			int py = (int)(g_prevPY + dy * t + 0.5f);
 			int pz = (int)(g_prevPZ + dz * t + 0.5f);
-			FillBrushAt(px, py, pz);
+			BrushAction(px, py, pz, 0);
 		}
 	}
 
@@ -609,8 +606,8 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 			lastMx3D = 0; lastMy3D = 0;
 			UpdateBrushFrom3DWindow(e.motion.x, e.motion.y);
 			if (g_placing) PlaceParticleAtBrush();
-			if (g_deleting) DeleteBrushAt(
-				(int)(g_brushPX + 0.5f), (int)(g_brushPY + 0.5f), (int)(g_brushPZ + 0.5f));
+			if (g_deleting) BrushAction(
+				(int)(g_brushPX + 0.5f), (int)(g_brushPY + 0.5f), (int)(g_brushPZ + 0.5f), 1);
 		}
 	}
 	// Left click: place; Right click: delete
@@ -624,7 +621,7 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		else if (e.button.button == SDL_BUTTON_RIGHT)
 		{
 			g_deleting = true;
-			DeleteBrushAt((int)(g_brushPX + 0.5f), (int)(g_brushPY + 0.5f), (int)(g_brushPZ + 0.5f));
+			BrushAction((int)(g_brushPX + 0.5f), (int)(g_brushPY + 0.5f), (int)(g_brushPZ + 0.5f), 1);
 		}
 	}
 	// Release: stop placing or deleting
