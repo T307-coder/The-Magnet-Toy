@@ -728,6 +728,7 @@ void GameController::Tick()
 	gameModel->Tick();
 	// Update 3D brush radius from current brush
 	{
+		CubeTest_SetSimulation(gameModel->GetSimulation());
 		Brush &b = gameModel->GetBrush();
 		auto r = b.GetRadius();
 		CubeTest_SetBrushRadius(r.X, r.Y);

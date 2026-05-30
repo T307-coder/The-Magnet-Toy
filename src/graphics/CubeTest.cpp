@@ -63,9 +63,10 @@ void CubeTest_SetSimulation(const Simulation *sim) { g_sim = sim; }
 
 void CubeTest_Render()
 {
-	if (!g_win) return;
+	if (!g_win || !g_gl) return;
 	const Simulation *sim = g_sim;
 
+	SDL_GL_MakeCurrent(g_win, g_gl);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, g_w, g_h);
 
@@ -84,7 +85,7 @@ void CubeTest_Render()
 	glScalef(1, -1, 1);
 
 	// Grid on XY plane: X→right, Y→down (TPT native)
-	glColor3f(0.2f, 0.2f, 0.3f);
+	glColor3f(0.25f, 0.25f, 0.35f);
 	glBegin(GL_LINES);
 	for (int x = 0; x <= XRES; x += 50)
 	{ glVertex3f((float)x, 0, 0); glVertex3f((float)x, (float)YRES, 0); }
