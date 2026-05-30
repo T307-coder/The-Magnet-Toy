@@ -29,6 +29,9 @@ static bool g_showZGrid = false;
 static int g_viewMode = 0;
 static float g_brushPX = 0, g_brushPY = 0, g_brushPZ = 0;
 static int g_activeToolType = 0; // current tool element type for 3D clicks
+// Cached matrices for gluUnProject
+static double g_proj[16], g_modelview[16];
+static int    g_viewport[4];
 
 #ifdef _WIN32
 bool CubeTest_Init()
@@ -83,6 +86,11 @@ void CubeTest_Render()
 	// Pivot rotation around active area, then flip Y (TPT Y=0 at screen top)
 	glTranslatef(-300.0f, 100.0f, 0);
 	glScalef(1, -1, 1);
+
+	// Cache matrices for gluUnProject (3D window mouse → world coords)
+	glGetDoublev(GL_PROJECTION_MATRIX, g_proj);
+	glGetDoublev(GL_MODELVIEW_MATRIX, g_modelview);
+	glGetIntegerv(GL_VIEWPORT, g_viewport);
 
 	// Grid on XY plane: X→right, Y→down (TPT native)
 	glColor3f(0.25f, 0.25f, 0.35f);
@@ -369,6 +377,62 @@ void CubeTest_SetActiveTool(int toolType)
 	g_activeToolType = toolType;
 }
 
+// Convert 3D window screen coords to world position on the active plane
+static void UpdateBrushFrom3DWindow(int mx, int my)
+{
+	double wx, wy, wz;
+	double rx, ry, rz; // ray direction
+
+	// Unproject at near plane
+	gluUnProject((double)mx, (double)(g_h - my), 0.0,
+		g_modelview, g_proj, g_viewport, &wx, &wy, &wz);
+	// Unproject at far plane
+	gluUnProject((double)mx, (double)(g_h - my), 1.0,
+		g_modelview, g_proj, g_viewport, &rx, &ry, &rz);
+	rx -= wx; ry -= wy; rz -= wz; // ray direction
+
+	// Intersect ray with the active plane (locked axis)
+	double t;
+	switch (g_viewMode) {
+	case 0: case 3: // XY plane: Z locked at g_brushPZ
+		if (fabs(rz) < 1e-9) return;
+		t = ((double)g_brushPZ - wz) / rz;
+		if (t < 0) return;
+		g_brushPX = (float)(wx + rx * t);
+		g_brushPY = (float)(wy + ry * t);
+		if (g_brushPX < 0) g_brushPX = 0;
+		if (g_brushPX >= XRES) g_brushPX = (float)(XRES - 1);
+		if (g_brushPY < 0) g_brushPY = 0;
+		if (g_brushPY >= YRES) g_brushPY = (float)(YRES - 1);
+		break;
+	case 1: case 4: // XZ plane: Y locked at g_brushPY
+		if (fabs(ry) < 1e-9) return;
+		t = ((double)g_brushPY - wy) / ry;
+		if (t < 0) return;
+		g_brushPX = (float)(wx + rx * t);
+		g_brushPZ = (float)(wz + rz * t);
+		if (g_brushPX < 0) g_brushPX = 0;
+		if (g_brushPX >= XRES) g_brushPX = (float)(XRES - 1);
+		if (g_brushPZ < -200) g_brushPZ = -200;
+		if (g_brushPZ > 200) g_brushPZ = 200;
+		break;
+	default: // YZ plane (Right 2, Left 5): X locked at g_brushPX
+		if (fabs(rx) < 1e-9) return;
+		t = ((double)g_brushPX - wx) / rx;
+		if (t < 0) return;
+		g_brushPY = (float)(wy + ry * t);
+		g_brushPZ = (float)(wz + rz * t);
+		if (g_brushPY < 0) g_brushPY = 0;
+		if (g_brushPY >= YRES) g_brushPY = (float)(YRES - 1);
+		if (g_brushPZ < -200) g_brushPZ = -200;
+		if (g_brushPZ > 200) g_brushPZ = 200;
+		break;
+	}
+	// Sync g_brushX/Y for compatibility (used by brush render guard)
+	g_brushX = (int)(g_brushPX + 0.5f);
+	g_brushY = (int)(g_brushPY + 0.5f);
+}
+
 void CubeTest_HandleEvent(const SDL_Event &e)
 {
 	if (!g_win) return;
@@ -384,7 +448,12 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		else if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
 		{ SDL_ShowCursor(SDL_ENABLE);  } // show cursor when leaving
 	}
-	// Left click: place particle at brush 3D position
+	// 3D window mouse motion → update brush on active plane
+	if (e.type == SDL_MOUSEMOTION && e.motion.windowID == wid)
+	{
+		UpdateBrushFrom3DWindow(e.motion.x, e.motion.y);
+	}
+	// Left click in 3D window: place particle at brush 3D position
 	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && e.button.windowID == wid)
 	{
 		if (g_sim && g_activeToolType > 0 && g_brushX >= 0)

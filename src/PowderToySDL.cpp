@@ -383,18 +383,14 @@ static void EventProcess(const SDL_Event &event)
 			if (clx) CubeTest_Rotate(event.motion.x - clx, event.motion.y - cly);
 			clx = event.motion.x; cly = event.motion.y;
 		}
+		else if (g_layerSelect)
+		{
+			int dy = g_prevMouseY - event.motion.y;
+			if (dy) { CubeTest_AdjustLayer(dy / 5); g_prevMouseY = event.motion.y; }
+		}
 		else
 		{
-			CubeTest_SetBrushPos(mousex, mousey);
-			if (g_layerSelect)
-			{
-				int dy = g_prevMouseY - event.motion.y;
-				if (dy) { CubeTest_AdjustLayer(dy / 5); g_prevMouseY = event.motion.y; }
-			}
-			else
-			{
-				engine.onMouseMove(mousex, mousey);
-			}
+			engine.onMouseMove(mousex, mousey);
 		}
 		hasMouseMoved = true;
 		break;
