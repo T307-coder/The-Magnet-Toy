@@ -1065,7 +1065,9 @@ void CopiableSimulation::InitAsyncFields()
 {
 	if (!asyncFields)
 		asyncFields = std::make_unique<AsyncFieldSolver>();
-	asyncFields->Start(gpuFFTEnabled);
+	// Async workers always use CPU FFTW3 (GPU only via main-thread sync path)
+	// Small FFT grids suffer from GPU launch overhead + PCIe contention
+	asyncFields->Start(false);
 }
 
 void CopiableSimulation::EnableAsyncFields(bool enable)
@@ -1120,12 +1122,9 @@ void CopiableSimulation::EnableGPUFFT(bool enable)
 	gpuFFTEnabled = enable;
 	if (!enable && gpuFFT)
 		gpuFFT.reset();
-	// Restart async field workers to pick up GPU change
-	if (asyncFieldsEnabled && asyncFields)
-	{
-		asyncFields->Stop();
-		asyncFields->Start(gpuFFTEnabled);
-	}
+	// Note: GPU FFT and async fields are mutually exclusive.
+	// Async workers always use CPU FFTW3; GPU only via main-thread sync path.
+	// Small FFT grids (612x459) see GPU launch overhead > compute time.
 }
 
 CopiableSimulation &CopiableSimulation::operator =(const CopiableSimulation &other)
