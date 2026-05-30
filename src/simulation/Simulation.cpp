@@ -875,7 +875,14 @@ void CopiableSimulation::InitGPUFFT()
 	gpuFFT->Init(XCELLS, YCELLS);
 }
 
-// (EnableGPUFFT moved after AsyncFieldSolver definition)
+void CopiableSimulation::EnableGPUFFT(bool enable)
+{
+	if (enable && !gpuFFT)
+		InitGPUFFT();
+	gpuFFTEnabled = enable;
+	if (!enable && gpuFFT)
+		gpuFFT.reset();
+}
 
 // ============================================================================
 // AsyncFieldSolver: B-field and E-field FFT each on its own worker thread
@@ -900,27 +907,12 @@ struct CopiableSimulation::AsyncFieldSolver
 
 		std::vector<float> srcBuf;
 		std::vector<float> resultBuf;
-
-		// CPU FFTW3 (always available)
-		std::unique_ptr<CopiableSimulation::MagFFT> magFFT;
-		std::unique_ptr<CopiableSimulation::ElecFFT> elecFFT;
-
-		// GPU cuFFT (optional, init'd on worker thread)
-		std::unique_ptr<CopiableSimulation::GPUFFT> gpuFFT;
-		bool useGPU = false;
+		std::unique_ptr<CopiableSimulation::MagFFT> magFFT;  // for B
+		std::unique_ptr<CopiableSimulation::ElecFFT> elecFFT; // for E
 		bool isElectric = false;
 
 		void Run()
 		{
-#ifdef USE_CUDA
-			// Bind CUDA context on this worker thread, init GPU resources
-			if (useGPU && gpuFFT)
-			{
-				cudaSetDevice(0);
-				gpuFFT->Init(XCELLS, YCELLS);
-			}
-#endif
-
 			while (true)
 			{
 				{
@@ -931,23 +923,10 @@ struct CopiableSimulation::AsyncFieldSolver
 				}
 
 				std::vector<float> result(N);
-
-#ifdef USE_CUDA
-				if (useGPU && gpuFFT && gpuFFT->available)
-				{
-					gpuFFT->Solve(srcBuf.data(), result.data(), XCELLS, YCELLS);
-				}
-				else
-#endif
 				if (isElectric && elecFFT)
-				{
 					elecFFT->Solve(srcBuf.data(), result.data(), XCELLS, YCELLS);
-				}
 				else if (!isElectric && magFFT)
-				{
 					magFFT->Solve(srcBuf.data(), result.data(), XCELLS, YCELLS);
-				}
-
 				resultBuf = std::move(result);
 
 				{
@@ -958,33 +937,21 @@ struct CopiableSimulation::AsyncFieldSolver
 			}
 		}
 
-		void Start(bool electric, bool enableGPU)
+		void Start(bool electric)
 		{
 			isElectric = electric;
-			useGPU = enableGPU;
 			srcBuf.resize(N, 0.0f);
 			resultBuf.resize(N, 0.0f);
-
-			// CPU fallback: create FFTW3 plans now (main thread, fine for FFTW)
-			if (!useGPU)
+			if (electric)
 			{
-				if (electric)
-				{
-					elecFFT = std::make_unique<CopiableSimulation::ElecFFT>();
-					elecFFT->Init(XCELLS, YCELLS);
-				}
-				else
-				{
-					magFFT = std::make_unique<CopiableSimulation::MagFFT>();
-					magFFT->Init(XCELLS, YCELLS);
-				}
+				elecFFT = std::make_unique<CopiableSimulation::ElecFFT>();
+				elecFFT->Init(XCELLS, YCELLS);
 			}
 			else
 			{
-				// GPU: create GPUFFT object, but Init() will be called on worker thread
-				gpuFFT = std::make_unique<CopiableSimulation::GPUFFT>();
+				magFFT = std::make_unique<CopiableSimulation::MagFFT>();
+				magFFT->Init(XCELLS, YCELLS);
 			}
-
 			shouldStop = false;
 			firstFrame = true;
 			thread = std::thread([this]() { Run(); });
@@ -1041,10 +1008,10 @@ struct CopiableSimulation::AsyncFieldSolver
 		Stop();
 	}
 
-	void Start(bool enableGPU)
+	void Start()
 	{
-		bWorker.Start(false, enableGPU); // B-field
-		eWorker.Start(true,  enableGPU); // E-field
+		bWorker.Start(false); // B-field → MagFFT
+		eWorker.Start(true);  // E-field → ElecFFT
 	}
 
 	void Stop()
@@ -1065,7 +1032,7 @@ void CopiableSimulation::InitAsyncFields()
 {
 	if (!asyncFields)
 		asyncFields = std::make_unique<AsyncFieldSolver>();
-	asyncFields->Start(gpuFFTEnabled);
+	asyncFields->Start();
 }
 
 void CopiableSimulation::EnableAsyncFields(bool enable)
@@ -1111,21 +1078,6 @@ void CopiableSimulation::WaitAsyncFields()
 {
 	// No-op: Exchange() already waits for previous work.
 	// Results were already copied out in Exchange().
-}
-
-void CopiableSimulation::EnableGPUFFT(bool enable)
-{
-	if (enable && !gpuFFT)
-		InitGPUFFT();
-	gpuFFTEnabled = enable;
-	if (!enable && gpuFFT)
-		gpuFFT.reset();
-	// Restart async field workers to pick up GPU change
-	if (asyncFieldsEnabled && asyncFields)
-	{
-		asyncFields->Stop();
-		asyncFields->Start(gpuFFTEnabled);
-	}
 }
 
 CopiableSimulation &CopiableSimulation::operator =(const CopiableSimulation &other)
