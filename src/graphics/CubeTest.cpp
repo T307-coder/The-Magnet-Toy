@@ -258,6 +258,134 @@ void CubeTest_Render()
 		glEnd();
 	}
 
+	// ---- Brush coordinate overlay (screen-space) ----
+#ifdef _WIN32
+	if (g_fontBase && g_brushX >= 0)
+	{
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glLoadIdentity();
+		glOrtho(0, g_w, g_h, 0, -1, 1);
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
+		glDisable(GL_DEPTH_TEST);
+
+		char buf[64];
+		snprintf(buf, sizeof(buf), "X:%.0f Y:%.0f Z:%.0f  R:%d S:%s",
+			g_brushPX, g_brushPY, g_brushPZ,
+			(int)(g_brushRX + 0.5f),
+			g_brushShape == 0 ? "Cube" : "Sphere");
+		glColor3f(1, 1, 0.6f);
+		glRasterPos2i(10, 20);
+		glListBase(g_fontBase);
+		glCallLists((GLsizei)strlen(buf), GL_UNSIGNED_BYTE, buf);
+
+		glEnable(GL_DEPTH_TEST);
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+	}
+
+	// ---- 3 cross-section slice views (top-right corner) ----
+	if (sim)
+	{
+		const int S = 150; // slice size in pixels
+		const int margin = 10;
+		float scale = (float)S / (float)XRES; // XRES=YRES=ZMAX=384
+
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glLoadIdentity();
+		glOrtho(0, g_w, g_h, 0, -1, 1);
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
+		glDisable(GL_DEPTH_TEST);
+
+		auto &sd2 = SimulationData::CRef();
+		auto &el2 = sd2.elements;
+
+		for (int sliceIdx = 0; sliceIdx < 3; sliceIdx++)
+		{
+			int ox = g_w - S - margin;
+			int oy = margin + sliceIdx * (S + margin);
+			float lockVal; // locked axis value for this slice
+			const char *label;
+
+			if (sliceIdx == 0) { lockVal = g_brushPZ; label = "XY (Z locked)"; }
+			else if (sliceIdx == 1) { lockVal = g_brushPY; label = "XZ (Y locked)"; }
+			else { lockVal = g_brushPX; label = "YZ (X locked)"; }
+
+			// Background
+			glColor3f(0.05f, 0.05f, 0.08f);
+			glBegin(GL_QUADS);
+			glVertex2i(ox, oy); glVertex2i(ox+S, oy);
+			glVertex2i(ox+S, oy+S); glVertex2i(ox, oy+S);
+			glEnd();
+
+			// Particles within ±1 unit of the slice plane
+			glPointSize(2.0f);
+			glBegin(GL_POINTS);
+			for (int i = 0; i < sim->parts.active; i++)
+			{
+				if (!sim->parts[i].type) continue;
+				int t = sim->parts[i].type;
+				if (t <= 0 || t >= PT_NUM) continue;
+				auto col = el2[t].Colour;
+				glColor3ub(col.Red, col.Green, col.Blue);
+
+				float px = sim->parts[i].x, py = sim->parts[i].y, pz = sim->parts[i].z;
+				int sx, sy;
+
+				if (sliceIdx == 0) { // XY slice
+					if (fabsf(pz - lockVal) > 1.5f) continue;
+					sx = ox + (int)(px * scale);
+					sy = oy + (int)(py * scale);
+				} else if (sliceIdx == 1) { // XZ slice
+					if (fabsf(py - lockVal) > 1.5f) continue;
+					sx = ox + (int)(px * scale);
+					sy = oy + (int)((ZMAX - 1 - pz) * scale);
+				} else { // YZ slice
+					if (fabsf(px - lockVal) > 1.5f) continue;
+					sx = ox + (int)(pz * scale);
+					sy = oy + (int)(py * scale);
+				}
+				glVertex2i(sx, sy);
+			}
+			glEnd();
+			glPointSize(1.0f);
+
+			// Brush crosshair on slice
+			int bx, by;
+			if (sliceIdx == 0) { bx = ox + (int)(g_brushPX * scale); by = oy + (int)(g_brushPY * scale); }
+			else if (sliceIdx == 1) { bx = ox + (int)(g_brushPX * scale); by = oy + (int)((ZMAX - 1 - g_brushPZ) * scale); }
+			else { bx = ox + (int)(g_brushPZ * scale); by = oy + (int)(g_brushPY * scale); }
+
+			int cs = 5;
+			glColor3f(1, 1, 0);
+			glBegin(GL_LINES);
+			glVertex2i(bx-cs, by); glVertex2i(bx+cs, by);
+			glVertex2i(bx, by-cs); glVertex2i(bx, by+cs);
+			glEnd();
+
+			// Border
+			glColor3f(0.3f, 0.3f, 0.4f);
+			glBegin(GL_LINE_LOOP);
+			glVertex2i(ox, oy); glVertex2i(ox+S, oy);
+			glVertex2i(ox+S, oy+S); glVertex2i(ox, oy+S);
+			glEnd();
+		}
+
+		glEnable(GL_DEPTH_TEST);
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+	}
+#endif
+
 	SDL_GL_SwapWindow(g_win);
 }
 

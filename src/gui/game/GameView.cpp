@@ -2524,7 +2524,8 @@ void GameView::OnDraw()
 			if (type)
 				sampleInfo << "#" << sample.ParticleID << ", ";
 
-			sampleInfo << "X:" << sample.PositionX << " Y:" << sample.PositionY;
+			sampleInfo << "X:" << sample.PositionX << " Y:" << sample.PositionY
+		           << " Z:" << (int)(sample.particle.z + 0.5f);
 
 			auto gravtot = std::abs(sample.GravityVelocityX) +
 			               std::abs(sample.GravityVelocityY);
