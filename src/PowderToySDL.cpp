@@ -337,6 +337,14 @@ static void EventProcess(const SDL_Event &event)
 		// 'F' toggles 3D window fullscreen
 		if (event.key.keysym.scancode == SDL_SCANCODE_F)
 			{ CubeTest_ToggleFullscreen(); break; }
+		// Tab: toggle 3D brush shape (cube ↔ sphere)
+		if (event.key.keysym.scancode == SDL_SCANCODE_TAB)
+			{ CubeTest_ToggleBrushShape(); break; }
+		// [ ] resize 3D brush
+		if (event.key.keysym.scancode == SDL_SCANCODE_LEFTBRACKET)
+			{ CubeTest_ResizeBrush(-1); break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_RIGHTBRACKET)
+			{ CubeTest_ResizeBrush(1); break; }
 		if (engine.GetGlobalQuit() && ALLOW_QUIT && !event.key.repeat && event.key.keysym.sym == 'q' && (event.key.keysym.mod&KMOD_CTRL) && !(event.key.keysym.mod&KMOD_ALT))
 			engine.ConfirmExit();
 		else

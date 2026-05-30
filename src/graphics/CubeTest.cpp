@@ -24,6 +24,8 @@ static GLuint g_fontBase = 0;
 #endif
 static int g_brushX = -1, g_brushY = -1;
 static int g_brushRX = 4, g_brushRY = 4;
+static int g_brushShape = 0;  // 0=cube, 1=sphere
+static float g_brushR = 8.0f; // 3D brush radius
 static bool g_showZGrid = false;
 // View mode and full 3D brush position
 static int g_viewMode = 0;
@@ -176,55 +178,62 @@ void CubeTest_Render()
 		glEnd();
 	}
 
-	// ---- Brush preview: rectangle + crosshair in the active plane ----
+	// ---- 3D Brush preview: wireframe cube or sphere rings ----
 	if (g_brushX >= 0 && g_brushY >= 0)
 	{
 		float bx = g_brushPX, by = g_brushPY, bz = g_brushPZ;
-		float rx = (float)g_brushRX, ry = (float)g_brushRY;
-		int vm = g_viewMode;
-
-		// Yellow wireframe rectangle on the active plane
+		float r = g_brushR;
 		glColor3f(1.0f, 1.0f, 0.3f);
-		glBegin(GL_LINE_LOOP);
-		if (vm == 0 || vm == 3) { // XY plane (Front 0, Back 3)
-			glVertex3f(bx-rx, by-ry, bz); glVertex3f(bx+rx, by-ry, bz);
-			glVertex3f(bx+rx, by+ry, bz); glVertex3f(bx-rx, by+ry, bz);
-		} else if (vm == 1 || vm == 4) { // XZ plane (Top 1, Bottom 4)
-			glVertex3f(bx-rx, by, bz-ry); glVertex3f(bx+rx, by, bz-ry);
-			glVertex3f(bx+rx, by, bz+ry); glVertex3f(bx-rx, by, bz+ry);
-		} else { // YZ plane (Right 2, Left 5)
-			glVertex3f(bx, by-ry, bz-rx); glVertex3f(bx, by+ry, bz-rx);
-			glVertex3f(bx, by+ry, bz+rx); glVertex3f(bx, by-ry, bz+rx);
-		}
-		glEnd();
-
-		// Crosshair: two lines in the active plane, perpendicular to each other
 		glBegin(GL_LINES);
-		glColor3f(1, 1, 0.3f);
-		float c = 6.0f; // crosshair half-length
-		switch (vm) {
-		case 0: case 3: // XY plane: cross in X and Y, lock Z
-			glVertex3f(bx-c, by, bz); glVertex3f(bx+c, by, bz);
-			glVertex3f(bx, by-c, bz); glVertex3f(bx, by+c, bz);
-			// Locked axis: blue stub pointing in Z
-			glColor3f(0.4f, 0.4f, 1.0f);
-			glVertex3f(bx, by, bz-c*2); glVertex3f(bx, by, bz+c*2);
-			break;
-		case 1: case 4: // XZ plane: cross in X and Z, lock Y
-			glVertex3f(bx-c, by, bz); glVertex3f(bx+c, by, bz);
-			glVertex3f(bx, by, bz-c); glVertex3f(bx, by, bz+c);
-			glColor3f(0.4f, 0.4f, 1.0f);
-			glVertex3f(bx, by-c*2, bz); glVertex3f(bx, by+c*2, bz);
-			break;
-		default: // YZ plane: cross in Y and Z, lock X
-			glVertex3f(bx, by-c, bz); glVertex3f(bx, by+c, bz);
-			glVertex3f(bx, by, bz-c); glVertex3f(bx, by, bz+c);
-			glColor3f(0.4f, 0.4f, 1.0f);
-			glVertex3f(bx-c*2, by, bz); glVertex3f(bx+c*2, by, bz);
-			break;
+
+		if (g_brushShape == 0) // Cube wireframe
+		{
+			// 12 edges of a cube centered at (bx,by,bz) with half-extent r
+			// 4 edges along X direction (at Y±r, Z±r)
+			glVertex3f(bx-r, by-r, bz-r); glVertex3f(bx+r, by-r, bz-r);
+			glVertex3f(bx-r, by+r, bz-r); glVertex3f(bx+r, by+r, bz-r);
+			glVertex3f(bx-r, by-r, bz+r); glVertex3f(bx+r, by-r, bz+r);
+			glVertex3f(bx-r, by+r, bz+r); glVertex3f(bx+r, by+r, bz+r);
+			// 4 edges along Y direction
+			glVertex3f(bx-r, by-r, bz-r); glVertex3f(bx-r, by+r, bz-r);
+			glVertex3f(bx+r, by-r, bz-r); glVertex3f(bx+r, by+r, bz-r);
+			glVertex3f(bx-r, by-r, bz+r); glVertex3f(bx-r, by+r, bz+r);
+			glVertex3f(bx+r, by-r, bz+r); glVertex3f(bx+r, by+r, bz+r);
+			// 4 edges along Z direction
+			glVertex3f(bx-r, by-r, bz-r); glVertex3f(bx-r, by-r, bz+r);
+			glVertex3f(bx+r, by-r, bz-r); glVertex3f(bx+r, by-r, bz+r);
+			glVertex3f(bx-r, by+r, bz-r); glVertex3f(bx-r, by+r, bz+r);
+			glVertex3f(bx+r, by+r, bz-r); glVertex3f(bx+r, by+r, bz+r);
+		}
+		else // Sphere: 3 great circles in XY, XZ, YZ planes
+		{
+			const int N = 48;
+			// XY circle (Z locked)
+			for (int i = 0; i < N; i++) {
+				float a0 = (float)i / N * 6.283185f;
+				float a1 = (float)(i+1) / N * 6.283185f;
+				glVertex3f(bx+cosf(a0)*r, by+sinf(a0)*r, bz);
+				glVertex3f(bx+cosf(a1)*r, by+sinf(a1)*r, bz);
+			}
+			// XZ circle (Y locked)
+			for (int i = 0; i < N; i++) {
+				float a0 = (float)i / N * 6.283185f;
+				float a1 = (float)(i+1) / N * 6.283185f;
+				glVertex3f(bx+cosf(a0)*r, by, bz+sinf(a0)*r);
+				glVertex3f(bx+cosf(a1)*r, by, bz+sinf(a1)*r);
+			}
+			// YZ circle (X locked)
+			for (int i = 0; i < N; i++) {
+				float a0 = (float)i / N * 6.283185f;
+				float a1 = (float)(i+1) / N * 6.283185f;
+				glVertex3f(bx, by+cosf(a0)*r, bz+sinf(a0)*r);
+				glVertex3f(bx, by+cosf(a1)*r, bz+sinf(a1)*r);
+			}
 		}
 		glEnd();
 	}
+
+	// Draw particles as small cubes
 
 	// Draw particles as small cubes
 	const float hs = 1.5f; // half-size of cube
@@ -382,6 +391,18 @@ void CubeTest_Zoom(int delta)
 	if (g_dist > 5000) g_dist = 5000;
 }
 
+void CubeTest_ResizeBrush(int delta)
+{
+	g_brushR += (float)delta;
+	if (g_brushR < 2) g_brushR = 2;
+	if (g_brushR > 100) g_brushR = 100;
+}
+
+void CubeTest_ToggleBrushShape()
+{
+	g_brushShape = (g_brushShape + 1) % 2;
+}
+
 int CubeTest_GetPlacementZ()
 {
 	// Brush Z is persistent across view switches
@@ -405,11 +426,11 @@ static void PlaceParticleAtBrush()
 	float dx = cx - g_prevPX, dy = cy - g_prevPY, dz = cz - g_prevPZ;
 	auto *sim = const_cast<Simulation *>(g_sim);
 
-	int steps = g_havePrev ? (int)ceilf(sqrtf(dx*dx + dy*dy + dz*dz)) : 0;
+	int steps = g_havePrev ? (int)ceilf(sqrtf(dx*dx + dy*dy + dz*dz) * 2.0f) : 0;
 	if (steps <= 0)
 	{
 		int px = (int)(cx + 0.5f), py = (int)(cy + 0.5f), pz = (int)(cz + 0.5f);
-		int i = sim->create_part(-2, px, py, g_activeToolType);
+		int i = sim->create_part(-1, px, py, g_activeToolType);
 		if (i >= 0) sim->parts[i].z = (float)pz;
 	}
 	else
@@ -424,7 +445,7 @@ static void PlaceParticleAtBrush()
 			int pz = (int)(g_prevPZ + dz * t + 0.5f);
 			if (px == lastPX && py == lastPY) continue;
 			lastPX = px; lastPY = py;
-			int i = sim->create_part(-2, px, py, g_activeToolType);
+			int i = sim->create_part(-1, px, py, g_activeToolType);
 			if (i >= 0) sim->parts[i].z = (float)pz;
 		}
 	}
@@ -531,6 +552,14 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 	{
 		g_placing = false;
 		g_havePrev = false;
+	}
+	// Scroll in 3D window: resize brush (Ctrl+scroll still zooms via TPT handler)
+	if (e.type == SDL_MOUSEWHEEL && e.wheel.windowID == wid)
+	{
+		if (SDL_GetModState() & KMOD_CTRL)
+			CubeTest_Zoom(e.wheel.y * 30);
+		else
+			CubeTest_ResizeBrush(e.wheel.y);
 	}
 }
 

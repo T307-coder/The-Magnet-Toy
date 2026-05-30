@@ -13,6 +13,8 @@ void CubeTest_ToggleZGrid(); // G key toggles Z-axis grid lines
 void CubeTest_ResetView();   // R key resets camera to front view
 void CubeTest_ToggleFullscreen(); // F key toggles fullscreen
 void CubeTest_Zoom(int delta);    // Ctrl+scroll: zoom 3D camera
+void CubeTest_ResizeBrush(int delta); // scroll / []: resize 3D brush
+void CubeTest_ToggleBrushShape(); // Tab: cube ↔ sphere
 int  CubeTest_GetPlacementZ(); // returns Z for particle placement based on view+brush
 void CubeTest_SetActiveTool(int toolType); // set tool type for 3D-window clicks
 void CubeTest_SetSimulation(const Simulation *sim);
