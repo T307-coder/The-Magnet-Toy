@@ -448,10 +448,20 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		else if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
 		{ SDL_ShowCursor(SDL_ENABLE);  } // show cursor when leaving
 	}
-	// 3D window mouse motion → update brush on active plane
+	// 3D window mouse motion: camera drag if C held, else brush on active plane
 	if (e.type == SDL_MOUSEMOTION && e.motion.windowID == wid)
 	{
-		UpdateBrushFrom3DWindow(e.motion.x, e.motion.y);
+		static int lastMx3D = 0, lastMy3D = 0;
+		if (g_camControl)
+		{
+			if (lastMx3D) CubeTest_Rotate(e.motion.x - lastMx3D, e.motion.y - lastMy3D);
+			lastMx3D = e.motion.x; lastMy3D = e.motion.y;
+		}
+		else
+		{
+			lastMx3D = 0; lastMy3D = 0;
+			UpdateBrushFrom3DWindow(e.motion.x, e.motion.y);
+		}
 	}
 	// Left click in 3D window: place particle at brush 3D position
 	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && e.button.windowID == wid)
