@@ -32,6 +32,7 @@ static int g_viewMode = 0;
 static float g_brushPX = 0, g_brushPY = 0, g_brushPZ = 0;
 static int g_activeToolType = 0; // current tool element type for 3D clicks
 static bool g_placing = false;   // left button held → continuous placement
+static bool g_deleting = false;   // right button held → continuous deletion
 static const int ZMAX = 384;     // Z extent (matches YRES for cubic volume)
 // Cached matrices for gluUnProject
 static double g_proj[16], g_modelview[16];
@@ -466,7 +467,31 @@ static void FillBrushAt(int cx, int cy, int cz)
 				}
 	}
 }
+// Delete particles within brush volume at (cx,cy,cz)
+static void DeleteBrushAt(int cx, int cy, int cz)
+{
+	auto *sim = const_cast<Simulation *>(g_sim);
+	int r = (int)(g_brushR + 0.5f);
+	if (r <= 0) r = 1;
+	int r2 = r * r;
 
+	for (int i = 0; i < sim->parts.active; i++)
+	{
+		if (!sim->parts[i].type) continue;
+		int dx = (int)(sim->parts[i].x + 0.5f) - cx;
+		int dy = (int)(sim->parts[i].y + 0.5f) - cy;
+		int dz = (int)(sim->parts[i].z + 0.5f) - cz;
+
+		bool hit = false;
+		if (g_brushShape == 0)
+			hit = (abs(dx) <= r && abs(dy) <= r && abs(dz) <= r);
+		else
+			hit = (dx*dx + dy*dy + dz*dz <= r2);
+
+		if (hit)
+			sim->kill_part(i);
+	}
+}
 // Place particles along the 3D line from previous to current brush position
 static float g_prevPX = 0, g_prevPY = 0, g_prevPZ = 0;
 static bool g_havePrev = false;
@@ -570,7 +595,7 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		else if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
 		{ SDL_ShowCursor(SDL_ENABLE);  } // show cursor when leaving
 	}
-	// 3D window mouse motion: camera drag if C held, else brush + continuous placement
+	// 3D window mouse motion: camera drag if C held, else brush + continuous placement/deletion
 	if (e.type == SDL_MOUSEMOTION && e.motion.windowID == wid)
 	{
 		static int lastMx3D = 0, lastMy3D = 0;
@@ -584,19 +609,36 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 			lastMx3D = 0; lastMy3D = 0;
 			UpdateBrushFrom3DWindow(e.motion.x, e.motion.y);
 			if (g_placing) PlaceParticleAtBrush();
+			if (g_deleting) DeleteBrushAt(
+				(int)(g_brushPX + 0.5f), (int)(g_brushPY + 0.5f), (int)(g_brushPZ + 0.5f));
 		}
 	}
-	// Left click in 3D window: place particle + start continuous placement
-	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && e.button.windowID == wid)
+	// Left click: place; Right click: delete
+	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.windowID == wid)
 	{
-		g_placing = true;
-		PlaceParticleAtBrush();
+		if (e.button.button == SDL_BUTTON_LEFT)
+		{
+			g_placing = true;
+			PlaceParticleAtBrush();
+		}
+		else if (e.button.button == SDL_BUTTON_RIGHT)
+		{
+			g_deleting = true;
+			DeleteBrushAt((int)(g_brushPX + 0.5f), (int)(g_brushPY + 0.5f), (int)(g_brushPZ + 0.5f));
+		}
 	}
-	// Left release: stop continuous placement, reset line interpolation
-	if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT)
+	// Release: stop placing or deleting
+	if (e.type == SDL_MOUSEBUTTONUP)
 	{
-		g_placing = false;
-		g_havePrev = false;
+		if (e.button.button == SDL_BUTTON_LEFT)
+		{
+			g_placing = false;
+			g_havePrev = false;
+		}
+		else if (e.button.button == SDL_BUTTON_RIGHT)
+		{
+			g_deleting = false;
+		}
 	}
 	// Scroll in 3D window: resize brush (Ctrl+scroll still zooms via TPT handler)
 	if (e.type == SDL_MOUSEWHEEL && e.wheel.windowID == wid)
