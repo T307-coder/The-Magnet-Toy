@@ -414,6 +414,37 @@ void CubeTest_SetActiveTool(int toolType)
 	g_activeToolType = toolType;
 }
 
+// Place particles at (cx,cy,cz) using current brush shape and radius
+static void FillBrushAt(int cx, int cy, int cz)
+{
+	auto *sim = const_cast<Simulation *>(g_sim);
+	int r = (int)(g_brushR + 0.5f);
+	if (r <= 0) r = 1;
+
+	if (g_brushShape == 0) // Cube fill
+	{
+		for (int dx = -r; dx <= r; dx++)
+			for (int dy = -r; dy <= r; dy++)
+				for (int dz = -r; dz <= r; dz++)
+				{
+					int i = sim->create_part(-1, cx + dx, cy + dy, g_activeToolType);
+					if (i >= 0) sim->parts[i].z = (float)(cz + dz);
+				}
+	}
+	else // Sphere fill
+	{
+		int r2 = r * r;
+		for (int dx = -r; dx <= r; dx++)
+			for (int dy = -r; dy <= r; dy++)
+				for (int dz = -r; dz <= r; dz++)
+				{
+					if (dx*dx + dy*dy + dz*dz > r2) continue;
+					int i = sim->create_part(-1, cx + dx, cy + dy, g_activeToolType);
+					if (i >= 0) sim->parts[i].z = (float)(cz + dz);
+				}
+	}
+}
+
 // Place particles along the 3D line from previous to current brush position
 static float g_prevPX = 0, g_prevPY = 0, g_prevPZ = 0;
 static bool g_havePrev = false;
@@ -424,29 +455,21 @@ static void PlaceParticleAtBrush()
 
 	float cx = g_brushPX, cy = g_brushPY, cz = g_brushPZ;
 	float dx = cx - g_prevPX, dy = cy - g_prevPY, dz = cz - g_prevPZ;
-	auto *sim = const_cast<Simulation *>(g_sim);
 
 	int steps = g_havePrev ? (int)ceilf(sqrtf(dx*dx + dy*dy + dz*dz) * 2.0f) : 0;
 	if (steps <= 0)
 	{
-		int px = (int)(cx + 0.5f), py = (int)(cy + 0.5f), pz = (int)(cz + 0.5f);
-		int i = sim->create_part(-1, px, py, g_activeToolType);
-		if (i >= 0) sim->parts[i].z = (float)pz;
+		FillBrushAt((int)(cx + 0.5f), (int)(cy + 0.5f), (int)(cz + 0.5f));
 	}
 	else
 	{
-		// 3D line interpolation, deduplicate same-pixel points
-		int lastPX = -999, lastPY = -999;
 		for (int s = 1; s <= steps; s++)
 		{
 			float t = (float)s / (float)steps;
 			int px = (int)(g_prevPX + dx * t + 0.5f);
 			int py = (int)(g_prevPY + dy * t + 0.5f);
 			int pz = (int)(g_prevPZ + dz * t + 0.5f);
-			if (px == lastPX && py == lastPY) continue;
-			lastPX = px; lastPY = py;
-			int i = sim->create_part(-1, px, py, g_activeToolType);
-			if (i >= 0) sim->parts[i].z = (float)pz;
+			FillBrushAt(px, py, pz);
 		}
 	}
 
