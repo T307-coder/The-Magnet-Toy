@@ -218,3 +218,17 @@ void SprkCurrentOption::perform()
 {
 	m->SetSprkCurrentEnabled(!m->GetSprkCurrentEnabled());
 }
+
+FreeChargeFieldsOption::FreeChargeFieldsOption(GameModel * m):
+QuickOption("Q", "ELEC/PROT produce fields", m, Toggle)
+{
+
+}
+bool FreeChargeFieldsOption::GetToggle()
+{
+	return m->GetFreeChargeFieldsEnabled();
+}
+void FreeChargeFieldsOption::perform()
+{
+	m->SetFreeChargeFieldsEnabled(!m->GetFreeChargeFieldsEnabled());
+}

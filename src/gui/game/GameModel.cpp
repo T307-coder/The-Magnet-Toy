@@ -274,6 +274,7 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new ElectricityEnableOption(this));
 	quickOptions.push_back(new CurrentBFieldOption(this));
 	quickOptions.push_back(new SprkCurrentOption(this));
+	quickOptions.push_back(new FreeChargeFieldsOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
 
 	notifyQuickOptionsChanged();
@@ -1281,6 +1282,21 @@ void GameModel::SetRealisticPstnEnabled(bool enable)
 bool GameModel::GetRealisticPstnEnabled()
 {
 	return sim->realisticPstnEnabled;
+}
+
+void GameModel::SetFreeChargeFieldsEnabled(bool enable)
+{
+	sim->freeChargeFieldsEnabled = enable;
+	if (enable)
+		SetInfoTip("ELEC/PROT produce fields: On");
+	else
+		SetInfoTip("ELEC/PROT produce fields: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetFreeChargeFieldsEnabled()
+{
+	return sim->freeChargeFieldsEnabled;
 }
 
 void GameModel::SetSprkCurrentEnabled(bool enable)

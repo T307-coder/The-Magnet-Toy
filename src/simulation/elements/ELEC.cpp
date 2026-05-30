@@ -169,7 +169,8 @@ static int update(UPDATE_FUNC_ARGS)
 		int cy = y / CELL;
 		if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
 		{
-			sim->eSrc[cy][cx] += -1.0f;
+			if (sim->freeChargeFieldsEnabled)
+				sim->eSrc[cy][cx] += -1.0f;
 			if (cx > 0 && cy > 0 && cx < XCELLS - 1 && cy < YCELLS - 1)
 			{
 				float dEx = sim->eField[cy][cx + 1] - sim->eField[cy][cx - 1];

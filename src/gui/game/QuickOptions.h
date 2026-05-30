@@ -114,3 +114,11 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+
+class FreeChargeFieldsOption: public QuickOption
+{
+public:
+	FreeChargeFieldsOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

@@ -4046,8 +4046,8 @@ void Simulation::BeforeSim(bool willUpdate)
 					if (!parts[i].type) continue;
 					int type = parts[i].type;
 					float q = 0.0f;
-					if (type == PT_ELEC) q = -1.0f;
-					else if (type == PT_PROT) q = 1.0f;
+					if (type == PT_ELEC) q = freeChargeFieldsEnabled ? -1.0f : 0.0f;
+					else if (type == PT_PROT) q = freeChargeFieldsEnabled ? 1.0f : 0.0f;
 					else if (electricityEnabled && (elements[type].Properties & PROP_CONDUCTS))
 						q = parts[i].tmp4 * 0.01f;
 					if (q == 0.0f) continue;
