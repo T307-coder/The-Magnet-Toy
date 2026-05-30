@@ -378,16 +378,41 @@ void CubeTest_SetActiveTool(int toolType)
 	g_activeToolType = toolType;
 }
 
-// Place a single particle at current 3D brush position
+// Place particles along the 3D line from previous to current brush position
+static float g_prevPX = 0, g_prevPY = 0, g_prevPZ = 0;
+static bool g_havePrev = false;
+
 static void PlaceParticleAtBrush()
 {
-	if (!g_sim || g_activeToolType <= 0 || g_brushX < 0) return;
-	int px = (int)(g_brushPX + 0.5f);
-	int py = (int)(g_brushPY + 0.5f);
-	int pz = (int)(g_brushPZ + 0.5f);
+	if (!g_sim || g_activeToolType <= 0) return;
+
+	float cx = g_brushPX, cy = g_brushPY, cz = g_brushPZ;
+	float dx = cx - g_prevPX, dy = cy - g_prevPY, dz = cz - g_prevPZ;
 	auto *sim = const_cast<Simulation *>(g_sim);
-	int i = sim->create_part(-2, px, py, g_activeToolType);
-	if (i >= 0) sim->parts[i].z = (float)pz;
+
+	int steps = g_havePrev ? (int)ceilf(sqrtf(dx*dx + dy*dy + dz*dz)) : 0;
+	if (steps <= 0)
+	{
+		int px = (int)(cx + 0.5f), py = (int)(cy + 0.5f), pz = (int)(cz + 0.5f);
+		int i = sim->create_part(-2, px, py, g_activeToolType);
+		if (i >= 0) sim->parts[i].z = (float)pz;
+	}
+	else
+	{
+		// 3D Bresenham-like interpolation: 1 particle per unit distance
+		for (int s = 1; s <= steps; s++)
+		{
+			float t = (float)s / (float)steps;
+			int px = (int)(g_prevPX + dx * t + 0.5f);
+			int py = (int)(g_prevPY + dy * t + 0.5f);
+			int pz = (int)(g_prevPZ + dz * t + 0.5f);
+			int i = sim->create_part(-2, px, py, g_activeToolType);
+			if (i >= 0) sim->parts[i].z = (float)pz;
+		}
+	}
+
+	g_prevPX = cx; g_prevPY = cy; g_prevPZ = cz;
+	g_havePrev = true;
 }
 
 // Convert 3D window screen coords to world position on the active plane
@@ -483,10 +508,11 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		g_placing = true;
 		PlaceParticleAtBrush();
 	}
-	// Left release: stop continuous placement
+	// Left release: stop continuous placement, reset line interpolation
 	if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT)
 	{
 		g_placing = false;
+		g_havePrev = false;
 	}
 }
 
