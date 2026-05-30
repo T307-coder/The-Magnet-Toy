@@ -399,13 +399,16 @@ static void PlaceParticleAtBrush()
 	}
 	else
 	{
-		// 3D Bresenham-like interpolation: 1 particle per unit distance
+		// 3D line interpolation, deduplicate same-pixel points
+		int lastPX = -999, lastPY = -999;
 		for (int s = 1; s <= steps; s++)
 		{
 			float t = (float)s / (float)steps;
 			int px = (int)(g_prevPX + dx * t + 0.5f);
 			int py = (int)(g_prevPY + dy * t + 0.5f);
 			int pz = (int)(g_prevPZ + dz * t + 0.5f);
+			if (px == lastPX && py == lastPY) continue;
+			lastPX = px; lastPY = py;
 			int i = sim->create_part(-2, px, py, g_activeToolType);
 			if (i >= 0) sim->parts[i].z = (float)pz;
 		}
