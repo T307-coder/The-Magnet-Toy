@@ -4,7 +4,7 @@ class Simulation;
 bool CubeTest_Init();
 void CubeTest_Render();
 void CubeTest_Rotate(int dx, int dy); // mouse delta → camera orbit
-void CubeTest_RotateBy(float dRotX, float dRotY); // arrow keys → camera step
+void CubeTest_RotateView(int dir);     // 0=up 1=down 2=left 3=right, 90° relative to current view
 void CubeTest_AdjustLayer(int delta); // Z held → change selectedLayer
 void CubeTest_SetBrush(int x, int y, int rx, int ry); // update 3D brush preview
 void CubeTest_SetBrushPos(int x, int y);  // mouse move → brush position (auto-clamped)

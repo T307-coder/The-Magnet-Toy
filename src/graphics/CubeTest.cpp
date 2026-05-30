@@ -260,13 +260,20 @@ static void ApplyViewMode(int mode)
 	}
 }
 
-void CubeTest_RotateBy(float dRotX, float dRotY)
+void CubeTest_RotateView(int dir)
 {
-	// Snap to nearest 90° view based on rotation direction
-	if (dRotX > 0)      ApplyViewMode(1); // TOP
-	else if (dRotX < 0) ApplyViewMode(0); // FRONT
-	else if (dRotY > 0) ApplyViewMode(2); // RIGHT
-	else if (dRotY < 0) ApplyViewMode(5); // LEFT
+	// Transition table: viewMode × direction(0=Up 1=Down 2=Left 3=Right) → newViewMode
+	static const int table[6][4] = {
+		// Up   Down  Left  Right
+		{ 1,   4,    5,    2 },  // Front (0)
+		{ 3,   0,    5,    2 },  // Top   (1)
+		{ 1,   4,    0,    3 },  // Right (2)
+		{ 1,   4,    2,    5 },  // Back  (3)
+		{ 0,   3,    5,    2 },  // Bottom(4)
+		{ 1,   4,    3,    0 },  // Left  (5)
+	};
+	int newMode = table[g_viewMode][dir];
+	ApplyViewMode(newMode);
 }
 
 void CubeTest_AdjustLayer(int delta)

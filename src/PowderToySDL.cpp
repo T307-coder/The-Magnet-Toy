@@ -317,11 +317,11 @@ static void EventProcess(const SDL_Event &event)
 		break;
 	case SDL_KEYDOWN:
 		if (SDL_GetModState() & KMOD_GUI) break;
-		// Arrow keys: rotate 3D camera (5° per press)
-		if (event.key.keysym.scancode == SDL_SCANCODE_UP)    { CubeTest_RotateBy( 5, 0); break; }
-		if (event.key.keysym.scancode == SDL_SCANCODE_DOWN)  { CubeTest_RotateBy(-5, 0); break; }
-		if (event.key.keysym.scancode == SDL_SCANCODE_LEFT)  { CubeTest_RotateBy(0, -5); break; }
-		if (event.key.keysym.scancode == SDL_SCANCODE_RIGHT) { CubeTest_RotateBy(0,  5); break; }
+		// Arrow keys: rotate view 90° relative to current view
+		if (event.key.keysym.scancode == SDL_SCANCODE_UP)    { CubeTest_RotateView(0); break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_DOWN)  { CubeTest_RotateView(1); break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_LEFT)  { CubeTest_RotateView(2); break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_RIGHT) { CubeTest_RotateView(3); break; }
 		// 'Z' held: mouse Y drags layer selector
 		if (event.key.keysym.scancode == SDL_SCANCODE_Z)
 			{ g_layerSelect = true; g_prevMouseY = mousey; break; }
