@@ -34,8 +34,9 @@
 #include <cufft.h>
 #endif
 #ifdef USE_VKFFT
+#define VKFFT_BACKEND 0
 #include <vulkan/vulkan.h>
-#include <vkFFT.h>
+#include "vkFFT.h"
 #endif
 
 #ifdef __has_cpp_attribute
@@ -699,14 +700,7 @@ struct CopiableSimulation::GPUFFT
 };
 
 #ifdef USE_VKFFT
-// VkFFT stub — WIP: needs VkFFT API alignment (VkBuffer*, initializeVkFFT, VkFFTAppend)
-struct CopiableSimulation::VkFFTSolver
-{
-	bool available = false;
-	void Init(int, int) { available = false; }
-	void Solve(float *, float *, int, int) {}
-	void Release() {}
-};
+struct CopiableSimulation::VkFFTSolver { bool available = false; void Init(int,int){available=false;} void Solve(float*,float*,int,int){} void Release(){} };
 #endif
 
 void CopiableSimulation::InitMagFFT()

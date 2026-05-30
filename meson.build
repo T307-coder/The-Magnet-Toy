@@ -269,6 +269,7 @@ if use_vkfft
 	add_project_arguments('-I' + vulkan_sdk + '/Include/glslang/Include', language: 'cpp')
 	add_project_arguments('-I' + vulkan_sdk + '/Include/spirv-headers', language: 'cpp')
 	add_project_arguments('-I' + meson.project_source_root() + '/subprojects/vkfft/vkFFT', language: 'cpp')
+	add_project_arguments('-I' + meson.project_source_root() + '/subprojects/vkfft/benchmark_scripts/vkFFT_scripts/include', language: 'cpp')
 	add_project_link_arguments('-LIBPATH:' + vulkan_sdk + '/Lib', language: 'cpp')
 	add_project_link_arguments('vulkan-1.lib', 'glslang.lib', 'OSDependent.lib', 'SPIRV.lib', 'SPIRV-Tools.lib', language: 'cpp')
 endif
