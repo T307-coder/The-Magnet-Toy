@@ -7,7 +7,7 @@
 
 #ifdef USE_VKFFT
 #include <vulkan/vulkan.h>
-#include "vkFFT.h"
+#include <vkFFT.h>     // from subprojects/vkfft/vkFFT/vkFFT.h
 #include <vector>
 #include <cstring>
 

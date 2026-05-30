@@ -266,7 +266,7 @@ if use_vkfft
 	endif
 	add_project_arguments('-DUSE_VKFFT', language: 'cpp')
 	add_project_arguments('-I' + vulkan_sdk + '/Include', language: 'cpp')
-	add_project_arguments('-I' + meson.project_source_root() + '/subprojects/vkfft', language: 'cpp')
+	add_project_arguments('-I' + meson.project_source_root() + '/subprojects/vkfft/vkFFT', language: 'cpp')
 	add_project_link_arguments('-LIBPATH:' + vulkan_sdk + '/Lib', language: 'cpp')
 	add_project_link_arguments('vulkan-1.lib', language: 'cpp')
 endif
