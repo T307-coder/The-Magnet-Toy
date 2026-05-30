@@ -97,19 +97,19 @@ void CubeTest_Render()
 	const float headLen = 10.0f;
 	const float headW = 4.0f;
 	glBegin(GL_LINES);
-	// X axis â€?red â†?+X (right)
+	// X axis ï¿½?red ï¿½?+X (right)
 	glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f( axLen, 0, 0);
 	glVertex3f(axLen, 0, 0); glVertex3f(axLen-headLen,  headW, 0);
 	glVertex3f(axLen, 0, 0); glVertex3f(axLen-headLen, -headW, 0);
 	glVertex3f(axLen, 0, 0); glVertex3f(axLen-headLen, 0,  headW);
 	glVertex3f(axLen, 0, 0); glVertex3f(axLen-headLen, 0, -headW);
-	// Y axis â€?green â†?+Y (down, same direction as TPT Y)
+	// Y axis ï¿½?green ï¿½?+Y (down, same direction as TPT Y)
 	glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, axLen, 0);
 	glVertex3f(0, axLen, 0); glVertex3f( headW, axLen-headLen, 0);
 	glVertex3f(0, axLen, 0); glVertex3f(-headW, axLen-headLen, 0);
 	glVertex3f(0, axLen, 0); glVertex3f(0, axLen-headLen,  headW);
 	glVertex3f(0, axLen, 0); glVertex3f(0, axLen-headLen, -headW);
-	// Z axis â€?blue â†?+Z (out of screen)
+	// Z axis ï¿½?blue ï¿½?+Z (out of screen)
 	glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, axLen);
 	glVertex3f(0, 0, axLen); glVertex3f( headW, 0, axLen-headLen);
 	glVertex3f(0, 0, axLen); glVertex3f(-headW, 0, axLen-headLen);
@@ -250,12 +250,12 @@ static void ApplyViewMode(int mode)
 {
 	g_viewMode = mode;
 	switch (mode) {
-		case 0: g_rotX=0;   g_rotY=0;   break; // Front  â€?face XY, +Z toward viewer
-		case 1: g_rotX=-90; g_rotY=0;   break; // Top    â€?face XZ, +Y toward viewer
-		case 2: g_rotX=0;   g_rotY=90;  break; // Right  â€?face YZ, +X toward viewer
-		case 3: g_rotX=0;   g_rotY=180; break; // Back   â€?face XY, -Z toward viewer
-		case 4: g_rotX=90;  g_rotY=0;   break; // Bottom â€?face XZ, -Y toward viewer
-		case 5: g_rotX=0;   g_rotY=-90; break; // Left   â€?face YZ, -X toward viewer
+		case 0: g_rotX=0;   g_rotY=0;   break; // Front  ï¿½?face XY, +Z toward viewer
+		case 1: g_rotX=-90; g_rotY=0;   break; // Top    ï¿½?face XZ, +Y toward viewer
+		case 2: g_rotX=0;   g_rotY=90;  break; // Right  ï¿½?face YZ, +X toward viewer
+		case 3: g_rotX=0;   g_rotY=180; break; // Back   ï¿½?face XY, -Z toward viewer
+		case 4: g_rotX=90;  g_rotY=0;   break; // Bottom ï¿½?face XZ, -Y toward viewer
+		case 5: g_rotX=0;   g_rotY=-90; break; // Left   ï¿½?face YZ, -X toward viewer
 	}
 }
 
@@ -282,7 +282,9 @@ void CubeTest_SetBrush(int x, int y, int rx, int ry)
 
 void CubeTest_SetBrushPos(int x, int y)
 {
-	int sx = x, sy = y - 40; // MENUSIZE offset (windowâ†’simulation)
+	// TPT window: simulation area is at top-left (y=0..YRES-1),
+	// menu bar (MENUSIZE=40) is at bottom. No Y offset needed.
+	int sx = x, sy = y;
 	if (sx < 0) sx = 0; if (sx >= XRES) sx = XRES - 1;
 	if (sy < 0) sy = 0; if (sy >= YRES) sy = YRES - 1;
 	g_brushX = sx; g_brushY = sy;
@@ -303,7 +305,7 @@ void CubeTest_SetBrushPos(int x, int y)
 			g_brushPY = (float)sy;
 			g_brushPZ = (float)sx;
 			break;
-		case 5: // Left: YZ plane, X locked. Mouse Xâ†?Z, Mouse Yâ†’Y
+		case 5: // Left: YZ plane, X locked. Mouse Xï¿½?Z, Mouse Yâ†’Y
 			g_brushPX = (float)layer;
 			g_brushPY = (float)sy;
 			g_brushPZ = (float)(XRES - 1 - sx);
