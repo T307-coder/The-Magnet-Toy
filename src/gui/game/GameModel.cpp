@@ -275,7 +275,9 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new CurrentBFieldOption(this));
 	quickOptions.push_back(new SprkCurrentOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
+#ifdef USE_CUDA
 	quickOptions.push_back(new GPUFFTEnableOption(this));
+#endif
 
 	notifyQuickOptionsChanged();
 	UpdateQuickOptions();

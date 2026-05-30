@@ -212,6 +212,13 @@ struct CopiableSimulation : public RenderableSimulation
 
 	FrameTime *frameTime = nullptr;
 	int threadCount = 1;
+
+	// Pre-allocated flat buffers for FFT field computation (reused every frame)
+	std::vector<float> flatBufB;       // B-field source, size XCELLS*YCELLS
+	std::vector<float> flatBufResultB; // B-field result
+	std::vector<float> flatBufE;       // E-field source
+	std::vector<float> flatBufResultE; // E-field result
+	void EnsureFlatBufs();
 };
 
 class Simulation : public CopiableSimulation

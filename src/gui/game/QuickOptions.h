@@ -115,6 +115,7 @@ public:
 	void perform() override;
 };
 
+#ifdef USE_CUDA
 class GPUFFTEnableOption: public QuickOption
 {
 public:
@@ -122,3 +123,4 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+#endif

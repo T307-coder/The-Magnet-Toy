@@ -483,10 +483,20 @@ struct CopiableSimulation::MagFFT
 
 	void Solve(float *src, float *result, int w, int h)
 	{
-		std::fill_n(srcReal, totalSize, 0.0f);
+		// Zero top padding rows (0 to h-1)
 		for (int j = 0; j < h; j++)
-			for (int i = 0; i < w; i++)
-				srcReal[(j + h) * paddedW + (i + w)] = src[j * w + i];
+			std::fill_n(&srcReal[j * paddedW], paddedW, 0.0f);
+		// Data rows (h to 2h-1): zero left pad, copy source, zero right pad
+		for (int j = 0; j < h; j++)
+		{
+			int row = (j + h) * paddedW;
+			std::fill_n(&srcReal[row], w, 0.0f);
+			std::copy_n(&src[j * w], w, &srcReal[row + w]);
+			std::fill_n(&srcReal[row + w + w], paddedW - w - w, 0.0f);
+		}
+		// Zero bottom padding rows (2h to paddedH-1)
+		for (int j = 2 * h; j < paddedH; j++)
+			std::fill_n(&srcReal[j * paddedW], paddedW, 0.0f);
 
 		fftwf_execute_dft_r2c(planForward, srcReal, data);
 
@@ -699,40 +709,53 @@ struct CopiableSimulation::GPUFFT
 #endif
 };
 
-#ifdef USE_VKFFT
+// VkFFTSolver stub: always defined (no-op when USE_VKFFT is off)
+// Full Vulkan implementation deferred until Vulkan glue code is written.
 struct CopiableSimulation::VkFFTSolver { bool available = false; void Init(int,int){available=false;} void Solve(float*,float*,int,int){} void Release(){} };
-#endif
+
+void CopiableSimulation::EnsureFlatBufs()
+{
+	const size_t N = size_t(XCELLS) * YCELLS;
+	flatBufB.resize(N);
+	flatBufResultB.resize(N);
+	flatBufE.resize(N);
+	flatBufResultE.resize(N);
+}
 
 void CopiableSimulation::InitMagFFT()
 {
 	if (!magFFT)
 		magFFT = std::make_unique<MagFFT>();
 	magFFT->Init(XCELLS, YCELLS);
+	EnsureFlatBufs();
 }
 
 void CopiableSimulation::ComputeBField()
 {
 	if (!magnetismEnabled) return;
 
-	// Flatten magSrc into 1D array
-	std::vector<float> src(XCELLS * YCELLS);
+	EnsureFlatBufs();
+	const int N = XCELLS * YCELLS;
+
+	// Flatten magSrc into pre-allocated buffer
+	float *src = flatBufB.data();
 	for (int j = 0; j < YCELLS; j++)
 		for (int i = 0; i < XCELLS; i++)
 			src[j * XCELLS + i] = magSrc[j][i];
 
-	std::vector<float> result(XCELLS * YCELLS);
+	float *result = flatBufResultB.data();
 
 	if (vkFFTEnabled && vkFFT && vkFFT->available)
 	{
-		vkFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+		vkFFT->Solve(src, result, XCELLS, YCELLS);
 	}
 	else if (gpuFFTEnabled && gpuFFT && gpuFFT->available)
 	{
-		gpuFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+		gpuFFT->Solve(src, result, XCELLS, YCELLS);
 	}
 	else if (magFFT)
 	{
-		magFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+		magFFT->Solve(src, result, XCELLS, YCELLS);
 	}
 	else return;
 
@@ -824,10 +847,20 @@ struct CopiableSimulation::ElecFFT
 
 	void Solve(float *src, float *result, int w, int h)
 	{
-		std::fill_n(srcReal, totalSize, 0.0f);
+		// Zero top padding rows (0 to h-1)
 		for (int j = 0; j < h; j++)
-			for (int i = 0; i < w; i++)
-				srcReal[(j + h) * paddedW + (i + w)] = src[j * w + i];
+			std::fill_n(&srcReal[j * paddedW], paddedW, 0.0f);
+		// Data rows (h to 2h-1): zero left pad, copy source, zero right pad
+		for (int j = 0; j < h; j++)
+		{
+			int row = (j + h) * paddedW;
+			std::fill_n(&srcReal[row], w, 0.0f);
+			std::copy_n(&src[j * w], w, &srcReal[row + w]);
+			std::fill_n(&srcReal[row + w + w], paddedW - w - w, 0.0f);
+		}
+		// Zero bottom padding rows (2h to paddedH-1)
+		for (int j = 2 * h; j < paddedH; j++)
+			std::fill_n(&srcReal[j * paddedW], paddedW, 0.0f);
 
 		fftwf_execute_dft_r2c(planForward, srcReal, data);
 
@@ -853,30 +886,34 @@ void CopiableSimulation::InitElecFFT()
 	if (!elecFFT)
 		elecFFT = std::make_unique<ElecFFT>();
 	elecFFT->Init(XCELLS, YCELLS);
+	EnsureFlatBufs();
 }
 
 void CopiableSimulation::ComputeEField()
 {
 	if (!electricityEnabled) return;
 
-	std::vector<float> src(XCELLS * YCELLS);
+	EnsureFlatBufs();
+	const int N = XCELLS * YCELLS;
+
+	float *src = flatBufE.data();
 	for (int j = 0; j < YCELLS; j++)
 		for (int i = 0; i < XCELLS; i++)
 			src[j * XCELLS + i] = eSrc[j][i];
 
-	std::vector<float> result(XCELLS * YCELLS);
+	float *result = flatBufResultE.data();
 
 	if (vkFFTEnabled && vkFFT && vkFFT->available)
 	{
-		vkFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+		vkFFT->Solve(src, result, XCELLS, YCELLS);
 	}
 	else if (gpuFFTEnabled && gpuFFT && gpuFFT->available)
 	{
-		gpuFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+		gpuFFT->Solve(src, result, XCELLS, YCELLS);
 	}
 	else if (elecFFT)
 	{
-		elecFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+		elecFFT->Solve(src, result, XCELLS, YCELLS);
 	}
 	else return;
 
@@ -901,7 +938,6 @@ void CopiableSimulation::EnableGPUFFT(bool enable)
 		gpuFFT.reset();
 }
 
-#ifdef USE_VKFFT
 void CopiableSimulation::InitVkFFT()
 {
 	if (!vkFFT)
@@ -917,7 +953,6 @@ void CopiableSimulation::EnableVkFFT(bool enable)
 	if (!enable && vkFFT)
 		vkFFT->Release();
 }
-#endif
 
 // ============================================================================
 // AsyncFieldSolver: B-field and E-field FFT each on its own worker thread
@@ -957,12 +992,11 @@ struct CopiableSimulation::AsyncFieldSolver
 					workReady = false;
 				}
 
-				std::vector<float> result(N);
+				// Reuse pre-allocated resultBuf (resized in Start)
 				if (isElectric && elecFFT)
-					elecFFT->Solve(srcBuf.data(), result.data(), XCELLS, YCELLS);
+					elecFFT->Solve(srcBuf.data(), resultBuf.data(), XCELLS, YCELLS);
 				else if (!isElectric && magFFT)
-					magFFT->Solve(srcBuf.data(), result.data(), XCELLS, YCELLS);
-				resultBuf = std::move(result);
+					magFFT->Solve(srcBuf.data(), resultBuf.data(), XCELLS, YCELLS);
 
 				{
 					std::lock_guard lk(mx);
@@ -1084,12 +1118,12 @@ void CopiableSimulation::EnableAsyncFields(bool enable)
 
 void CopiableSimulation::DispatchAsyncFields()
 {
-	// Flatten magSrc and eSrc to 1D, exchange with worker
-	std::vector<float> magSrcFlat(XCELLS * YCELLS);
-	std::vector<float> eSrcFlat(XCELLS * YCELLS);
-	std::vector<float> bFieldFlat(XCELLS * YCELLS);
-	std::vector<float> eFieldFlat(XCELLS * YCELLS);
+	EnsureFlatBufs();
+	const int N = XCELLS * YCELLS;
 
+	// Flatten magSrc and eSrc to pre-allocated 1D buffers
+	float *magSrcFlat = flatBufB.data();
+	float *eSrcFlat = flatBufE.data();
 	for (int j = 0; j < YCELLS; j++)
 		for (int i = 0; i < XCELLS; i++)
 		{
@@ -1097,8 +1131,9 @@ void CopiableSimulation::DispatchAsyncFields()
 			eSrcFlat[j * XCELLS + i] = eSrc[j][i];
 		}
 
-	asyncFields->Exchange(magSrcFlat.data(), eSrcFlat.data(),
-	                      bFieldFlat.data(), eFieldFlat.data());
+	float *bFieldFlat = flatBufResultB.data();
+	float *eFieldFlat = flatBufResultE.data();
+	asyncFields->Exchange(magSrcFlat, eSrcFlat, bFieldFlat, eFieldFlat);
 
 	// Unflatten results back to 2D arrays
 	for (int j = 0; j < YCELLS; j++)
@@ -5417,6 +5452,9 @@ void SimVariantImpl<Variant>::BeforeSim(bool willUpdate)
 				constexpr int BIOT_RADIUS = 8;
 				auto &sd = SimulationData::CRef();
 				auto &elements = sd.elements;
+				// Fast skip: only scan if charged particles may exist
+				// (conductors are always possible, but ELEC/PROT give early-out when absent)
+				bool hasCharges = elementCount[PT_ELEC] > 0 || elementCount[PT_PROT] > 0;
 				for (int i = 0; i < NPART; i++)
 				{
 					if (!parts[i].type) continue;
@@ -5424,6 +5462,7 @@ void SimVariantImpl<Variant>::BeforeSim(bool willUpdate)
 					float q = 0.0f;
 					if (type == PT_ELEC) q = -1.0f;
 					else if (type == PT_PROT) q = 1.0f;
+					else if (!hasCharges) continue;  // skip conductor check if no free charges
 					else if (electricityEnabled && (elements[type].Properties & PROP_CONDUCTS))
 						q = parts[i].tmp4 * 0.01f;
 					if (q == 0.0f) continue;
