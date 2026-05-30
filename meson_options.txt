@@ -52,7 +52,7 @@ option(
 	'mod_id',
 	type: 'integer',
 	min: 0,
-	value: 0,
+	value: 19,
 	description: 'Mod ID, used on the https://starcatcher.us/TPT build server, the build server will compile for all platforms for you and send updates in-game, see jacob1 to get a mod ID'
 )
 option(
@@ -102,7 +102,7 @@ option(
 option(
 	'update_server',
 	type: 'string',
-	value: '',
+	value: 'starcatcher.us/TPT/mods/The-Magnet-Toy',
 	description: 'Update server, only used by snapshots and mods, see \'snapshot\' and \'mod_id\''
 )
 option(
