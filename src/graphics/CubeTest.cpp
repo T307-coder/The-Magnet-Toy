@@ -278,8 +278,8 @@ void CubeTest_RotateView(int dir)
 
 void CubeTest_AdjustLayer(int delta)
 {
-	if (!g_sim) return;
-	const_cast<Simulation *>(g_sim)->selectedLayer += delta;
+	// Directly shift brush Z for persistent 3D positioning
+	g_brushPZ += (float)delta;
 }
 
 void CubeTest_SetBrush(int x, int y, int rx, int ry)
@@ -296,35 +296,29 @@ void CubeTest_SetBrushPos(int x, int y)
 	if (sx < 0) sx = 0; if (sx >= XRES) sx = XRES - 1;
 	if (sy < 0) sy = 0; if (sy >= YRES) sy = YRES - 1;
 	g_brushX = sx; g_brushY = sy;
-	int layer = g_sim ? g_sim->selectedLayer : 0;
+	// Only update the 2 active axes for current view; locked axis keeps its value
 	switch (g_viewMode) {
-		case 0: // Front: XY plane, screen RIGHT=+X, screen DOWN=+Y
+		case 0: // Front: XY plane, Z locked. screen RIGHT=+X, DOWN=+Y
 			g_brushPX = (float)sx;
 			g_brushPY = (float)sy;
-			g_brushPZ = (float)layer;
 			break;
-		case 3: // Back: XY plane, screen RIGHT=-X, screen DOWN=+Y
+		case 3: // Back: XY plane, Z locked. screen RIGHT=-X, DOWN=+Y
 			g_brushPX = (float)(XRES - 1 - sx);
 			g_brushPY = (float)sy;
-			g_brushPZ = (float)layer;
 			break;
-		case 1: // Top: XZ plane, screen RIGHT=+X, screen UP=+Z
+		case 1: // Top: XZ plane, Y locked. screen RIGHT=+X, UP=+Z
 			g_brushPX = (float)sx;
-			g_brushPY = (float)layer;
 			g_brushPZ = (float)(YRES - 1 - sy);
 			break;
-		case 4: // Bottom: XZ plane, screen RIGHT=+X, screen DOWN=+Z
+		case 4: // Bottom: XZ plane, Y locked. screen RIGHT=+X, DOWN=+Z
 			g_brushPX = (float)sx;
-			g_brushPY = (float)layer;
 			g_brushPZ = (float)sy;
 			break;
-		case 2: // Right: YZ plane, screen RIGHT=+Z, screen DOWN=+Y
-			g_brushPX = (float)layer;
+		case 2: // Right: YZ plane, X locked. screen RIGHT=+Z, DOWN=+Y
 			g_brushPY = (float)sy;
 			g_brushPZ = (float)sx;
 			break;
-		case 5: // Left: YZ plane, screen RIGHT=-Z, screen DOWN=+Y
-			g_brushPX = (float)layer;
+		case 5: // Left: YZ plane, X locked. screen RIGHT=-Z, DOWN=+Y
 			g_brushPY = (float)sy;
 			g_brushPZ = (float)(XRES - 1 - sx);
 			break;
@@ -366,13 +360,8 @@ void CubeTest_Zoom(int delta)
 
 int CubeTest_GetPlacementZ()
 {
-	switch (g_viewMode) {
-		case 0: case 3: return g_sim ? g_sim->selectedLayer : 0;
-		case 1:         return YRES - 1 - g_brushY; // Top: Z inverted from mouse Y
-		case 4:         return g_brushY;             // Bottom: Z follows mouse Y directly
-		case 5:         return XRES - 1 - g_brushX;
-		default:        return g_brushX;
-	}
+	// Brush Z is persistent across view switches
+	return (int)(g_brushPZ + 0.5f);
 }
 
 void CubeTest_SetActiveTool(int toolType)
@@ -395,20 +384,17 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		else if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
 		{ SDL_ShowCursor(SDL_ENABLE);  } // show cursor when leaving
 	}
-	// Left click: place particle at brush position
+	// Left click: place particle at brush 3D position
 	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && e.button.windowID == wid)
 	{
 		if (g_sim && g_activeToolType > 0 && g_brushX >= 0)
 		{
-			int px = g_brushX, py = g_brushY;
-			int pz = CubeTest_GetPlacementZ();
-			// For non-front views, map (px, py) back to correct TPT coords
-			int tx = px, ty = py;
-			switch (g_viewMode) {
-			case 1: case 4: ty = g_sim->selectedLayer; break; // Top: Y=layer, Z=pz
-			case 2: case 5: tx = g_sim->selectedLayer; break; // Side: X=layer, Z=pz
-			}
-			const_cast<Simulation *>(g_sim)->create_part(-2, tx, ty, g_activeToolType);
+			int px = (int)(g_brushPX + 0.5f);
+			int py = (int)(g_brushPY + 0.5f);
+			int pz = (int)(g_brushPZ + 0.5f);
+			auto *sim = const_cast<Simulation *>(g_sim);
+			int i = sim->create_part(-2, px, py, g_activeToolType);
+			if (i >= 0) sim->parts[i].z = (float)pz;
 		}
 	}
 }
