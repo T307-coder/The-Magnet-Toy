@@ -164,6 +164,12 @@ struct CopiableSimulation : public RenderableSimulation
 	void InitGPUFFT();
 	void EnableGPUFFT(bool enable);
 
+	struct VkFFTSolver;
+	std::unique_ptr<VkFFTSolver> vkFFT;
+	bool vkFFTEnabled = false;
+	void InitVkFFT();
+	void EnableVkFFT(bool enable);
+
 	struct AsyncFieldSolver;
 	std::unique_ptr<AsyncFieldSolver> asyncFields;
 	bool asyncFieldsEnabled = false;

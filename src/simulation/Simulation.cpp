@@ -33,6 +33,10 @@
 #include <cuda_runtime.h>
 #include <cufft.h>
 #endif
+#ifdef USE_VKFFT
+#include <vulkan/vulkan.h>
+#include <vkFFT.h>
+#endif
 
 #ifdef __has_cpp_attribute
 # if __has_cpp_attribute(gnu::noinline)
@@ -694,6 +698,17 @@ struct CopiableSimulation::GPUFFT
 #endif
 };
 
+#ifdef USE_VKFFT
+// VkFFT stub — WIP: needs VkFFT API alignment (VkBuffer*, initializeVkFFT, VkFFTAppend)
+struct CopiableSimulation::VkFFTSolver
+{
+	bool available = false;
+	void Init(int, int) { available = false; }
+	void Solve(float *, float *, int, int) {}
+	void Release() {}
+};
+#endif
+
 void CopiableSimulation::InitMagFFT()
 {
 	if (!magFFT)
@@ -713,7 +728,11 @@ void CopiableSimulation::ComputeBField()
 
 	std::vector<float> result(XCELLS * YCELLS);
 
-	if (gpuFFTEnabled && gpuFFT && gpuFFT->available)
+	if (vkFFTEnabled && vkFFT && vkFFT->available)
+	{
+		vkFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+	}
+	else if (gpuFFTEnabled && gpuFFT && gpuFFT->available)
 	{
 		gpuFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
 	}
@@ -853,7 +872,11 @@ void CopiableSimulation::ComputeEField()
 
 	std::vector<float> result(XCELLS * YCELLS);
 
-	if (gpuFFTEnabled && gpuFFT && gpuFFT->available)
+	if (vkFFTEnabled && vkFFT && vkFFT->available)
+	{
+		vkFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
+	}
+	else if (gpuFFTEnabled && gpuFFT && gpuFFT->available)
 	{
 		gpuFFT->Solve(src.data(), result.data(), XCELLS, YCELLS);
 	}
@@ -883,6 +906,24 @@ void CopiableSimulation::EnableGPUFFT(bool enable)
 	if (!enable && gpuFFT)
 		gpuFFT.reset();
 }
+
+#ifdef USE_VKFFT
+void CopiableSimulation::InitVkFFT()
+{
+	if (!vkFFT)
+		vkFFT = std::make_unique<VkFFTSolver>();
+	vkFFT->Init(XCELLS, YCELLS);
+}
+
+void CopiableSimulation::EnableVkFFT(bool enable)
+{
+	if (enable && !vkFFT)
+		InitVkFFT();
+	vkFFTEnabled = enable;
+	if (!enable && vkFFT)
+		vkFFT->Release();
+}
+#endif
 
 // ============================================================================
 // AsyncFieldSolver: B-field and E-field FFT each on its own worker thread
