@@ -124,6 +124,12 @@ struct RenderableSimulation
 	int pmap[YRES][XRES];
 	int photons[YRES][XRES];
 
+	// Magnetic source cache (push model, rebuilt each frame)
+	int magSourceCount = 0;
+	int magSourceX[4096];
+	int magSourceY[4096];
+	int magSourceTarget[4096];
+
 	int aheat_enable = 0;
 
 	bool useLuaCallbacks = false;

@@ -58,69 +58,63 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 	return false;
 }
 
-// Range-based magnetization: ferromagnets receive magnetization from nearby MAGN/ELMG/MGPN.
-// reach = 1 + |source_strength| / 25 (stronger sources reach further).
-// Distance² falloff via rng.chance.
+// Build cached list of magnetic source positions (MAGN, active ELMG, MGPN).
+// Call once per frame in BeforeSim. O(N) scan, thread-safe during setup phase.
+static inline void magnetism_buildSourceList(Simulation *sim)
+{
+	sim->magSourceCount = 0;
+	constexpr int maxSources = 4096;
+	auto &parts = sim->parts;
+	for (int i = 0; i < parts.active && sim->magSourceCount < maxSources; i++)
+	{
+		if (!parts[i].type) continue;
+		int t = parts[i].type;
+		int x = (int)(parts[i].x + 0.5f);
+		int y = (int)(parts[i].y + 0.5f);
+		int target = 0;
+		if (t == PT_MAGN)
+			target = parts[i].tmp;
+		else if (t == PT_ELMG && parts[i].life == 10)
+		{
+			target = (int)((parts[i].temp - 273.15f) / 5.0f);
+			if (target > 100) target = 100;
+			if (target < -100) target = -100;
+		}
+		else if (t == PT_MGPN)
+			target = parts[i].tmp;
+		else continue;
+		if (target == 0) continue;
+		int idx = sim->magSourceCount++;
+		sim->magSourceX[idx] = x;
+		sim->magSourceY[idx] = y;
+		sim->magSourceTarget[idx] = target;
+	}
+}
+
+// Range-based magnetization: ferromagnets receive magnetization from cached source list.
+// Push model: O(S × N) vs old scan model O(N × R²), S << N.
 static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref)
 {
 	int cx = x / CELL, cy = y / CELL;
 	if (!sim->magnetismEnabled || cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS) return;
-	if (p.temp >= 773.15f) return; // above Curie temperature, doesn't magnetize
+	if (p.temp >= 773.15f) return;
 
-	constexpr int scanR = 30;
-	for (int rx = -scanR; rx <= scanR; rx++)
-		for (int ry = -scanR; ry <= scanR; ry++)
+	for (int si = 0; si < sim->magSourceCount; si++)
+	{
+		int sx = sim->magSourceX[si], sy = sim->magSourceY[si];
+		int dist = std::max(abs(x - sx), abs(y - sy));
+		int reach = 1 + std::abs(sim->magSourceTarget[si]) / 25;
+		if (dist <= reach)
 		{
-			if (!rx && !ry) continue;
-			int dist = std::max(abs(rx), abs(ry));
-			auto r = sim->pmap[y + ry][x + rx];
-			if (r)
+			int target = sim->magSourceTarget[si];
+			int chance = dist * dist;
+			if (dist <= 1 || sim->rng.chance(1, chance))
 			{
-				int rt = TYP(r);
-				int target = 0;
-				bool hasTarget = false;
-				if (rt == PT_MAGN)
-				{
-					target = sim->parts[ID(r)].tmp;
-					hasTarget = true;
-				}
-				else if (rt == PT_ELMG && sim->parts[ID(r)].life == 10)
-				{
-					target = (int)((sim->parts[ID(r)].temp - 273.15f) / 5.0f);
-					if (target > 100) target = 100;
-					if (target < -100) target = -100;
-					hasTarget = true;
-				}
-				if (hasTarget)
-				{
-					int reach = 1 + std::abs(target) / 25;
-					if (dist <= reach)
-					{
-						int chance = dist * dist;
-						if (dist <= 1 || sim->rng.chance(1, chance))
-						{
-							if (tmp3Ref < target) tmp3Ref++;
-							else if (tmp3Ref > target) tmp3Ref--;
-						}
-					}
-				}
-			}
-			auto pr = sim->photons[y + ry][x + rx];
-			if (pr && TYP(pr) == PT_MGPN)
-			{
-				int target = sim->parts[ID(pr)].tmp;
-				int reach = 1 + std::abs(target) / 25;
-				if (dist <= reach)
-				{
-					int chance = dist * dist;
-					if (dist <= 1 || sim->rng.chance(1, chance))
-					{
-						if (tmp3Ref < target) tmp3Ref++;
-						else if (tmp3Ref > target) tmp3Ref--;
-					}
-				}
+				if (tmp3Ref < target) tmp3Ref++;
+				else if (tmp3Ref > target) tmp3Ref--;
 			}
 		}
+	}
 }
 
 // DEUT-style magnetization diffusion between ferromagnets in range.

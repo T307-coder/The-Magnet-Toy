@@ -4028,6 +4028,9 @@ void Simulation::BeforeSim(bool willUpdate)
 		// Magnetic field: save previous frame, compute new
 		if (magnetismEnabled)
 		{
+			// Build cached magnetic source list (push model for element lookups)
+			magnetism_buildSourceList(this);
+
 			memcpy(prevBField, bField, sizeof(bField));
 			prevBFieldValid = true;
 			// Biot-Savart: moving charges produce magnetic field circling around velocity
