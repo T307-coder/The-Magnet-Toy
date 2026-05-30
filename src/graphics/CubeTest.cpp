@@ -29,6 +29,7 @@ static bool g_showZGrid = false;
 static int g_viewMode = 0;
 static float g_brushPX = 0, g_brushPY = 0, g_brushPZ = 0;
 static int g_activeToolType = 0; // current tool element type for 3D clicks
+static bool g_placing = false;   // left button held → continuous placement
 // Cached matrices for gluUnProject
 static double g_proj[16], g_modelview[16];
 static int    g_viewport[4];
@@ -377,6 +378,18 @@ void CubeTest_SetActiveTool(int toolType)
 	g_activeToolType = toolType;
 }
 
+// Place a single particle at current 3D brush position
+static void PlaceParticleAtBrush()
+{
+	if (!g_sim || g_activeToolType <= 0 || g_brushX < 0) return;
+	int px = (int)(g_brushPX + 0.5f);
+	int py = (int)(g_brushPY + 0.5f);
+	int pz = (int)(g_brushPZ + 0.5f);
+	auto *sim = const_cast<Simulation *>(g_sim);
+	int i = sim->create_part(-2, px, py, g_activeToolType);
+	if (i >= 0) sim->parts[i].z = (float)pz;
+}
+
 // Convert 3D window screen coords to world position on the active plane
 static void UpdateBrushFrom3DWindow(int mx, int my)
 {
@@ -448,7 +461,7 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		else if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
 		{ SDL_ShowCursor(SDL_ENABLE);  } // show cursor when leaving
 	}
-	// 3D window mouse motion: camera drag if C held, else brush on active plane
+	// 3D window mouse motion: camera drag if C held, else brush + continuous placement
 	if (e.type == SDL_MOUSEMOTION && e.motion.windowID == wid)
 	{
 		static int lastMx3D = 0, lastMy3D = 0;
@@ -461,20 +474,19 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		{
 			lastMx3D = 0; lastMy3D = 0;
 			UpdateBrushFrom3DWindow(e.motion.x, e.motion.y);
+			if (g_placing) PlaceParticleAtBrush();
 		}
 	}
-	// Left click in 3D window: place particle at brush 3D position
+	// Left click in 3D window: place particle + start continuous placement
 	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && e.button.windowID == wid)
 	{
-		if (g_sim && g_activeToolType > 0 && g_brushX >= 0)
-		{
-			int px = (int)(g_brushPX + 0.5f);
-			int py = (int)(g_brushPY + 0.5f);
-			int pz = (int)(g_brushPZ + 0.5f);
-			auto *sim = const_cast<Simulation *>(g_sim);
-			int i = sim->create_part(-2, px, py, g_activeToolType);
-			if (i >= 0) sim->parts[i].z = (float)pz;
-		}
+		g_placing = true;
+		PlaceParticleAtBrush();
+	}
+	// Left release: stop continuous placement
+	if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT)
+	{
+		g_placing = false;
 	}
 }
 
