@@ -115,4 +115,10 @@ public:
 	void perform() override;
 };
 
-
+class GPUFFTEnableOption: public QuickOption
+{
+public:
+	GPUFFTEnableOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

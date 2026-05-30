@@ -286,6 +286,8 @@ public:
 	bool GetElectricityEnabled();
 	void SetUniformBField(float value);
 	float GetUniformBField();
+	void SetGPUFFTEnabled(bool enable);
+	bool GetGPUFFTEnabled();
 	void ClearSimulation();
 	std::vector<Menu*> GetMenuList();
 	std::vector<QuickOption*> GetQuickOptions();

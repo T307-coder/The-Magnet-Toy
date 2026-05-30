@@ -275,6 +275,7 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new CurrentBFieldOption(this));
 	quickOptions.push_back(new SprkCurrentOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
+	quickOptions.push_back(new GPUFFTEnableOption(this));
 
 	notifyQuickOptionsChanged();
 	UpdateQuickOptions();
@@ -1335,6 +1336,16 @@ void GameModel::SetUniformBField(float value)
 float GameModel::GetUniformBField()
 {
 	return sim->uniformBField;
+}
+
+void GameModel::SetGPUFFTEnabled(bool enable)
+{
+	sim->EnableGPUFFT(enable);
+}
+
+bool GameModel::GetGPUFFTEnabled()
+{
+	return sim->gpuFFTEnabled;
 }
 
 void GameModel::FrameStep(int frames)
