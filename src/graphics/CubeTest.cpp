@@ -23,9 +23,8 @@ static int g_mx = 0, g_my = 0;
 static GLuint g_fontBase = 0;
 #endif
 static int g_brushX = -1, g_brushY = -1;
-static int g_brushRX = 4, g_brushRY = 4;
 static int g_brushShape = 0;  // 0=cube, 1=sphere
-static float g_brushR = 8.0f; // 3D brush radius
+static float g_brushRX = 8.0f, g_brushRY = 8.0f, g_brushRZ = 8.0f; // per-axis radii
 static bool g_showZGrid = false;
 // View mode and full 3D brush position
 static int g_viewMode = 0;
@@ -183,52 +182,38 @@ void CubeTest_Render()
 	if (g_brushX >= 0 && g_brushY >= 0)
 	{
 		float bx = g_brushPX, by = g_brushPY, bz = g_brushPZ;
-		float r = g_brushR;
+		float rx = g_brushRX, ry = g_brushRY, rz = g_brushRZ;
 		glColor3f(1.0f, 1.0f, 0.3f);
 		glBegin(GL_LINES);
 
 		if (g_brushShape == 0) // Cube wireframe
 		{
-			// 12 edges of a cube centered at (bx,by,bz) with half-extent r
-			// 4 edges along X direction (at Y±r, Z±r)
-			glVertex3f(bx-r, by-r, bz-r); glVertex3f(bx+r, by-r, bz-r);
-			glVertex3f(bx-r, by+r, bz-r); glVertex3f(bx+r, by+r, bz-r);
-			glVertex3f(bx-r, by-r, bz+r); glVertex3f(bx+r, by-r, bz+r);
-			glVertex3f(bx-r, by+r, bz+r); glVertex3f(bx+r, by+r, bz+r);
-			// 4 edges along Y direction
-			glVertex3f(bx-r, by-r, bz-r); glVertex3f(bx-r, by+r, bz-r);
-			glVertex3f(bx+r, by-r, bz-r); glVertex3f(bx+r, by+r, bz-r);
-			glVertex3f(bx-r, by-r, bz+r); glVertex3f(bx-r, by+r, bz+r);
-			glVertex3f(bx+r, by-r, bz+r); glVertex3f(bx+r, by+r, bz+r);
-			// 4 edges along Z direction
-			glVertex3f(bx-r, by-r, bz-r); glVertex3f(bx-r, by-r, bz+r);
-			glVertex3f(bx+r, by-r, bz-r); glVertex3f(bx+r, by-r, bz+r);
-			glVertex3f(bx-r, by+r, bz-r); glVertex3f(bx-r, by+r, bz+r);
-			glVertex3f(bx+r, by+r, bz-r); glVertex3f(bx+r, by+r, bz+r);
+			// 12 edges with per-axis half-extents
+			glVertex3f(bx-rx, by-ry, bz-rz); glVertex3f(bx+rx, by-ry, bz-rz);
+			glVertex3f(bx-rx, by+ry, bz-rz); glVertex3f(bx+rx, by+ry, bz-rz);
+			glVertex3f(bx-rx, by-ry, bz+rz); glVertex3f(bx+rx, by-ry, bz+rz);
+			glVertex3f(bx-rx, by+ry, bz+rz); glVertex3f(bx+rx, by+ry, bz+rz);
+			glVertex3f(bx-rx, by-ry, bz-rz); glVertex3f(bx-rx, by+ry, bz-rz);
+			glVertex3f(bx+rx, by-ry, bz-rz); glVertex3f(bx+rx, by+ry, bz-rz);
+			glVertex3f(bx-rx, by-ry, bz+rz); glVertex3f(bx-rx, by+ry, bz+rz);
+			glVertex3f(bx+rx, by-ry, bz+rz); glVertex3f(bx+rx, by+ry, bz+rz);
+			glVertex3f(bx-rx, by-ry, bz-rz); glVertex3f(bx-rx, by-ry, bz+rz);
+			glVertex3f(bx+rx, by-ry, bz-rz); glVertex3f(bx+rx, by-ry, bz+rz);
+			glVertex3f(bx-rx, by+ry, bz-rz); glVertex3f(bx-rx, by+ry, bz+rz);
+			glVertex3f(bx+rx, by+ry, bz-rz); glVertex3f(bx+rx, by+ry, bz+rz);
 		}
-		else // Sphere: 3 great circles in XY, XZ, YZ planes
+		else // Sphere/ellipsoid: 3 great circles
 		{
 			const int N = 48;
-			// XY circle (Z locked)
 			for (int i = 0; i < N; i++) {
 				float a0 = (float)i / N * 6.283185f;
 				float a1 = (float)(i+1) / N * 6.283185f;
-				glVertex3f(bx+cosf(a0)*r, by+sinf(a0)*r, bz);
-				glVertex3f(bx+cosf(a1)*r, by+sinf(a1)*r, bz);
-			}
-			// XZ circle (Y locked)
-			for (int i = 0; i < N; i++) {
-				float a0 = (float)i / N * 6.283185f;
-				float a1 = (float)(i+1) / N * 6.283185f;
-				glVertex3f(bx+cosf(a0)*r, by, bz+sinf(a0)*r);
-				glVertex3f(bx+cosf(a1)*r, by, bz+sinf(a1)*r);
-			}
-			// YZ circle (X locked)
-			for (int i = 0; i < N; i++) {
-				float a0 = (float)i / N * 6.283185f;
-				float a1 = (float)(i+1) / N * 6.283185f;
-				glVertex3f(bx, by+cosf(a0)*r, bz+sinf(a0)*r);
-				glVertex3f(bx, by+cosf(a1)*r, bz+sinf(a1)*r);
+				glVertex3f(bx+cosf(a0)*rx, by+sinf(a0)*ry, bz);
+				glVertex3f(bx+cosf(a1)*rx, by+sinf(a1)*ry, bz);
+				glVertex3f(bx+cosf(a0)*rx, by, bz+sinf(a0)*rz);
+				glVertex3f(bx+cosf(a1)*rx, by, bz+sinf(a1)*rz);
+				glVertex3f(bx, by+cosf(a0)*ry, bz+sinf(a0)*rz);
+				glVertex3f(bx, by+cosf(a1)*ry, bz+sinf(a1)*rz);
 			}
 		}
 		glEnd();
@@ -392,11 +377,14 @@ void CubeTest_Zoom(int delta)
 	if (g_dist > 5000) g_dist = 5000;
 }
 
-void CubeTest_ResizeBrush(int delta)
+void CubeTest_ResizeBrush(int delta, int axis)
 {
-	g_brushR += (float)delta;
-	if (g_brushR < 1) g_brushR = 1;
-	if (g_brushR > 100) g_brushR = 100;
+	auto clamp = [](float &v) { if (v < 0) v = 0; if (v > 100) v = 100; };
+	if (axis == 0)      { g_brushRX += (float)delta; g_brushRY += (float)delta; g_brushRZ += (float)delta; }
+	else if (axis == 1) { g_brushRX += (float)delta; }
+	else if (axis == 2) { g_brushRY += (float)delta; }
+	else if (axis == 3) { g_brushRZ += (float)delta; }
+	clamp(g_brushRX); clamp(g_brushRY); clamp(g_brushRZ);
 }
 
 void CubeTest_ToggleBrushShape()
@@ -445,32 +433,39 @@ static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 static void BrushAction(int cx, int cy, int cz, int mode)
 {
 	auto *sim = const_cast<Simulation *>(g_sim);
-	int r = (int)(g_brushR + 0.5f);
-	if (r < 1) r = 1;
-	int r2 = r * r;
+	int rx = (int)(g_brushRX + 0.5f);
+	int ry = (int)(g_brushRY + 0.5f);
+	int rz = (int)(g_brushRZ + 0.5f);
+	if (rx < 0) rx = 0; if (ry < 0) ry = 0; if (rz < 0) rz = 0;
 
 	if (mode == 0) // Place
 	{
-		if (g_brushShape == 0) // Cube
+		if (g_brushShape == 0) // Box
 		{
-			for (int dx = -r; dx <= r; dx++)
-				for (int dy = -r; dy <= r; dy++)
-					for (int dz = -r; dz <= r; dz++)
+			for (int dx = -rx; dx <= rx; dx++)
+				for (int dy = -ry; dy <= ry; dy++)
+					for (int dz = -rz; dz <= rz; dz++)
 						CreatePart3D(sim, cx + dx, cy + dy, cz + dz, g_activeToolType);
 		}
-		else // Sphere
+		else // Ellipsoid
 		{
-			for (int dx = -r; dx <= r; dx++)
-				for (int dy = -r; dy <= r; dy++)
-					for (int dz = -r; dz <= r; dz++)
+			float irx2 = rx>0 ? 1.0f/((float)rx*rx) : 1e9f;
+			float iry2 = ry>0 ? 1.0f/((float)ry*ry) : 1e9f;
+			float irz2 = rz>0 ? 1.0f/((float)rz*rz) : 1e9f;
+			for (int dx = -rx; dx <= rx; dx++)
+				for (int dy = -ry; dy <= ry; dy++)
+					for (int dz = -rz; dz <= rz; dz++)
 					{
-						if (dx*dx + dy*dy + dz*dz > r2) continue;
+						if ((float)(dx*dx)*irx2 + (float)(dy*dy)*iry2 + (float)(dz*dz)*irz2 > 1.0f) continue;
 						CreatePart3D(sim, cx + dx, cy + dy, cz + dz, g_activeToolType);
 					}
 		}
 	}
 	else // Delete
 	{
+		float irx2 = rx>0 ? 1.0f/((float)rx*rx) : 1e9f;
+		float iry2 = ry>0 ? 1.0f/((float)ry*ry) : 1e9f;
+		float irz2 = rz>0 ? 1.0f/((float)rz*rz) : 1e9f;
 		for (int i = 0; i < sim->parts.active; i++)
 		{
 			if (!sim->parts[i].type) continue;
@@ -480,9 +475,9 @@ static void BrushAction(int cx, int cy, int cz, int mode)
 
 			bool hit;
 			if (g_brushShape == 0)
-				hit = (abs(dx) <= r && abs(dy) <= r && abs(dz) <= r);
+				hit = (abs(dx) <= rx && abs(dy) <= ry && abs(dz) <= rz);
 			else
-				hit = (dx*dx + dy*dy + dz*dz <= r2);
+				hit = ((float)(dx*dx)*irx2 + (float)(dy*dy)*iry2 + (float)(dz*dz)*irz2 <= 1.0f);
 
 			if (hit) sim->kill_part(i);
 		}
@@ -637,13 +632,20 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 			g_deleting = false;
 		}
 	}
-	// Scroll in 3D window: resize brush (Ctrl+scroll still zooms via TPT handler)
+	// Scroll in 3D window: uniform or per-axis resize
 	if (e.type == SDL_MOUSEWHEEL && e.wheel.windowID == wid)
 	{
+		int d = e.wheel.y;
 		if (SDL_GetModState() & KMOD_CTRL)
-			CubeTest_Zoom(e.wheel.y * 30);
+			CubeTest_Zoom(d * 30);
+		else if (SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_X])
+			CubeTest_ResizeBrush(d, 3); // Z axis
+		else if (SDL_GetModState() & KMOD_SHIFT)
+			CubeTest_ResizeBrush(d, 1); // X axis
+		else if (SDL_GetModState() & KMOD_ALT)
+			CubeTest_ResizeBrush(d, 2); // Y axis
 		else
-			CubeTest_ResizeBrush(e.wheel.y);
+			CubeTest_ResizeBrush(d, 0); // uniform
 	}
 }
 
