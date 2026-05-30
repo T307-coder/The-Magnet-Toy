@@ -280,6 +280,8 @@ public:
 	bool GetCurrentBFieldEnabled();
 	void SetRealisticPstnEnabled(bool enable);
 	bool GetRealisticPstnEnabled();
+	void SetFreeChargeFieldsEnabled(bool enable);
+	bool GetFreeChargeFieldsEnabled();
 	void SetSprkCurrentEnabled(bool enable);
 	bool GetSprkCurrentEnabled();
 	void SetElectricityEnabled(bool enable);

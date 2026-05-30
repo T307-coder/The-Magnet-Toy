@@ -205,6 +205,20 @@ void RealisticPstnOption::perform()
 	m->SetRealisticPstnEnabled(!m->GetRealisticPstnEnabled());
 }
 
+FreeChargeFieldsOption::FreeChargeFieldsOption(GameModel * m):
+QuickOption("Q", "ELEC/PROT produce fields", m, Toggle)
+{
+
+}
+bool FreeChargeFieldsOption::GetToggle()
+{
+	return m->GetFreeChargeFieldsEnabled();
+}
+void FreeChargeFieldsOption::perform()
+{
+	m->SetFreeChargeFieldsEnabled(!m->GetFreeChargeFieldsEnabled());
+}
+
 SprkCurrentOption::SprkCurrentOption(GameModel * m):
 QuickOption("K", "SPRK current magnetic field", m, Toggle)
 {
