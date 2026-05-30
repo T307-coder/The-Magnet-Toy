@@ -32,6 +32,9 @@ static float g_brushPX = 0, g_brushPY = 0, g_brushPZ = 0;
 static int g_activeToolType = 0; // current tool element type for 3D clicks
 static bool g_placing = false;   // left button held → continuous placement
 static bool g_deleting = false;   // right button held → continuous deletion
+static bool g_shiftHeld = false;  // Shift → X-axis scroll
+static bool g_altHeld = false;    // Alt → Y-axis scroll
+static bool g_xHeld = false;      // X key → Z-axis scroll
 static const int ZMAX = 384;     // Z extent (matches YRES for cubic volume)
 // Cached matrices for gluUnProject
 static double g_proj[16], g_modelview[16];
@@ -346,7 +349,7 @@ void CubeTest_SetBrushPos(int x, int y)
 
 void CubeTest_SetBrushRadius(int rx, int ry)
 {
-	g_brushRX = rx; g_brushRY = ry;
+	// 3D brush now has independent per-axis radii; ignore 2D sync
 }
 
 void CubeTest_ToggleZGrid()
@@ -638,14 +641,23 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		int d = e.wheel.y;
 		if (SDL_GetModState() & KMOD_CTRL)
 			CubeTest_Zoom(d * 30);
-		else if (SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_X])
+		else if (g_xHeld)
 			CubeTest_ResizeBrush(d, 3); // Z axis
-		else if (SDL_GetModState() & KMOD_SHIFT)
+		else if (g_shiftHeld)
 			CubeTest_ResizeBrush(d, 1); // X axis
-		else if (SDL_GetModState() & KMOD_ALT)
+		else if (g_altHeld)
 			CubeTest_ResizeBrush(d, 2); // Y axis
 		else
 			CubeTest_ResizeBrush(d, 0); // uniform
+	}
+	// Track modifier keys (any window — CubeTest sees all events)
+	if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP)
+	{
+		bool down = (e.type == SDL_KEYDOWN);
+		auto sc = e.key.keysym.scancode;
+		if (sc == SDL_SCANCODE_LSHIFT || sc == SDL_SCANCODE_RSHIFT) g_shiftHeld = down;
+		if (sc == SDL_SCANCODE_LALT || sc == SDL_SCANCODE_RALT)     g_altHeld = down;
+		if (sc == SDL_SCANCODE_X)                                   g_xHeld = down;
 	}
 }
 
