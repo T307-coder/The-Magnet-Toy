@@ -162,7 +162,7 @@ void CubeTest_Render()
 		// Yellow wireframe rectangle on the active plane
 		glColor3f(1.0f, 1.0f, 0.3f);
 		glBegin(GL_LINE_LOOP);
-		if (vm <= 3) { // XY plane (Front 0, Back 3)
+		if (vm == 0 || vm == 3) { // XY plane (Front 0, Back 3)
 			glVertex3f(bx-rx, by-ry, bz); glVertex3f(bx+rx, by-ry, bz);
 			glVertex3f(bx+rx, by+ry, bz); glVertex3f(bx-rx, by+ry, bz);
 		} else if (vm == 1 || vm == 4) { // XZ plane (Top 1, Bottom 4)
@@ -298,22 +298,32 @@ void CubeTest_SetBrushPos(int x, int y)
 	g_brushX = sx; g_brushY = sy;
 	int layer = g_sim ? g_sim->selectedLayer : 0;
 	switch (g_viewMode) {
-		case 0: case 3: // Front/Back: XY plane, Z locked
+		case 0: // Front: XY plane, screen RIGHT=+X, screen DOWN=+Y
 			g_brushPX = (float)sx;
 			g_brushPY = (float)sy;
 			g_brushPZ = (float)layer;
 			break;
-		case 1: case 4: // Top/Bottom: XZ plane, Y locked. Mouse X→X, Mouse Y→Z(inverted)
+		case 3: // Back: XY plane, screen RIGHT=-X, screen DOWN=+Y
+			g_brushPX = (float)(XRES - 1 - sx);
+			g_brushPY = (float)sy;
+			g_brushPZ = (float)layer;
+			break;
+		case 1: // Top: XZ plane, screen RIGHT=+X, screen UP=+Z
 			g_brushPX = (float)sx;
 			g_brushPY = (float)layer;
-			g_brushPZ = (float)(YRES - 1 - sy); // invert so mouse-up = +Z
+			g_brushPZ = (float)(YRES - 1 - sy);
 			break;
-		case 2: // Right: YZ plane, X locked. Mouse X→Z, Mouse Y→Y
+		case 4: // Bottom: XZ plane, screen RIGHT=+X, screen DOWN=+Z
+			g_brushPX = (float)sx;
+			g_brushPY = (float)layer;
+			g_brushPZ = (float)sy;
+			break;
+		case 2: // Right: YZ plane, screen RIGHT=+Z, screen DOWN=+Y
 			g_brushPX = (float)layer;
 			g_brushPY = (float)sy;
 			g_brushPZ = (float)sx;
 			break;
-		case 5: // Left: YZ plane, X locked. Mouse X�?Z, Mouse Y→Y
+		case 5: // Left: YZ plane, screen RIGHT=-Z, screen DOWN=+Y
 			g_brushPX = (float)layer;
 			g_brushPY = (float)sy;
 			g_brushPZ = (float)(XRES - 1 - sx);
@@ -358,7 +368,8 @@ int CubeTest_GetPlacementZ()
 {
 	switch (g_viewMode) {
 		case 0: case 3: return g_sim ? g_sim->selectedLayer : 0;
-		case 1: case 4: return YRES - 1 - g_brushY;
+		case 1:         return YRES - 1 - g_brushY; // Top: Z inverted from mouse Y
+		case 4:         return g_brushY;             // Bottom: Z follows mouse Y directly
 		case 5:         return XRES - 1 - g_brushX;
 		default:        return g_brushX;
 	}
