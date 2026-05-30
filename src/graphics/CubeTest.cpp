@@ -475,3 +475,8 @@ void CubeTest_Shutdown()
 }
 
 bool CubeTest_IsOpen() { return g_win != nullptr; }
+
+Uint32 CubeTest_GetWindowID()
+{
+	return g_win ? SDL_GetWindowID(g_win) : 0;
+}

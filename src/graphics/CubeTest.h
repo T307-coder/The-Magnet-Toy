@@ -20,3 +20,4 @@ void CubeTest_HandleEvent(const SDL_Event &e);
 void CubeTest_Shutdown();
 bool CubeTest_IsOpen();
 void CubeTest_ToggleCamControl(); // 'C' key toggles camera-drag mode
+Uint32 CubeTest_GetWindowID();    // SDL window ID of 3D viewport, 0 if closed

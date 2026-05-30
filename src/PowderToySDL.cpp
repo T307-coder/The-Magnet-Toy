@@ -364,6 +364,9 @@ static void EventProcess(const SDL_Event &event)
 		break;
 	case SDL_MOUSEWHEEL:
 	{
+		// 3D window events handled by CubeTest_HandleEvent, skip 2D
+		if (CubeTest_GetWindowID() && event.wheel.windowID == CubeTest_GetWindowID())
+			break;
 		int y = event.wheel.y;
 		if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
 			y *= -1;
@@ -375,6 +378,9 @@ static void EventProcess(const SDL_Event &event)
 		break;
 	}
 	case SDL_MOUSEMOTION:
+		// 3D window mouse → handled by CubeTest_HandleEvent, skip 2D
+		if (CubeTest_GetWindowID() && event.motion.windowID == CubeTest_GetWindowID())
+			break;
 		mousex = event.motion.x;
 		mousey = event.motion.y;
 		if (g_camControl)
@@ -399,6 +405,9 @@ static void EventProcess(const SDL_Event &event)
 		SDL_free(event.drop.file);
 		break;
 	case SDL_MOUSEBUTTONDOWN:
+		// 3D window clicks handled by CubeTest_HandleEvent, skip 2D
+		if (CubeTest_GetWindowID() && event.button.windowID == CubeTest_GetWindowID())
+			break;
 		// if mouse hasn't moved yet, sdl will send 0,0. We don't want that
 		if (hasMouseMoved)
 		{
@@ -415,6 +424,9 @@ static void EventProcess(const SDL_Event &event)
 		}
 		break;
 	case SDL_MOUSEBUTTONUP:
+		// 3D window events handled by CubeTest_HandleEvent, skip 2D
+		if (CubeTest_GetWindowID() && event.button.windowID == CubeTest_GetWindowID())
+			break;
 		// if mouse hasn't moved yet, sdl will send 0,0. We don't want that
 		if (hasMouseMoved)
 		{
