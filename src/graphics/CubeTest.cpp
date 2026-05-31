@@ -10,6 +10,8 @@
 #endif
 #include <cmath>
 #include <cstdio>
+#include <vector>
+#include <memory>
 
 static SDL_Window *g_win = nullptr;
 static SDL_GLContext g_gl = nullptr;
@@ -32,10 +34,15 @@ static float g_brushPX = 0, g_brushPY = 0, g_brushPZ = 0;
 static int g_activeToolType = 0; // current tool element type for 3D clicks
 static bool g_placing = false;   // left button held → continuous placement
 static bool g_deleting = false;   // right button held → continuous deletion
-static bool g_shiftHeld = false;  // Shift → X-axis scroll
+static bool g_shiftHeld = false;  // Shift → X-axis scroll / line mode
 static bool g_altHeld = false;    // Alt → Y-axis scroll
 static bool g_xHeld = false;      // X key → Z-axis scroll
 static const int ZMAX = 384;     // Z extent (matches YRES for cubic volume)
+
+// Tool modes for 3D drawing (matching 2D tool concepts)
+static bool g_lineMode = false;   // Shift+left: 3D line
+static bool g_rectMode = false;   // Ctrl+left: 3D cuboid
+static float g_toolStartX, g_toolStartY, g_toolStartZ; // anchor point for line/rect
 // Cached matrices for gluUnProject
 static double g_proj[16], g_modelview[16];
 static int    g_viewport[4];
@@ -181,8 +188,40 @@ void CubeTest_Render()
 		glEnd();
 	}
 
+	// ---- 3D Line / Rect preview ----
+	if (g_lineMode || g_rectMode)
+	{
+		float ex = g_brushPX, ey = g_brushPY, ez = g_brushPZ;
+		float sx = g_toolStartX, sy = g_toolStartY, sz = g_toolStartZ;
+		glBegin(GL_LINES);
+		if (g_lineMode) // Magenta line
+		{
+			glColor3f(1.0f, 0.3f, 1.0f);
+			glVertex3f(sx, sy, sz);
+			glVertex3f(ex, ey, ez);
+		}
+		else // Cyan cuboid wireframe
+		{
+			glColor3f(0.3f, 1.0f, 1.0f);
+			// 12 edges from (sx,sy,sz) to (ex,ey,ez)
+			glVertex3f(sx,sy,sz); glVertex3f(ex,sy,sz);
+			glVertex3f(sx,ey,sz); glVertex3f(ex,ey,sz);
+			glVertex3f(sx,sy,ez); glVertex3f(ex,sy,ez);
+			glVertex3f(sx,ey,ez); glVertex3f(ex,ey,ez);
+			glVertex3f(sx,sy,sz); glVertex3f(sx,ey,sz);
+			glVertex3f(ex,sy,sz); glVertex3f(ex,ey,sz);
+			glVertex3f(sx,sy,ez); glVertex3f(sx,ey,ez);
+			glVertex3f(ex,sy,ez); glVertex3f(ex,ey,ez);
+			glVertex3f(sx,sy,sz); glVertex3f(sx,sy,ez);
+			glVertex3f(ex,sy,sz); glVertex3f(ex,sy,ez);
+			glVertex3f(sx,ey,sz); glVertex3f(sx,ey,ez);
+			glVertex3f(ex,ey,sz); glVertex3f(ex,ey,ez);
+		}
+		glEnd();
+	}
+
 	// ---- 3D Brush preview: wireframe cube or sphere rings ----
-	if (g_brushX >= 0 && g_brushY >= 0)
+	if (g_brushX >= 0 && g_brushY >= 0 && !g_lineMode && !g_rectMode)
 	{
 		float bx = g_brushPX, by = g_brushPY, bz = g_brushPZ;
 		float rx = g_brushRX, ry = g_brushRY, rz = g_brushRZ;
@@ -535,6 +574,77 @@ void CubeTest_SetActiveTool(int toolType)
 }
 
 // Create a 3D particle bypassing pmap — allows multiple particles per (x,y)
+// Forward decls
+static int CreatePart3D(Simulation *sim, int x, int y, int z, int t);
+
+// 3D flood fill: fill all connected empty space from (sx,sy,sz)
+static void FloodFill3D(int sx, int sy, int sz)
+{
+	if (!g_sim || g_activeToolType <= 0) return;
+	auto *sim = const_cast<Simulation *>(g_sim);
+	if (sx<0||sy<0||sz<0||sx>=XRES||sy>=YRES||sz>=ZMAX) return;
+
+	// Check if start position is already occupied by checking pmap
+	if (sim->pmap[sy][sx]) return; // occupied in 2D grid
+
+	// Simple BFS flood fill in 3D
+	// Use a vector as queue — conservative size estimate
+	std::vector<int> qx, qy, qz;
+	qx.reserve(1024); qy.reserve(1024); qz.reserve(1024);
+	qx.push_back(sx); qy.push_back(sy); qz.push_back(sz);
+
+	// Bitmap for visited (2D only since pmap is 2D)
+	auto bitmap = std::make_unique<char[]>(XRES * YRES);
+	std::fill(bitmap.get(), bitmap.get() + XRES * YRES, 0);
+
+	int count = 0;
+	while (!qx.empty())
+	{
+		int x = qx.back(); qx.pop_back();
+		int y = qy.back(); qy.pop_back();
+		int z = qz.back(); qz.pop_back();
+
+		if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=ZMAX) continue;
+		int idx = y * XRES + x;
+		if (bitmap[idx]) continue;
+		if (sim->pmap[y][x]) continue; // occupied in 2D
+		bitmap[idx] = 1;
+
+		CreatePart3D(sim, x, y, z, g_activeToolType);
+		if (++count > 20000) break; // safety limit
+
+		// 6-directional neighbors
+		qx.push_back(x+1); qy.push_back(y);   qz.push_back(z);
+		qx.push_back(x-1); qy.push_back(y);   qz.push_back(z);
+		qx.push_back(x);   qy.push_back(y+1); qz.push_back(z);
+		qx.push_back(x);   qy.push_back(y-1); qz.push_back(z);
+		qx.push_back(x);   qy.push_back(y);   qz.push_back(z+1);
+		qx.push_back(x);   qy.push_back(y);   qz.push_back(z-1);
+	}
+}
+
+// Draw 3D line from (sx,sy,sz) to (ex,ey,ez)
+static void DrawLine3D(int sx, int sy, int sz, int ex, int ey, int ez)
+{
+	if (!g_sim || g_activeToolType <= 0) return;
+	auto *sim = const_cast<Simulation *>(g_sim);
+	float dx = (float)(ex - sx), dy = (float)(ey - sy), dz = (float)(ez - sz);
+	int steps = (int)ceilf(sqrtf(dx*dx + dy*dy + dz*dz));
+	if (steps <= 0) { CreatePart3D(sim, sx, sy, sz, g_activeToolType); return; }
+
+	int lastPX = -999, lastPY = -999;
+	for (int s = 0; s <= steps; s++)
+	{
+		float t = (float)s / (float)steps;
+		int px = (int)((float)sx + dx * t + 0.5f);
+		int py = (int)((float)sy + dy * t + 0.5f);
+		int pz = (int)((float)sz + dz * t + 0.5f);
+		if (px == lastPX && py == lastPY) continue;
+		lastPX = px; lastPY = py;
+		CreatePart3D(sim, px, py, pz, g_activeToolType);
+	}
+}
+
 static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 {
 	if (x<0 || y<0 || x>=XRES || y>=YRES) return -1;
@@ -718,7 +828,7 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		else if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
 		{ SDL_ShowCursor(SDL_ENABLE);  } // show cursor when leaving
 	}
-	// 3D window mouse motion: camera drag if C held, else brush + continuous placement/deletion
+	// 3D window mouse motion: camera drag if C held, else brush/tool
 	if (e.type == SDL_MOUSEMOTION && e.motion.windowID == wid)
 	{
 		static int lastMx3D = 0, lastMy3D = 0;
@@ -731,37 +841,79 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		{
 			lastMx3D = 0; lastMy3D = 0;
 			UpdateBrushFrom3DWindow(e.motion.x, e.motion.y);
-			if (g_placing) PlaceParticleAtBrush();
-			if (g_deleting) BrushAction(
-				(int)(g_brushPX + 0.5f), (int)(g_brushPY + 0.5f), (int)(g_brushPZ + 0.5f), 1);
+			if (g_lineMode || g_rectMode)
+				{ /* just update preview via render */ }
+			else if (g_placing)
+				PlaceParticleAtBrush();
+			else if (g_deleting)
+				BrushAction((int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f),1);
 		}
 	}
-	// Left click: place; Right click: delete
-	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.windowID == wid)
+	// Left click: depending on modifiers
+	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_LEFT && e.button.windowID == wid)
 	{
-		if (e.button.button == SDL_BUTTON_LEFT)
+		if ((SDL_GetModState() & KMOD_CTRL) && (SDL_GetModState() & KMOD_SHIFT))
+		{
+			// Ctrl+Shift: 3D flood fill
+			FloodFill3D((int)(g_brushPX+0.5f), (int)(g_brushPY+0.5f), (int)(g_brushPZ+0.5f));
+		}
+		else if (SDL_GetModState() & KMOD_CTRL)
+		{
+			// Ctrl: rect mode
+			g_rectMode = true;
+			g_toolStartX = g_brushPX; g_toolStartY = g_brushPY; g_toolStartZ = g_brushPZ;
+		}
+		else if (g_shiftHeld)
+		{
+			// Shift: line mode
+			g_lineMode = true;
+			g_toolStartX = g_brushPX; g_toolStartY = g_brushPY; g_toolStartZ = g_brushPZ;
+		}
+		else
 		{
 			g_placing = true;
 			PlaceParticleAtBrush();
 		}
-		else if (e.button.button == SDL_BUTTON_RIGHT)
-		{
-			g_deleting = true;
-			BrushAction((int)(g_brushPX + 0.5f), (int)(g_brushPY + 0.5f), (int)(g_brushPZ + 0.5f), 1);
-		}
 	}
-	// Release: stop placing or deleting
-	if (e.type == SDL_MOUSEBUTTONUP)
+	// Right click: delete (same as before)
+	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT && e.button.windowID == wid)
 	{
-		if (e.button.button == SDL_BUTTON_LEFT)
+		g_deleting = true;
+		BrushAction((int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f),1);
+	}
+	// Release: execute line/rect or stop brush
+	if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT)
+	{
+		if (g_lineMode)
+		{
+			g_lineMode = false;
+			DrawLine3D((int)(g_toolStartX+0.5f),(int)(g_toolStartY+0.5f),(int)(g_toolStartZ+0.5f),
+			           (int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f));
+		}
+		else if (g_rectMode)
+		{
+			g_rectMode = false;
+			// Fill cuboid from start to current brush
+			int sx = (int)(g_toolStartX+0.5f), sy = (int)(g_toolStartY+0.5f), sz = (int)(g_toolStartZ+0.5f);
+			int ex = (int)(g_brushPX+0.5f), ey = (int)(g_brushPY+0.5f), ez = (int)(g_brushPZ+0.5f);
+			int x1 = sx<ex ? sx : ex, x2 = sx>ex ? sx : ex;
+			int y1 = sy<ey ? sy : ey, y2 = sy>ey ? sy : ey;
+			int z1 = sz<ez ? sz : ez, z2 = sz>ez ? sz : ez;
+			auto *sim = const_cast<Simulation *>(g_sim);
+			for (int x=x1; x<=x2; x++)
+				for (int y=y1; y<=y2; y++)
+					for (int z=z1; z<=z2; z++)
+						CreatePart3D(sim, x, y, z, g_activeToolType);
+		}
+		else
 		{
 			g_placing = false;
 			g_havePrev = false;
 		}
-		else if (e.button.button == SDL_BUTTON_RIGHT)
-		{
-			g_deleting = false;
-		}
+	}
+	if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT)
+	{
+		g_deleting = false;
 	}
 	// Scroll in 3D window: uniform or per-axis resize
 	if (e.type == SDL_MOUSEWHEEL && e.wheel.windowID == wid)
