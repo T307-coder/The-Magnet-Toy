@@ -24,6 +24,9 @@
 #include <stack>
 #include <fftw3.h>
 
+extern int   CubeTest_Get2DViewMode();
+extern float CubeTest_Get2DLockedVal();
+
 namespace
 {
 	struct SimulationImpl : public Simulation
@@ -2113,6 +2116,21 @@ bool Simulation::part_change_type(int i, int x, int y, int t)
 //tv = Type (PMAPBITS bits) + Var (32-PMAPBITS bits), var is usually 0
 int Simulation::create_part(int p, int x, int y, int t, int v)
 {
+	// 3D remap: translate 2D coords to 3D based on current view plane
+	int view2D = CubeTest_Get2DViewMode();
+	float lockVal = CubeTest_Get2DLockedVal();
+	float setZ = 0;
+	int origX = x, origY = y;
+	if (view2D == 1) { // XZ plane: x→x, y→z, locked Y
+		setZ = (float)(YRES - 1 - y);
+		y = (int)(lockVal + 0.5f);
+	} else if (view2D == 2) { // YZ plane: x→z, y→y, locked X
+		setZ = (float)x;
+		x = (int)(lockVal + 0.5f);
+	} else {
+		setZ = lockVal; // XY: use brush Z
+	}
+
 	int i, oldType = PT_NONE;
 
 	auto &sd = SimulationData::CRef();
@@ -2211,6 +2229,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].type = t;
 	parts[i].x = (float)x;
 	parts[i].y = (float)y;
+	parts[i].z = setZ;
 	parts[i].tmp5 = 0;
 	parts[i].tmp6 = 0;
 
