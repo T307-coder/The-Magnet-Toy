@@ -296,6 +296,9 @@ void SDLSetScreen()
 	}
 	ApplyFpsLimit();
 	CubeTest_Init(); // 3D viewport test
+	SliceWindow_Init(SLICE_XY);
+	SliceWindow_Init(SLICE_XZ);
+	SliceWindow_Init(SLICE_YZ);
 	if (newFrameOpsNorm.fullscreen)
 	{
 		SDL_RaiseWindow(sdl_window);
@@ -374,9 +377,15 @@ static void EventProcess(const SDL_Event &event)
 		break;
 	case SDL_MOUSEWHEEL:
 	{
-		// 3D window events handled by CubeTest_HandleEvent, skip 2D
-		if (CubeTest_GetWindowID() && event.wheel.windowID == CubeTest_GetWindowID())
-			break;
+		// 3D / slice window events handled elsewhere, skip 2D
+		{
+			Uint32 wid = event.wheel.windowID;
+			if ((CubeTest_GetWindowID() && wid == CubeTest_GetWindowID()) ||
+			    (SliceWindow_GetID(SLICE_XY) && wid == SliceWindow_GetID(SLICE_XY)) ||
+			    (SliceWindow_GetID(SLICE_XZ) && wid == SliceWindow_GetID(SLICE_XZ)) ||
+			    (SliceWindow_GetID(SLICE_YZ) && wid == SliceWindow_GetID(SLICE_YZ)))
+				break;
+		}
 		int y = event.wheel.y;
 		if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED)
 			y *= -1;
@@ -388,9 +397,15 @@ static void EventProcess(const SDL_Event &event)
 		break;
 	}
 	case SDL_MOUSEMOTION:
-		// 3D window mouse → handled by CubeTest_HandleEvent, skip 2D
-		if (CubeTest_GetWindowID() && event.motion.windowID == CubeTest_GetWindowID())
-			break;
+		// 3D/slice window mouse → handled elsewhere, skip 2D
+		{
+			Uint32 wid = event.motion.windowID;
+			if ((CubeTest_GetWindowID() && wid == CubeTest_GetWindowID()) ||
+			    (SliceWindow_GetID(SLICE_XY) && wid == SliceWindow_GetID(SLICE_XY)) ||
+			    (SliceWindow_GetID(SLICE_XZ) && wid == SliceWindow_GetID(SLICE_XZ)) ||
+			    (SliceWindow_GetID(SLICE_YZ) && wid == SliceWindow_GetID(SLICE_YZ)))
+				break;
+		}
 		mousex = event.motion.x;
 		mousey = event.motion.y;
 		if (g_camControl)
@@ -415,9 +430,15 @@ static void EventProcess(const SDL_Event &event)
 		SDL_free(event.drop.file);
 		break;
 	case SDL_MOUSEBUTTONDOWN:
-		// 3D window clicks handled by CubeTest_HandleEvent, skip 2D
-		if (CubeTest_GetWindowID() && event.button.windowID == CubeTest_GetWindowID())
-			break;
+		// 3D/slice window clicks handled elsewhere, skip 2D
+		{
+			Uint32 wid = event.button.windowID;
+			if ((CubeTest_GetWindowID() && wid == CubeTest_GetWindowID()) ||
+			    (SliceWindow_GetID(SLICE_XY) && wid == SliceWindow_GetID(SLICE_XY)) ||
+			    (SliceWindow_GetID(SLICE_XZ) && wid == SliceWindow_GetID(SLICE_XZ)) ||
+			    (SliceWindow_GetID(SLICE_YZ) && wid == SliceWindow_GetID(SLICE_YZ)))
+				break;
+		}
 		// if mouse hasn't moved yet, sdl will send 0,0. We don't want that
 		if (hasMouseMoved)
 		{
@@ -434,9 +455,15 @@ static void EventProcess(const SDL_Event &event)
 		}
 		break;
 	case SDL_MOUSEBUTTONUP:
-		// 3D window events handled by CubeTest_HandleEvent, skip 2D
-		if (CubeTest_GetWindowID() && event.button.windowID == CubeTest_GetWindowID())
-			break;
+		// 3D/slice window events handled elsewhere, skip 2D
+		{
+			Uint32 wid = event.button.windowID;
+			if ((CubeTest_GetWindowID() && wid == CubeTest_GetWindowID()) ||
+			    (SliceWindow_GetID(SLICE_XY) && wid == SliceWindow_GetID(SLICE_XY)) ||
+			    (SliceWindow_GetID(SLICE_XZ) && wid == SliceWindow_GetID(SLICE_XZ)) ||
+			    (SliceWindow_GetID(SLICE_YZ) && wid == SliceWindow_GetID(SLICE_YZ)))
+				break;
+		}
 		// if mouse hasn't moved yet, sdl will send 0,0. We don't want that
 		if (hasMouseMoved)
 		{
@@ -507,6 +534,9 @@ std::optional<uint64_t> EngineProcess()
 	{
 		EventProcess(event);
 		if (CubeTest_IsOpen()) CubeTest_HandleEvent(event);
+		for (int p = 0; p < 3; p++)
+			if (SliceWindow_IsOpen((SlicePlane)p))
+				SliceWindow_HandleEvent((SlicePlane)p, event);
 	}
 
 	std::optional<uint64_t> delay;
@@ -546,6 +576,9 @@ std::optional<uint64_t> EngineProcess()
 		SDLSetScreen();
 		blit(engine.g->Data());
 		if (CubeTest_IsOpen()) CubeTest_Render();
+		for (int p = 0; p < 3; p++)
+			if (SliceWindow_IsOpen((SlicePlane)p))
+				SliceWindow_Render((SlicePlane)p);
 	}
 	if (effectiveDrawLimit)
 	{

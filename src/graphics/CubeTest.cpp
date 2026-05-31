@@ -801,3 +801,139 @@ Uint32 CubeTest_GetWindowID()
 {
 	return g_win ? SDL_GetWindowID(g_win) : 0;
 }
+
+// ============ 3 orthogonal 2D slice windows ============
+struct SliceWin {
+	SDL_Window *win = nullptr;
+	SDL_GLContext gl = nullptr;
+	int w = 400, h = 400;
+};
+static SliceWin g_slice[3];
+static const char *g_sliceTitle[3] = {
+	"TPT Slice: XY (Z=brush)",
+	"TPT Slice: XZ (Y=brush)",
+	"TPT Slice: YZ (X=brush)"
+};
+
+bool SliceWindow_Init(SlicePlane plane)
+{
+#ifdef _WIN32
+	auto &s = g_slice[plane];
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	s.win = SDL_CreateWindow(g_sliceTitle[plane],
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		s.w, s.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	if (!s.win) return false;
+	s.gl = SDL_GL_CreateContext(s.win);
+	return s.gl != nullptr;
+#else
+	return false;
+#endif
+}
+
+void SliceWindow_Render(SlicePlane plane)
+{
+#ifdef _WIN32
+	auto &s = g_slice[plane];
+	if (!s.win || !s.gl || !g_sim) return;
+	SDL_GL_MakeCurrent(s.win, s.gl);
+	glClearColor(0.05f, 0.05f, 0.08f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, s.w, s.h, 0, -1, 1);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	auto &sd = SimulationData::CRef();
+	auto &el = sd.elements;
+
+	float lockVal;
+	if (plane == SLICE_XY) lockVal = g_brushPZ;
+	else if (plane == SLICE_XZ) lockVal = g_brushPY;
+	else lockVal = g_brushPX;
+
+	float scale = (float)s.w / (float)XRES; // square 384×384 grid
+
+	// Particles near slice plane
+	glPointSize(2.5f);
+	glBegin(GL_POINTS);
+	for (int i = 0; i < g_sim->parts.active; i++)
+	{
+		if (!g_sim->parts[i].type) continue;
+		int t = g_sim->parts[i].type;
+		if (t <= 0 || t >= PT_NUM) continue;
+		auto col = el[t].Colour;
+		glColor3ub(col.Red, col.Green, col.Blue);
+
+		float px = g_sim->parts[i].x, py = g_sim->parts[i].y, pz = g_sim->parts[i].z;
+		int sx, sy;
+		if (plane == SLICE_XY) {
+			if (fabsf(pz - lockVal) > 1.5f) continue;
+			sx = (int)(px * scale); sy = (int)(py * scale);
+		} else if (plane == SLICE_XZ) {
+			if (fabsf(py - lockVal) > 1.5f) continue;
+			sx = (int)(px * scale); sy = (int)((ZMAX - 1 - pz) * scale);
+		} else {
+			if (fabsf(px - lockVal) > 1.5f) continue;
+			sx = (int)(pz * scale); sy = (int)(py * scale);
+		}
+		glVertex2i(sx, sy);
+	}
+	glEnd();
+	glPointSize(1.0f);
+
+	// Brush crosshair
+	int bx, by;
+	if (plane == SLICE_XY) {
+		bx = (int)(g_brushPX * scale); by = (int)(g_brushPY * scale);
+	} else if (plane == SLICE_XZ) {
+		bx = (int)(g_brushPX * scale); by = (int)((ZMAX - 1 - g_brushPZ) * scale);
+	} else {
+		bx = (int)(g_brushPZ * scale); by = (int)(g_brushPY * scale);
+	}
+	int cs = 8;
+	glColor3f(1, 1, 0);
+	glBegin(GL_LINES);
+	glVertex2i(bx-cs, by); glVertex2i(bx+cs, by);
+	glVertex2i(bx, by-cs); glVertex2i(bx, by+cs);
+	glEnd();
+
+	// Title bar text
+	char title[64];
+	snprintf(title, sizeof(title), "%s  Z:%.0f", g_sliceTitle[plane],
+		plane == SLICE_XY ? g_brushPZ : plane == SLICE_XZ ? g_brushPY : g_brushPX);
+	SDL_SetWindowTitle(s.win, title);
+
+	SDL_GL_SwapWindow(s.win);
+#endif
+}
+
+void SliceWindow_HandleEvent(SlicePlane plane, const SDL_Event &e)
+{
+	auto &s = g_slice[plane];
+	if (!s.win) return;
+	auto wid = SDL_GetWindowID(s.win);
+	if (e.type == SDL_WINDOWEVENT && e.window.windowID == wid)
+	{
+		if (e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
+		{ s.w = e.window.data1; s.h = e.window.data2; }
+		else if (e.window.event == SDL_WINDOWEVENT_CLOSE)
+		{ SliceWindow_Shutdown(plane); }
+	}
+}
+
+void SliceWindow_Shutdown(SlicePlane plane)
+{
+	auto &s = g_slice[plane];
+	if (s.gl) { SDL_GL_DeleteContext(s.gl); s.gl = nullptr; }
+	if (s.win) { SDL_DestroyWindow(s.win); s.win = nullptr; }
+}
+
+bool SliceWindow_IsOpen(SlicePlane plane) { return g_slice[plane].win != nullptr; }
+
+Uint32 SliceWindow_GetID(SlicePlane plane)
+{
+	return g_slice[plane].win ? SDL_GetWindowID(g_slice[plane].win) : 0;
+}

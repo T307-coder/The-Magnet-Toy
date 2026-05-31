@@ -23,3 +23,12 @@ void CubeTest_Shutdown();
 bool CubeTest_IsOpen();
 void CubeTest_ToggleCamControl(); // 'C' key toggles camera-drag mode
 Uint32 CubeTest_GetWindowID();    // SDL window ID of 3D viewport, 0 if closed
+
+// ---- 3 orthogonal 2D slice windows (XY, XZ, YZ at brush position) ----
+enum SlicePlane { SLICE_XY=0, SLICE_XZ=1, SLICE_YZ=2 };
+bool SliceWindow_Init(SlicePlane plane);
+void SliceWindow_Render(SlicePlane plane);
+void SliceWindow_HandleEvent(SlicePlane plane, const SDL_Event &e);
+void SliceWindow_Shutdown(SlicePlane plane);
+bool SliceWindow_IsOpen(SlicePlane plane);
+Uint32 SliceWindow_GetID(SlicePlane plane);
