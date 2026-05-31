@@ -167,6 +167,14 @@ public:
 	void InitElecFFT();
 	void ComputeEField();
 
+	struct AsyncFieldSolver;
+	std::unique_ptr<AsyncFieldSolver> asyncFields;
+	bool asyncFieldsEnabled = true;
+	void InitAsyncFields();
+	void EnableAsyncFields(bool enable);
+	void DispatchAsyncFields();
+	void WaitAsyncFields();
+
 	Particle portalp[CHANNELS][8][80];
 	int wireless[CHANNELS][2];
 
