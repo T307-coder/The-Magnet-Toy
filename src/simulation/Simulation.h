@@ -173,7 +173,7 @@ struct CopiableSimulation : public RenderableSimulation
 
 	struct AsyncFieldSolver;
 	std::unique_ptr<AsyncFieldSolver> asyncFields;
-	bool asyncFieldsEnabled = false;
+	bool asyncFieldsEnabled = true;
 	void InitAsyncFields();
 	void EnableAsyncFields(bool enable);
 	void DispatchAsyncFields();
