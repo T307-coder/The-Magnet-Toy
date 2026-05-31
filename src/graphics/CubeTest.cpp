@@ -3,6 +3,7 @@
 #include "SimulationConfig.h"
 #include "simulation/Simulation.h"
 #include "simulation/SimulationData.h"
+#include "gui/game/GameController.h"
 #ifdef _WIN32
 #include <windows.h>
 #include <GL/gl.h>
@@ -40,8 +41,9 @@ static bool g_xHeld = false;      // X key → Z-axis scroll
 static const int ZMAX = 384;     // Z extent (matches YRES for cubic volume)
 
 // Tool modes for 3D drawing (matching 2D tool concepts)
-static bool g_lineMode = false;   // Shift+left: 3D line
-static bool g_rectMode = false;   // Ctrl+left: 3D cuboid
+static bool g_lineMode = false;   // Shift+left/right: 3D line
+static bool g_rectMode = false;   // Ctrl+left/right: 3D cuboid
+static bool g_toolDelete = false; // true = delete mode, false = place mode
 static float g_toolStartX, g_toolStartY, g_toolStartZ; // anchor point for line/rect
 // Cached matrices for gluUnProject
 static double g_proj[16], g_modelview[16];
@@ -194,15 +196,16 @@ void CubeTest_Render()
 		float ex = g_brushPX, ey = g_brushPY, ez = g_brushPZ;
 		float sx = g_toolStartX, sy = g_toolStartY, sz = g_toolStartZ;
 		glBegin(GL_LINES);
-		if (g_lineMode) // Magenta line
+		bool del = g_toolDelete;
+		if (g_lineMode) // Line preview: magenta (place) / red (delete)
 		{
-			glColor3f(1.0f, 0.3f, 1.0f);
+			glColor3f(del ? 1.0f : 1.0f, del ? 0.2f : 0.3f, del ? 0.2f : 1.0f);
 			glVertex3f(sx, sy, sz);
 			glVertex3f(ex, ey, ez);
 		}
-		else // Cyan cuboid wireframe
+		else // Cuboid wireframe: cyan (place) / red (delete)
 		{
-			glColor3f(0.3f, 1.0f, 1.0f);
+			glColor3f(del ? 1.0f : 0.3f, del ? 0.2f : 1.0f, del ? 0.2f : 1.0f);
 			// 12 edges from (sx,sy,sz) to (ex,ey,ez)
 			glVertex3f(sx,sy,sz); glVertex3f(ex,sy,sz);
 			glVertex3f(sx,ey,sz); glVertex3f(ex,ey,sz);
@@ -225,7 +228,8 @@ void CubeTest_Render()
 	{
 		float bx = g_brushPX, by = g_brushPY, bz = g_brushPZ;
 		float rx = g_brushRX, ry = g_brushRY, rz = g_brushRZ;
-		glColor3f(1.0f, 1.0f, 0.3f);
+		bool delPreview = g_deleting;
+		glColor3f(delPreview ? 1.0f : 1.0f, delPreview ? 0.3f : 1.0f, 0.3f);
 		glBegin(GL_LINES);
 
 		if (g_brushShape == 0) // Cube wireframe
@@ -467,8 +471,11 @@ void CubeTest_RotateView(int dir)
 
 void CubeTest_AdjustLayer(int delta)
 {
-	// Directly shift brush Z for persistent 3D positioning
-	g_brushPZ += (float)delta;
+	// Adjust the locked axis based on current view plane (clamped to volume bounds)
+	int v2d = CubeTest_Get2DViewMode();
+	if (v2d == 0)      { g_brushPZ += (float)delta; if (g_brushPZ < 0) g_brushPZ = 0; if (g_brushPZ >= ZMAX) g_brushPZ = ZMAX-1; }
+	else if (v2d == 1) { g_brushPY += (float)delta; if (g_brushPY < 0) g_brushPY = 0; if (g_brushPY >= YRES) g_brushPY = YRES-1; }
+	else               { g_brushPX += (float)delta; if (g_brushPX < 0) g_brushPX = 0; if (g_brushPX >= XRES) g_brushPX = XRES-1; }
 }
 
 void CubeTest_SetBrush(int x, int y, int rx, int ry)
@@ -625,12 +632,14 @@ static void FloodFill3D(int sx, int sy, int sz)
 }
 
 // Draw 3D line with brush shape from (sx,sy,sz) to (ex,ey,ez)
-static void DrawLine3D(int sx, int sy, int sz, int ex, int ey, int ez)
+// mode: 0=place, 1=delete
+static void DrawLine3D(int sx, int sy, int sz, int ex, int ey, int ez, int mode = 0)
 {
-	if (!g_sim || g_activeToolType <= 0) return;
+	if (!g_sim) return;
+	if (mode == 0 && g_activeToolType <= 0) return;
 	float dx = (float)(ex - sx), dy = (float)(ey - sy), dz = (float)(ez - sz);
 	int steps = (int)ceilf(sqrtf(dx*dx + dy*dy + dz*dz));
-	if (steps <= 0) { BrushAction(sx, sy, sz, 0); return; }
+	if (steps <= 0) { BrushAction(sx, sy, sz, mode); return; }
 
 	for (int s = 0; s <= steps; s++)
 	{
@@ -638,7 +647,71 @@ static void DrawLine3D(int sx, int sy, int sz, int ex, int ey, int ez)
 		int px = (int)((float)sx + dx * t + 0.5f);
 		int py = (int)((float)sy + dy * t + 0.5f);
 		int pz = (int)((float)sz + dz * t + 0.5f);
-		BrushAction(px, py, pz, 0);
+		BrushAction(px, py, pz, mode);
+	}
+}
+
+// 3D flood delete: BFS following connected same-type particles and deleting them
+static void FloodDelete3D(int sx, int sy, int sz)
+{
+	if (!g_sim) return;
+	auto *sim = const_cast<Simulation *>(g_sim);
+	if (sx<0||sy<0||sz<0||sx>=XRES||sy>=YRES||sz>=ZMAX) return;
+
+	// Find target type at start position
+	int targetType = 0;
+	int targetIdx = -1;
+	for (int i = 0; i < sim->parts.active; i++)
+	{
+		if (!sim->parts[i].type) continue;
+		int px = (int)(sim->parts[i].x + 0.5f);
+		int py = (int)(sim->parts[i].y + 0.5f);
+		int pz = (int)(sim->parts[i].z + 0.5f);
+		if (px == sx && py == sy && pz == sz) { targetType = sim->parts[i].type; targetIdx = i; break; }
+	}
+	if (targetType <= 0) return; // nothing to delete
+
+	// BFS following same-type particles (6-directional)
+	std::vector<int> qx, qy, qz;
+	qx.reserve(1024); qy.reserve(1024); qz.reserve(1024);
+	qx.push_back(sx); qy.push_back(sy); qz.push_back(sz);
+
+	// Use a simple visited tracking: we mark deleted particles by type=0
+	// and use kill_part which also removes from pmap.
+	// But we need to avoid infinite loops, so track visited positions.
+	// Since we're deleting as we go, we just need to find neighbors first.
+	sim->kill_part(targetIdx); // delete the seed
+
+	int count = 1;
+	while (!qx.empty())
+	{
+		int cx = qx.back(); qx.pop_back();
+		int cy = qy.back(); qy.pop_back();
+		int cz = qz.back(); qz.pop_back();
+
+		// Check 6 neighbors
+		static const int dirs[6][3] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+		for (int d = 0; d < 6; d++)
+		{
+			int nx = cx + dirs[d][0], ny = cy + dirs[d][1], nz = cz + dirs[d][2];
+			if (nx<0||ny<0||nz<0||nx>=XRES||ny>=YRES||nz>=ZMAX) continue;
+
+			for (int i = 0; i < sim->parts.active; i++)
+			{
+				if (!sim->parts[i].type || sim->parts[i].type != targetType) continue;
+				int px = (int)(sim->parts[i].x + 0.5f);
+				int py = (int)(sim->parts[i].y + 0.5f);
+				int pz = (int)(sim->parts[i].z + 0.5f);
+				if (px == nx && py == ny && pz == nz)
+				{
+					qx.push_back(nx); qy.push_back(ny); qz.push_back(nz);
+					sim->kill_part(i);
+					if (++count > 50000) { qx.clear(); break; } // safety limit
+					break;
+				}
+			}
+			if (count > 50000) break;
+		}
 	}
 }
 
@@ -814,6 +887,11 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 {
 	if (!g_win) return;
 	auto wid = SDL_GetWindowID(g_win);
+	// Helper: take history snapshot before first mutation in a gesture
+	auto snap = [&]() {
+		if (!g_placing && !g_deleting && !g_lineMode && !g_rectMode)
+			GameController::Ref().HistorySnapshot();
+	};
 	if (e.type == SDL_WINDOWEVENT && e.window.windowID == wid)
 	{
 		if (e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
@@ -852,31 +930,59 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		if ((SDL_GetModState() & KMOD_CTRL) && (SDL_GetModState() & KMOD_SHIFT))
 		{
 			// Ctrl+Shift: 3D flood fill
+			snap();
 			FloodFill3D((int)(g_brushPX+0.5f), (int)(g_brushPY+0.5f), (int)(g_brushPZ+0.5f));
 		}
 		else if (SDL_GetModState() & KMOD_CTRL)
 		{
 			// Ctrl: rect mode
 			g_rectMode = true;
+			g_toolDelete = false;
 			g_toolStartX = g_brushPX; g_toolStartY = g_brushPY; g_toolStartZ = g_brushPZ;
 		}
 		else if (g_shiftHeld)
 		{
 			// Shift: line mode
 			g_lineMode = true;
+			g_toolDelete = false;
 			g_toolStartX = g_brushPX; g_toolStartY = g_brushPY; g_toolStartZ = g_brushPZ;
 		}
 		else
 		{
+			snap();
 			g_placing = true;
 			PlaceParticleAtBrush();
 		}
 	}
-	// Right click: delete (same as before)
+	// Right click: delete — with modifier support for line/rect/fill
 	if (e.type == SDL_MOUSEBUTTONDOWN && e.button.button == SDL_BUTTON_RIGHT && e.button.windowID == wid)
 	{
-		g_deleting = true;
-		BrushAction((int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f),1);
+		if ((SDL_GetModState() & KMOD_CTRL) && (SDL_GetModState() & KMOD_SHIFT))
+		{
+			// Ctrl+Shift+Right: 3D flood delete (same-type connected)
+			snap();
+			FloodDelete3D((int)(g_brushPX+0.5f), (int)(g_brushPY+0.5f), (int)(g_brushPZ+0.5f));
+		}
+		else if (SDL_GetModState() & KMOD_CTRL)
+		{
+			// Ctrl+Right: rect delete mode
+			g_rectMode = true;
+			g_toolDelete = true;
+			g_toolStartX = g_brushPX; g_toolStartY = g_brushPY; g_toolStartZ = g_brushPZ;
+		}
+		else if (g_shiftHeld)
+		{
+			// Shift+Right: line delete mode
+			g_lineMode = true;
+			g_toolDelete = true;
+			g_toolStartX = g_brushPX; g_toolStartY = g_brushPY; g_toolStartZ = g_brushPZ;
+		}
+		else
+		{
+			snap();
+			g_deleting = true;
+			BrushAction((int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f),1);
+		}
 	}
 	// Release: execute line/rect or stop brush
 	if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_LEFT)
@@ -885,7 +991,7 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		{
 			g_lineMode = false;
 			DrawLine3D((int)(g_toolStartX+0.5f),(int)(g_toolStartY+0.5f),(int)(g_toolStartZ+0.5f),
-			           (int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f));
+			           (int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f), 0);
 		}
 		else if (g_rectMode)
 		{
@@ -897,10 +1003,19 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 			int y1 = sy<ey ? sy : ey, y2 = sy>ey ? sy : ey;
 			int z1 = sz<ez ? sz : ez, z2 = sz>ez ? sz : ez;
 			auto *sim = const_cast<Simulation *>(g_sim);
-			for (int x=x1; x<=x2; x++)
-				for (int y=y1; y<=y2; y++)
-					for (int z=z1; z<=z2; z++)
-						CreatePart3D(sim, x, y, z, g_activeToolType);
+			int mode = g_toolDelete ? 1 : 0;
+			if (mode == 0) {
+				for (int x=x1; x<=x2; x++)
+					for (int y=y1; y<=y2; y++)
+						for (int z=z1; z<=z2; z++)
+							CreatePart3D(sim, x, y, z, g_activeToolType);
+			} else {
+				for (int x=x1; x<=x2; x++)
+					for (int y=y1; y<=y2; y++)
+						for (int z=z1; z<=z2; z++)
+							BrushAction(x, y, z, 1);
+			}
+			g_toolDelete = false;
 		}
 		else
 		{
@@ -910,7 +1025,31 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 	}
 	if (e.type == SDL_MOUSEBUTTONUP && e.button.button == SDL_BUTTON_RIGHT)
 	{
-		g_deleting = false;
+		if (g_lineMode)
+		{
+			g_lineMode = false;
+			DrawLine3D((int)(g_toolStartX+0.5f),(int)(g_toolStartY+0.5f),(int)(g_toolStartZ+0.5f),
+			           (int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f), 1);
+			g_toolDelete = false;
+		}
+		else if (g_rectMode)
+		{
+			g_rectMode = false;
+			int sx = (int)(g_toolStartX+0.5f), sy = (int)(g_toolStartY+0.5f), sz = (int)(g_toolStartZ+0.5f);
+			int ex = (int)(g_brushPX+0.5f), ey = (int)(g_brushPY+0.5f), ez = (int)(g_brushPZ+0.5f);
+			int x1 = sx<ex ? sx : ex, x2 = sx>ex ? sx : ex;
+			int y1 = sy<ey ? sy : ey, y2 = sy>ey ? sy : ey;
+			int z1 = sz<ez ? sz : ez, z2 = sz>ez ? sz : ez;
+			for (int x=x1; x<=x2; x++)
+				for (int y=y1; y<=y2; y++)
+					for (int z=z1; z<=z2; z++)
+						BrushAction(x, y, z, 1);
+			g_toolDelete = false;
+		}
+		else
+		{
+			g_deleting = false;
+		}
 	}
 	// Scroll in 3D window: uniform or per-axis resize
 	if (e.type == SDL_MOUSEWHEEL && e.wheel.windowID == wid)

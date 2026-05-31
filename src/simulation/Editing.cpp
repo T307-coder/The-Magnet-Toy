@@ -11,6 +11,9 @@
 #include <iostream>
 #include <cmath>
 
+extern int   CubeTest_Get2DViewMode();
+extern float CubeTest_Get2DLockedVal();
+
 std::unique_ptr<Snapshot> Simulation::CreateSnapshot() const
 {
 	auto snap = std::make_unique<Snapshot>();
@@ -366,6 +369,16 @@ int Simulation::FloodWalls(int x, int y, int wall, int bm)
 
 int Simulation::CreatePartFlags(int p, int x, int y, int c, int flags)
 {
+	// 3D remap for non-place (delete/replace) brush ops: translate 2D coords to locked slice.
+	// Placement goes through create_part which does its own remapping including setZ.
+	int view2D = 0;
+	float lockVal = 0;
+	if (p == -2)
+	{
+		view2D = CubeTest_Get2DViewMode();
+		lockVal = CubeTest_Get2DLockedVal();
+	}
+
 	if (x < 0 || y < 0 || x >= XRES || y >= YRES)
 	{
 		return 0;
@@ -373,35 +386,89 @@ int Simulation::CreatePartFlags(int p, int x, int y, int c, int flags)
 
 	if (flags & REPLACE_MODE)
 	{
-		// if replace whatever and there's something to replace
-		// or replace X and there's a non-energy particle on top with type X
-		// or replace X and there's an energy particle on top with type X
-		if ((!replaceModeSelected && (photons[y][x] || pmap[y][x])) ||
-			(!photons[y][x] && pmap[y][x] && TYP(pmap[y][x]) == replaceModeSelected) ||
-			(photons[y][x] && TYP(photons[y][x]) == replaceModeSelected))
+		// 3D remap for replace: translate to locked slice position
+		int rx = x, ry = y;
+		if (p == -2)
+		{
+			if (view2D == 1) { ry = (int)(lockVal + 0.5f); }
+			else if (view2D == 2) { rx = (int)(lockVal + 0.5f); }
+		}
+		if ((!replaceModeSelected && (photons[ry][rx] || pmap[ry][rx])) ||
+			(!photons[ry][rx] && pmap[ry][rx] && TYP(pmap[ry][rx]) == replaceModeSelected) ||
+			(photons[ry][rx] && TYP(photons[ry][rx]) == replaceModeSelected))
 		{
 			if (c)
-				create_part(photons[y][x] ? ID(photons[y][x]) : ID(pmap[y][x]), x, y, TYP(c), ID(c));
+				create_part(photons[ry][rx] ? ID(photons[ry][rx]) : ID(pmap[ry][rx]), rx, ry, TYP(c), ID(c));
 			else
-				delete_part(x, y);
+				delete_part(rx, ry);
 		}
 		return 0;
 	}
 	else if (!c)
 	{
-		delete_part(x, y);
+		// Save original 2D coords before remapping, needed for 3D position calc
+		int origX = x, origY = y;
+		// 3D remap for delete: translate 2D coords to locked slice
+		if (p == -2)
+		{
+			if (view2D == 1) { y = (int)(lockVal + 0.5f); }
+			else if (view2D == 2) { x = (int)(lockVal + 0.5f); }
+		}
+		if (p == -2)
+		{
+			// All views: find particle by true 3D position (Z-aware, no cross-layer)
+			int tgtX, tgtY, tgtZ;
+			if (view2D == 0)      { tgtX = origX; tgtY = origY; tgtZ = (int)(lockVal + 0.5f); }
+			else if (view2D == 1) { tgtX = origX; tgtY = y; tgtZ = YRES - 1 - origY; }
+			else                  { tgtX = x; tgtY = origY; tgtZ = origX; }
+			for (int i = 0; i < parts.active; i++)
+			{
+				if (!parts[i].type) continue;
+				if ((int)(parts[i].x+0.5f) == tgtX &&
+				    (int)(parts[i].y+0.5f) == tgtY &&
+				    (int)(parts[i].z+0.5f) == tgtZ)
+				{
+					kill_part(i);
+					break;
+				}
+			}
+		}
+		else
+		{
+			delete_part(x, y);
+		}
 		return 0;
 	}
 	else if (flags & SPECIFIC_DELETE)
 	{
-		// if delete whatever and there's something to delete
-		// or delete X and there's a non-energy particle on top with type X
-		// or delete X and there's an energy particle on top with type X
-		if ((!replaceModeSelected && (photons[y][x] || pmap[y][x])) ||
-			(!photons[y][x] && pmap[y][x] && TYP(pmap[y][x]) == replaceModeSelected) ||
-			(photons[y][x] && TYP(photons[y][x]) == replaceModeSelected))
+		int origX = x, origY = y;
+		// 3D remap for specific delete
+		int rx = x, ry = y;
+		if (p == -2)
 		{
-			delete_part(x, y);
+			if (view2D == 1) { ry = (int)(lockVal + 0.5f); }
+			else if (view2D == 2) { rx = (int)(lockVal + 0.5f); }
+		}
+		if (view2D != 0 && p == -2)
+		{
+			// Non-XY: scan by 3D position, delete if found
+			int tgtX, tgtY, tgtZ;
+			if (view2D == 1) { tgtX = origX; tgtY = ry; tgtZ = YRES - 1 - origY; }
+			else             { tgtX = rx; tgtY = origY; tgtZ = origX; }
+			for (int i = 0; i < parts.active; i++)
+			{
+				if (!parts[i].type) continue;
+				if ((int)(parts[i].x+0.5f) == tgtX &&
+				    (int)(parts[i].y+0.5f) == tgtY &&
+				    (int)(parts[i].z+0.5f) == tgtZ)
+					{ kill_part(i); break; }
+			}
+		}
+		else if ((!replaceModeSelected && (photons[ry][rx] || pmap[ry][rx])) ||
+			(!photons[ry][rx] && pmap[ry][rx] && TYP(pmap[ry][rx]) == replaceModeSelected) ||
+			(photons[ry][rx] && TYP(photons[ry][rx]) == replaceModeSelected))
+		{
+			delete_part(rx, ry);
 		}
 		return 0;
 	}
@@ -410,7 +477,6 @@ int Simulation::CreatePartFlags(int p, int x, int y, int c, int flags)
 		return (create_part(p, x, y, TYP(c), ID(c)) == -1);
 	}
 
-	// I'm sure at least one compiler exists that would complain if this wasn't here
 	return 0;
 }
 

@@ -271,19 +271,19 @@ void Renderer::render_parts()
 	stats.foundParticles = 0;
 	for(i = 0; i < sim->parts.active; i++) {
 		if (sim->parts[i].type && sim->parts[i].type >= 0 && sim->parts[i].type < PT_NUM) {
-			// 3D view-dependent slice filter + coordinate remap
+			// 3D view-dependent slice filter (exact layer ±0.5)
 			int view2D = CubeTest_Get2DViewMode();
 			float lockVal = CubeTest_Get2DLockedVal();
 			if (view2D == 0) { // XY plane (normal)
-				if (fabsf(sim->parts[i].z - lockVal) > 1.5f) continue;
+				if (fabsf(sim->parts[i].z - lockVal) > 0.5f) continue;
 				nx = (int)(sim->parts[i].x+0.5f);
 				ny = (int)(sim->parts[i].y+0.5f);
 			} else if (view2D == 1) { // XZ plane (Top/Bottom)
-				if (fabsf(sim->parts[i].y - lockVal) > 1.5f) continue;
+				if (fabsf(sim->parts[i].y - lockVal) > 0.5f) continue;
 				nx = (int)(sim->parts[i].x+0.5f);
 				ny = (int)((YRES - 1 - sim->parts[i].z)+0.5f);
 			} else { // YZ plane (Right/Left)
-				if (fabsf(sim->parts[i].x - lockVal) > 1.5f) continue;
+				if (fabsf(sim->parts[i].x - lockVal) > 0.5f) continue;
 				nx = (int)(sim->parts[i].z+0.5f);
 				ny = (int)(sim->parts[i].y+0.5f);
 			}

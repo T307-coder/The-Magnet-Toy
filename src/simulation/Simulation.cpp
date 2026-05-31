@@ -2170,14 +2170,25 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		// In XZ/YZ slice views, pmap is degenerate (many 3D particles share
 		// the same pmap cell) and walls are a 2D concept. Skip these checks.
+		// In XY view, also check Z — don't block if existing particle is on a different layer.
 		if (view2D == 0)
 		{
 			if (pmap[y][x])
 			{
-				int drawOn = TYP(pmap[y][x]);
-				if (elements[drawOn].CtypeDraw)
-					elements[drawOn].CtypeDraw(this, ID(pmap[y][x]), t, v);
-				return -1;
+				int existing = ID(pmap[y][x]);
+				// If existing particle is on a different Z slice, allow placement
+				if (fabsf(parts[existing].z - lockVal) > 0.5f)
+				{
+					// Different layer: don't block, but clear old pmap entry
+					// (old particle still exists in parts[], just loses pmap slot)
+				}
+				else
+				{
+					int drawOn = TYP(pmap[y][x]);
+					if (elements[drawOn].CtypeDraw)
+						elements[drawOn].CtypeDraw(this, ID(pmap[y][x]), t, v);
+					return -1;
+				}
 			}
 			if (IsWallBlocking(x, y, t))
 				return -1;
@@ -2242,7 +2253,13 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].tmp6 = 0;
 
 	//and finally set the pmap/photon maps to the newly created particle
-	if (elements[t].Properties & TYPE_ENERGY)
+	// In XZ/YZ slice views, pmap is 2D and can't represent 3D space.
+	// Skip pmap so particles at different Z can coexist at same (x,y).
+	if (view2D != 0 && p == -2)
+	{
+		// Non-XY brush: no pmap entry (3D position stored in parts[i].x/y/z)
+	}
+	else if (elements[t].Properties & TYPE_ENERGY)
 		photons[y][x] = PMAP(i, t);
 	else if (t!=PT_STKM && t!=PT_STKM2 && t!=PT_FIGH)
 		pmap[y][x] = PMAP(i, t);

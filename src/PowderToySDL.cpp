@@ -8,8 +8,6 @@
 #include "common/platform/Platform.h"
 
 extern bool g_camControl; // from CubeTest.cpp
-static bool g_layerSelect = false; // Z held: mouse Y draggs layer
-static int g_prevMouseY = 0;
 #include "common/clipboard/Clipboard.h"
 #include "FrameSchedule.h"
 #include <iostream>
@@ -322,11 +320,10 @@ static void EventProcess(const SDL_Event &event)
 		if (event.key.keysym.scancode == SDL_SCANCODE_DOWN)  { CubeTest_RotateView(1); break; }
 		if (event.key.keysym.scancode == SDL_SCANCODE_LEFT)  { CubeTest_RotateView(2); break; }
 		if (event.key.keysym.scancode == SDL_SCANCODE_RIGHT) { CubeTest_RotateView(3); break; }
-		// 'Z' held: mouse Y drags layer selector
-		if (event.key.keysym.scancode == SDL_SCANCODE_Z)
-			{ g_layerSelect = true; g_prevMouseY = mousey; break; }
-		// 'C' held: free-look 3D camera (mouse drag, brush disabled)
-		if (event.key.keysym.scancode == SDL_SCANCODE_C)
+		// 'Z' passes through to engine for zoom toggle (original TPT behavior)
+		// Ctrl+Z = undo, handled by engine
+		// 'C' held: free-look 3D camera (only without Ctrl, so Ctrl+C = copy)
+		if (event.key.keysym.scancode == SDL_SCANCODE_C && !(event.key.keysym.mod & KMOD_CTRL))
 			{ g_camControl = true; break; }
 		// 'G' toggles Z-axis grid in 3D view
 		if (event.key.keysym.scancode == SDL_SCANCODE_G)
@@ -345,6 +342,11 @@ static void EventProcess(const SDL_Event &event)
 			{ CubeTest_ResizeBrush(-1, 0); break; }
 		if (event.key.keysym.scancode == SDL_SCANCODE_RIGHTBRACKET)
 			{ CubeTest_ResizeBrush(1, 0); break; }
+		// PageUp/PageDown: navigate layers (adjust slice perpendicular to view plane)
+		if (event.key.keysym.scancode == SDL_SCANCODE_PAGEUP)
+			{ CubeTest_AdjustLayer(1); break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_PAGEDOWN)
+			{ CubeTest_AdjustLayer(-1); break; }
 		// X key + scroll: resize Z axis (scroll handled in 3D window)
 		// Shift+scroll: X axis, Alt+scroll: Y axis (handled in 3D window)
 		if (engine.GetGlobalQuit() && ALLOW_QUIT && !event.key.repeat && event.key.keysym.sym == 'q' && (event.key.keysym.mod&KMOD_CTRL) && !(event.key.keysym.mod&KMOD_ALT))
@@ -354,8 +356,7 @@ static void EventProcess(const SDL_Event &event)
 		break;
 	case SDL_KEYUP:
 		if (SDL_GetModState() & KMOD_GUI) break;
-		if (event.key.keysym.scancode == SDL_SCANCODE_Z) { g_layerSelect = false; break; }
-		if (event.key.keysym.scancode == SDL_SCANCODE_C) { g_camControl = false; break; }
+		if (event.key.keysym.scancode == SDL_SCANCODE_C && !(event.key.keysym.mod & KMOD_CTRL)) { g_camControl = false; break; }
 		engine.onKeyRelease(event.key.keysym.sym, event.key.keysym.scancode, event.key.repeat, event.key.keysym.mod&KMOD_SHIFT, event.key.keysym.mod&KMOD_CTRL, event.key.keysym.mod&KMOD_ALT);
 		break;
 	case SDL_TEXTINPUT:
@@ -398,11 +399,6 @@ static void EventProcess(const SDL_Event &event)
 			static int clx = 0, cly = 0;
 			if (clx) CubeTest_Rotate(event.motion.x - clx, event.motion.y - cly);
 			clx = event.motion.x; cly = event.motion.y;
-		}
-		else if (g_layerSelect)
-		{
-			int dy = g_prevMouseY - event.motion.y;
-			if (dy) { CubeTest_AdjustLayer(dy / 5); g_prevMouseY = event.motion.y; }
 		}
 		else
 		{
