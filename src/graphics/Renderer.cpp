@@ -5,6 +5,7 @@
 #include "RasterDrawMethodsImpl.h"
 #include "common/tpt-rand.h"
 #include "gui/game/RenderPreset.h"
+#include "CubeTest.h"
 #include "simulation/Simulation.h"
 #include "simulation/ElementGraphics.h"
 #include "simulation/ElementClasses.h"
@@ -270,12 +271,23 @@ void Renderer::render_parts()
 	stats.foundParticles = 0;
 	for(i = 0; i < sim->parts.active; i++) {
 		if (sim->parts[i].type && sim->parts[i].type >= 0 && sim->parts[i].type < PT_NUM) {
-			// Layer filter: only render particles on the selected Z layer
-			if (int(sim->parts[i].z + 0.5f) != sim->selectedLayer) continue;
+			// 3D view-dependent slice filter + coordinate remap
+			int view2D = CubeTest_Get2DViewMode();
+			float lockVal = CubeTest_Get2DLockedVal();
+			if (view2D == 0) { // XY plane (normal)
+				if (fabsf(sim->parts[i].z - lockVal) > 1.5f) continue;
+				nx = (int)(sim->parts[i].x+0.5f);
+				ny = (int)(sim->parts[i].y+0.5f);
+			} else if (view2D == 1) { // XZ plane (Top/Bottom)
+				if (fabsf(sim->parts[i].y - lockVal) > 1.5f) continue;
+				nx = (int)(sim->parts[i].x+0.5f);
+				ny = (int)((YRES - 1 - sim->parts[i].z)+0.5f);
+			} else { // YZ plane (Right/Left)
+				if (fabsf(sim->parts[i].x - lockVal) > 1.5f) continue;
+				nx = (int)(sim->parts[i].z+0.5f);
+				ny = (int)(sim->parts[i].y+0.5f);
+			}
 			t = sim->parts[i].type;
-
-			nx = (int)(sim->parts[i].x+0.5f);
-			ny = (int)(sim->parts[i].y+0.5f);
 
 			if(nx >= XRES || nx < 0 || ny >= YRES || ny < 0)
 				continue;

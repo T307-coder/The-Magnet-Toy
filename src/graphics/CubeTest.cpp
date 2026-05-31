@@ -802,6 +802,22 @@ Uint32 CubeTest_GetWindowID()
 	return g_win ? SDL_GetWindowID(g_win) : 0;
 }
 
+int CubeTest_Get2DViewMode()
+{
+	// Map 3D view to 2D plane: Front/Back=XY, Top/Bottom=XZ, Right/Left=YZ
+	if (g_viewMode == 0 || g_viewMode == 3) return 0; // XY
+	if (g_viewMode == 1 || g_viewMode == 4) return 1; // XZ
+	return 2; // YZ
+}
+
+float CubeTest_Get2DLockedVal()
+{
+	int mode = CubeTest_Get2DViewMode();
+	if (mode == 0) return g_brushPZ; // XY: Z locked
+	if (mode == 1) return g_brushPY; // XZ: Y locked
+	return g_brushPX; // YZ: X locked
+}
+
 // ============ 3 orthogonal 2D slice windows ============
 struct SliceWin {
 	SDL_Window *win = nullptr;
