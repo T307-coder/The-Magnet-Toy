@@ -2116,19 +2116,22 @@ bool Simulation::part_change_type(int i, int x, int y, int t)
 //tv = Type (PMAPBITS bits) + Var (32-PMAPBITS bits), var is usually 0
 int Simulation::create_part(int p, int x, int y, int t, int v)
 {
-	// 3D remap: translate 2D coords to 3D based on current view plane
+	// 3D remap for direct brush placement (p==-2): translate 2D coords to 3D
+	// Internal tools (CreateLine etc use p==-1) are NOT remapped
 	int view2D = CubeTest_Get2DViewMode();
 	float lockVal = CubeTest_Get2DLockedVal();
 	float setZ = 0;
-	int origX = x, origY = y;
-	if (view2D == 1) { // XZ plane: x→x, y→z, locked Y
-		setZ = (float)(YRES - 1 - y);
-		y = (int)(lockVal + 0.5f);
-	} else if (view2D == 2) { // YZ plane: x→z, y→y, locked X
-		setZ = (float)x;
-		x = (int)(lockVal + 0.5f);
-	} else {
-		setZ = lockVal; // XY: use brush Z
+	if (p == -2)
+	{
+		if (view2D == 1) { // XZ plane: x→x, y→z, locked Y
+			setZ = (float)(YRES - 1 - y);
+			y = (int)(lockVal + 0.5f);
+		} else if (view2D == 2) { // YZ plane: x→z, y→y, locked X
+			setZ = (float)x;
+			x = (int)(lockVal + 0.5f);
+		} else {
+			setZ = lockVal; // XY: use brush Z
+		}
 	}
 
 	int i, oldType = PT_NONE;
@@ -2165,16 +2168,21 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 
 	if (p == -2)
 	{
-		if (pmap[y][x])
+		// In XZ/YZ slice views, pmap is degenerate (many 3D particles share
+		// the same pmap cell) and walls are a 2D concept. Skip these checks.
+		if (view2D == 0)
 		{
-			int drawOn = TYP(pmap[y][x]);
-			if (elements[drawOn].CtypeDraw)
-				elements[drawOn].CtypeDraw(this, ID(pmap[y][x]), t, v);
-			return -1;
+			if (pmap[y][x])
+			{
+				int drawOn = TYP(pmap[y][x]);
+				if (elements[drawOn].CtypeDraw)
+					elements[drawOn].CtypeDraw(this, ID(pmap[y][x]), t, v);
+				return -1;
+			}
+			if (IsWallBlocking(x, y, t))
+				return -1;
 		}
-		else if (IsWallBlocking(x, y, t))
-			return -1;
-		else if (photons[y][x] && (elements[t].Properties & TYPE_ENERGY))
+		if (photons[y][x] && (elements[t].Properties & TYPE_ENERGY))
 			return -1;
 	}
 
@@ -2229,7 +2237,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].type = t;
 	parts[i].x = (float)x;
 	parts[i].y = (float)y;
-	parts[i].z = setZ;
+	if (p == -2) parts[i].z = setZ;
 	parts[i].tmp5 = 0;
 	parts[i].tmp6 = 0;
 

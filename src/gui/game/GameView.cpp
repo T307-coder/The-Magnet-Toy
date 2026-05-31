@@ -21,6 +21,7 @@
 #include "client/Client.h"
 #include "client/GameSave.h"
 #include "common/platform/Platform.h"
+#include "graphics/CubeTest.h"
 #include "graphics/Graphics.h"
 #include "graphics/Renderer.h"
 #include "graphics/VideoBuffer.h"
@@ -2524,8 +2525,14 @@ void GameView::OnDraw()
 			if (type)
 				sampleInfo << "#" << sample.ParticleID << ", ";
 
-			sampleInfo << "X:" << sample.PositionX << " Y:" << sample.PositionY
-		           << " Z:" << (int)(sample.particle.z + 0.5f);
+			// Show true 3D coords based on current view plane
+			int v2d = CubeTest_Get2DViewMode();
+			float lv = CubeTest_Get2DLockedVal();
+			int cx, cy, cz;
+			if (v2d == 0)      { cx = sample.PositionX; cy = sample.PositionY; cz = (int)(lv+0.5f); }
+			else if (v2d == 1) { cx = sample.PositionX; cy = (int)(lv+0.5f); cz = YRES-1-sample.PositionY; }
+			else               { cx = (int)(lv+0.5f); cy = sample.PositionY; cz = sample.PositionX; }
+			sampleInfo << "X:" << cx << " Y:" << cy << " Z:" << cz;
 
 			auto gravtot = std::abs(sample.GravityVelocityX) +
 			               std::abs(sample.GravityVelocityY);

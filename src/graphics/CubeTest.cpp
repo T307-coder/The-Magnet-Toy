@@ -576,6 +576,7 @@ void CubeTest_SetActiveTool(int toolType)
 // Create a 3D particle bypassing pmap — allows multiple particles per (x,y)
 // Forward decls
 static int CreatePart3D(Simulation *sim, int x, int y, int z, int t);
+static void BrushAction(int cx, int cy, int cz, int mode);
 
 // 3D flood fill: fill all connected empty space from (sx,sy,sz)
 static void FloodFill3D(int sx, int sy, int sz)
@@ -623,25 +624,21 @@ static void FloodFill3D(int sx, int sy, int sz)
 	}
 }
 
-// Draw 3D line from (sx,sy,sz) to (ex,ey,ez)
+// Draw 3D line with brush shape from (sx,sy,sz) to (ex,ey,ez)
 static void DrawLine3D(int sx, int sy, int sz, int ex, int ey, int ez)
 {
 	if (!g_sim || g_activeToolType <= 0) return;
-	auto *sim = const_cast<Simulation *>(g_sim);
 	float dx = (float)(ex - sx), dy = (float)(ey - sy), dz = (float)(ez - sz);
 	int steps = (int)ceilf(sqrtf(dx*dx + dy*dy + dz*dz));
-	if (steps <= 0) { CreatePart3D(sim, sx, sy, sz, g_activeToolType); return; }
+	if (steps <= 0) { BrushAction(sx, sy, sz, 0); return; }
 
-	int lastPX = -999, lastPY = -999;
 	for (int s = 0; s <= steps; s++)
 	{
 		float t = (float)s / (float)steps;
 		int px = (int)((float)sx + dx * t + 0.5f);
 		int py = (int)((float)sy + dy * t + 0.5f);
 		int pz = (int)((float)sz + dz * t + 0.5f);
-		if (px == lastPX && py == lastPY) continue;
-		lastPX = px; lastPY = py;
-		CreatePart3D(sim, px, py, pz, g_activeToolType);
+		BrushAction(px, py, pz, 0);
 	}
 }
 
