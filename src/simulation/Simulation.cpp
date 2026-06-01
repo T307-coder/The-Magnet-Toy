@@ -1,4 +1,4 @@
-#include "Simulation.h"
+﻿#include "Simulation.h"
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
@@ -2126,10 +2126,10 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	float setZ = 0;
 	if (p == -2)
 	{
-		if (view2D == 1) { // XZ plane: x→x, y→z, locked Y
+		if (view2D == 1) { // XZ plane: x鈫抶, y鈫抸, locked Y
 			setZ = (float)(YRES - 1 - y);
 			y = (int)(lockVal + 0.5f);
-		} else if (view2D == 2) { // YZ plane: x→z, y→y, locked X
+		} else if (view2D == 2) { // YZ plane: x鈫抸, y鈫抷, locked X
 			setZ = (float)x;
 			x = (int)(lockVal + 0.5f);
 		} else {
@@ -2173,7 +2173,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		// In XZ/YZ slice views, pmap is degenerate (many 3D particles share
 		// the same pmap cell) and walls are a 2D concept. Skip these checks.
-		// In XY view, also check Z �?don't block if existing particle is on a different layer.
+		// In XY view, also check Z 鈥?don't block if existing particle is on a different layer.
 		if (view2D == 0)
 		{
 			if (pmap[y][x])
@@ -2590,20 +2590,33 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 	Neighbourhood n;
 		auto j = 0;
 		auto z = int(parts[i].z + 0.5f);
+		// XY neighbors (indices 0-7): backward-compatible surround_space / nt
+		for (auto ny=-1; ny<2; ny++)
+		{
+			for (auto nx=-1; nx<2; nx++)
+			{
+				if (nx||ny)
+				{
+					auto r = GetPmap3D(x+nx, y+ny, z);
+					n.surround[j] = r;
+					j++;
+					n.surround_space += (!TYP(r));
+					n.nt += (TYP(r)!=t);
+				}
+			}
+		}
+		// Z-axis neighbors (indices 8-25): 3D extension for heat conduction only
 		for (auto nz=-1; nz<2; nz++)
 		{
+			if (nz==0) continue; // XY already handled above
 			for (auto ny=-1; ny<2; ny++)
 			{
 				for (auto nx=-1; nx<2; nx++)
 				{
-					if (nx||ny||nz)
-					{
-						auto r = GetPmap3D(x+nx, y+ny, z+nz);
-						n.surround[j] = r;
-						j++;
-						n.surround_space += (!TYP(r)); // count empty space
-						n.nt += (TYP(r)!=t); // count empty space and particles of different type
-					}
+					auto r = GetPmap3D(x+nx, y+ny, z+nz);
+					n.surround[j] = r;
+					j++;
+					// NOT counted in surround_space/nt (3D extension only)
 				}
 			}
 		}
