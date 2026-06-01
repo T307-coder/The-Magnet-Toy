@@ -164,19 +164,28 @@ void CubeTest_Render()
 	glGetDoublev(GL_MODELVIEW_MATRIX, g_modelview);
 	glGetIntegerv(GL_VIEWPORT, g_viewport);
 
-	// ---- Lighting ----
+	// ---- Lighting: two directional lights + ambient for 6 distinct face shades ----
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
+	glEnable(GL_LIGHT1);
 	glEnable(GL_COLOR_MATERIAL);
 	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 	glEnable(GL_NORMALIZE);
-	// Directional light from upper-left-front (in TPT coords, before Y-flip)
-	GLfloat lightPos[] = { 0.6f, 0.8f, 0.4f, 0.0f }; // w=0 → directional
-	GLfloat lightAmb[] = { 0.15f, 0.15f, 0.18f, 1.0f };
-	GLfloat lightDif[] = { 0.75f, 0.75f, 0.70f, 1.0f };
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-	glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmb);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDif);
+	// Ambient: base visibility for all faces
+	GLfloat globalAmb[] = { 0.10f, 0.10f, 0.12f, 1.0f };
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmb);
+	// Light 0: upper-right-front (brightens top, right, front)
+	GLfloat l0Pos[]  = { 0.5f, 0.7f, 0.5f, 0.0f };
+	GLfloat l0Dif[]  = { 0.60f, 0.60f, 0.55f, 1.0f };
+	glLightfv(GL_LIGHT0, GL_POSITION, l0Pos);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE,  l0Dif);
+	glLightfv(GL_LIGHT0, GL_AMBIENT,  globalAmb); // reuse
+	// Light 1: lower-left-back (brightens bottom, left, back)
+	GLfloat l1Pos[]  = { -0.4f, -0.9f, -0.3f, 0.0f };
+	GLfloat l1Dif[]  = { 0.35f, 0.38f, 0.40f, 1.0f };
+	glLightfv(GL_LIGHT1, GL_POSITION, l1Pos);
+	glLightfv(GL_LIGHT1, GL_DIFFUSE,  l1Dif);
+	glLightfv(GL_LIGHT1, GL_AMBIENT,  globalAmb);
 
 	// ---- Three orthogonal grid planes (XY floor, XZ back, YZ left) ----
 	glDisable(GL_LIGHTING); // grids and lines don't need lighting
