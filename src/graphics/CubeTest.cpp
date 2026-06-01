@@ -819,7 +819,6 @@ static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 	p.x = (float)x;
 	p.y = (float)y;
 	p.z = (float)z;
-	p.vz = (float)((rand() % 41 - 20) * 0.05f); // +-1.0 random Z velocity for 3D spread
 	p.tmp5 = 0;
 	p.tmp6 = 0;
 
