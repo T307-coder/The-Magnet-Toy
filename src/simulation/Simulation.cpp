@@ -2718,7 +2718,6 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			parts[i].vx *= elements[t].Loss;
 			parts[i].vy *= elements[t].Loss;
 			parts[i].vz *= elements[t].Loss;
-			parts[i].vz *= elements[t].Loss;
 		}
 		//particle gets velocity from the vx and vy maps
 		parts[i].vx += elements[t].Advection*vx[y/CELL][x/CELL] + neighbourhood.pGravX;
