@@ -1,4 +1,4 @@
-﻿#include "Simulation.h"
+#include "Simulation.h"
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
@@ -1375,7 +1375,9 @@ int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ) const
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 0;
 
-	r = pmap[ny][nx];
+	// Phase 2: Z-aware occupancy via GetPmap3D (moveZ>=0: specific layer; moveZ==-1: Z=0)
+	int zCheck = (moveZ >= 0) ? moveZ : 0;
+	r = GetPmap3D(nx, ny, zCheck);
 	if (r)
 		r = (r&~PMAPMASK) | parts[ID(r)].type;
 	if (rr)
@@ -1466,10 +1468,11 @@ int Simulation::try_move(int i, int x, int y, int nx, int ny)
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 1;
 
-	e = eval_move(parts[i].type, nx, ny, &r);
+	int nz = (int)(parts[i].z + 0.5f);
+	e = eval_move(parts[i].type, nx, ny, &r, nz);
 
 	/* half-silvered mirror */
-	if (!e && parts[i].type==PT_PHOT && ((TYP(r)==PT_BMTL && rng.chance(1, 2)) || TYP(pmap[y][x])==PT_BMTL))
+	if (!e && parts[i].type==PT_PHOT && ((TYP(r)==PT_BMTL && rng.chance(1, 2)) || TYP(GetPmap3D(x, y, nz))==PT_BMTL))
 		e = 2;
 
 	auto &sd = SimulationData::CRef();
@@ -1890,7 +1893,7 @@ int Simulation::is_blocking(int t, int x, int y) const
 	if (t & REFRACT) {
 		if (x<0 || y<0 || x>=XRES || y>=YRES)
 			return 0;
-		if (TYP(pmap[y][x]) == PT_GLAS || TYP(pmap[y][x]) == PT_BGLA)
+		if (TYP(GetPmap3D(x, y, 0)) == PT_GLAS || TYP(GetPmap3D(x, y, 0)) == PT_BGLA)
 			return 1;
 		return 0;
 	}
@@ -2123,10 +2126,10 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	float setZ = 0;
 	if (p == -2)
 	{
-		if (view2D == 1) { // XZ plane: x鈫抶, y鈫抸, locked Y
+		if (view2D == 1) { // XZ plane: x→x, y→z, locked Y
 			setZ = (float)(YRES - 1 - y);
 			y = (int)(lockVal + 0.5f);
-		} else if (view2D == 2) { // YZ plane: x鈫抸, y鈫抷, locked X
+		} else if (view2D == 2) { // YZ plane: x→z, y→y, locked X
 			setZ = (float)x;
 			x = (int)(lockVal + 0.5f);
 		} else {
@@ -2170,7 +2173,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		// In XZ/YZ slice views, pmap is degenerate (many 3D particles share
 		// the same pmap cell) and walls are a 2D concept. Skip these checks.
-		// In XY view, also check Z 鈥?don't block if existing particle is on a different layer.
+		// In XY view, also check Z �?don't block if existing particle is on a different layer.
 		if (view2D == 0)
 		{
 			if (pmap[y][x])
