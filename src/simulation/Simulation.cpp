@@ -2716,16 +2716,19 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		{
 			parts[i].vx *= elements[t].Loss;
 			parts[i].vy *= elements[t].Loss;
+			parts[i].vz *= elements[t].Loss;
 		}
 		//particle gets velocity from the vx and vy maps
 		parts[i].vx += elements[t].Advection*vx[y/CELL][x/CELL] + neighbourhood.pGravX;
 		parts[i].vy += elements[t].Advection*vy[y/CELL][x/CELL] + neighbourhood.pGravY;
+		parts[i].vz += customGravityZ;
 
 
 		if (elements[t].Diffusion)//the random diffusion that gasses have
 		{
 			parts[i].vx += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
 			parts[i].vy += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
+			parts[i].vz += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
 		}
 
 		auto transitionOccurred = TransitionPhase(i, neighbourhood);
@@ -2756,10 +2759,30 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		if (transitionOccurred)
 			continue;
 
-		if (!parts[i].vx&&!parts[i].vy)//if its not moving, skip to next particle, movement code it next
+		if (!parts[i].vx&&!parts[i].vy&&!parts[i].vz)//if its not moving, skip to next particle, movement code it next
 			continue;
 
 		MovementPhase(i, neighbourhood);
+		// Z-axis movement (XYZ equal-rights Phase 4)
+		if (parts[i].vz != 0.0f)
+		{
+			float newZ = parts[i].z + parts[i].vz;
+			if (newZ < 0) { newZ = 0; parts[i].vz = 0; }
+			if (newZ >= 384) { newZ = 383.99f; parts[i].vz = 0; }
+			int tgtZ = (int)(newZ + 0.5f);
+			int tgtX = (int)(parts[i].x + 0.5f);
+			int tgtY = (int)(parts[i].y + 0.5f);
+			// Use eval_move for proper collision (can_move table, walls)
+			int nz = (int)(parts[i].z + 0.5f);
+			if (tgtZ != nz)
+			{
+				int ev = eval_move(parts[i].type, tgtX, tgtY, nullptr, tgtZ);
+				if (ev)
+					parts[i].z = newZ;
+				else
+					parts[i].vz = 0; // blocked
+			}
+		}
 	}
 }
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Particle.h"
 #include "Stickman.h"
 #include "WallType.h"
@@ -182,6 +182,7 @@ public:
 	int gravityMode = GRAV_VERTICAL;
 	float customGravityX = 0;
 	float customGravityY = 0;
+	float customGravityZ = 0;
 	int legacy_enable = 0;
 	int water_equal_test = 0;
 	int pretty_powder = 0;
@@ -199,7 +200,7 @@ public:
 	int sandcolour;
 	int sandcolour_interface;
 
-	// 3D spatial index: maps packed (x,y,z) → particle index
+	// 3D spatial index: maps packed (x,y,z) 鈫?particle index
 	std::unordered_map<uint64_t, int> spatialMap;
 	static uint64_t PackXYZ(int x, int y, int z) {
 		return ((uint64_t)(uint16_t)x << 32) | ((uint64_t)(uint16_t)y << 16) | (uint16_t)z;
@@ -207,13 +208,13 @@ public:
 	void BuildSpatialMap();
 	int  FindParticle3D(int x, int y, int z) const;
 
-	// ═══════════════════════════════════════════════════════════
-	// 3D Unified Occupancy Query API (Phase 1 — XYZ 平权化)
-	// Bridges 2D pmap (Z≈0) and 3D spatialMap (all Z).
-	// Z≈0 (±1 tolerance): reads 2D pmap (fast array).
+	// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
+	// 3D Unified Occupancy Query API (Phase 1 鈥?XYZ 骞虫潈鍖?
+	// Bridges 2D pmap (Z鈮?) and 3D spatialMap (all Z).
+	// Z鈮? (卤1 tolerance): reads 2D pmap (fast array).
 	// Other Z: reads spatialMap (hash, O(1) average).
 	// Returns PMAP-format particle reference, or 0 if empty.
-	// ═══════════════════════════════════════════════════════════
+	// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
 	int  GetPmap3D(int x, int y, int z) const;
 	bool IsOccupied3D(int x, int y, int z) const;
 
