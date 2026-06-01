@@ -1,4 +1,4 @@
-#include "Config.h"
+﻿#include "Config.h"
 #include "GameModel.h"
 #include "BitmapBrush.h"
 #include "EllipseBrush.h"
@@ -266,7 +266,7 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new NGravityOption(this));
 	quickOptions.push_back(new AHeatOption(this));
 	quickOptions.push_back(new ConsoleShowOption(this, controller));
-	// New magnet mod options — second row
+	// New magnet mod options 鈥?second row
 	quickOptions.push_back(new DrawMagneticOption(this));
 	quickOptions.push_back(new MagnetismEnableOption(this));
 	quickOptions.push_back(new InductionEnableOption(this));
@@ -1847,6 +1847,7 @@ void GameModel::BeforeSim()
 		CommandInterface::Ref().HandleEvent(BeforeSimEvent{});
 	}
 	sim->BeforeSim(willUpdate);
+	sim->BuildSpatialMap();
 }
 
 void GameModel::AfterSim()
