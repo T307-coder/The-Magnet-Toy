@@ -2774,11 +2774,12 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			if (newZ >= 384) { newZ = 383.99f; parts[i].vz = 0; }
 			int tgtX = (int)(parts[i].x + 0.5f);
 			int tgtY = (int)(parts[i].y + 0.5f);
-			int tgtZ = (int)(newZ + 0.5f);
-			int nz = (int)(parts[i].z + 0.5f);
-			if (tgtZ != nz)
+			int oldZ = (int)(parts[i].z + 0.5f);
+			int newZi = (int)(newZ + 0.5f);
+			// Always update Z; only do collision check when crossing integer Z boundary
+			if (newZi != oldZ)
 			{
-				int ev = eval_move(parts[i].type, tgtX, tgtY, nullptr, tgtZ);
+				int ev = eval_move(parts[i].type, tgtX, tgtY, nullptr, newZi);
 				if (ev)
 				{
 					parts[i].z = newZ;
@@ -2792,7 +2793,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 					{
 						for (int tryY = tgtY-1; tryY <= tgtY+1 && !moved; tryY++)
 						{
-							int tryZ = nz + dz;
+							int tryZ = oldZ + dz;
 							if (eval_move(parts[i].type, tryX, tryY, nullptr, tryZ))
 							{
 								parts[i].x = (float)tryX;
@@ -2802,8 +2803,12 @@ void SimulationImpl::UpdateParticles(int start, int end)
 							}
 						}
 					}
-					if (!moved) parts[i].vz = 0;
+					if (!moved) parts[i].vz = 0; // completely blocked
 				}
+			}
+			else
+			{
+				parts[i].z = newZ; // same integer Z, just update float
 			}
 		}
 	}
