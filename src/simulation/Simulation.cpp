@@ -2717,10 +2717,12 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			parts[i].vx *= elements[t].Loss;
 			parts[i].vy *= elements[t].Loss;
 			parts[i].vz *= elements[t].Loss;
+			parts[i].vz *= elements[t].Loss;
 		}
 		//particle gets velocity from the vx and vy maps
 		parts[i].vx += elements[t].Advection*vx[y/CELL][x/CELL] + neighbourhood.pGravX;
 		parts[i].vy += elements[t].Advection*vy[y/CELL][x/CELL] + neighbourhood.pGravY;
+		parts[i].vz += customGravityZ;
 		parts[i].vz += customGravityZ;
 
 
@@ -2763,24 +2765,44 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			continue;
 
 		MovementPhase(i, neighbourhood);
-		// Z-axis movement (XYZ equal-rights Phase 4)
+		// Z-axis movement with 3D powder spread (XYZ equal-rights Phase 5)
 		if (parts[i].vz != 0.0f)
 		{
 			float newZ = parts[i].z + parts[i].vz;
 			if (newZ < 0) { newZ = 0; parts[i].vz = 0; }
 			if (newZ >= 384) { newZ = 383.99f; parts[i].vz = 0; }
-			int tgtZ = (int)(newZ + 0.5f);
 			int tgtX = (int)(parts[i].x + 0.5f);
 			int tgtY = (int)(parts[i].y + 0.5f);
-			// Use eval_move for proper collision (can_move table, walls)
+			int tgtZ = (int)(newZ + 0.5f);
 			int nz = (int)(parts[i].z + 0.5f);
 			if (tgtZ != nz)
 			{
 				int ev = eval_move(parts[i].type, tgtX, tgtY, nullptr, tgtZ);
 				if (ev)
+				{
 					parts[i].z = newZ;
+				}
 				else
-					parts[i].vz = 0; // blocked
+				{
+					// Blocked - try Z-axis neighbours (3D pyramid formation)
+					int dz = (parts[i].vz > 0) ? 1 : -1;
+					bool moved = false;
+					for (int tryX = tgtX-1; tryX <= tgtX+1 && !moved; tryX++)
+					{
+						for (int tryY = tgtY-1; tryY <= tgtY+1 && !moved; tryY++)
+						{
+							int tryZ = nz + dz;
+							if (eval_move(parts[i].type, tryX, tryY, nullptr, tryZ))
+							{
+								parts[i].x = (float)tryX;
+								parts[i].y = (float)tryY;
+								parts[i].z = (float)tryZ;
+								moved = true;
+							}
+						}
+					}
+					if (!moved) parts[i].vz = 0;
+				}
 			}
 		}
 	}
