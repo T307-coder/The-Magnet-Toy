@@ -2765,8 +2765,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			continue;
 
 		MovementPhase(i, neighbourhood);
-		// Z-axis movement with powder-slide physics (XYZ equal-rights Phase 5)
-		// Mirrors MovementPhase Falldown>1 logic: when Z blocked, scan neighbours
+		// Z-axis powder-slide (mirrors MovementPhase Falldown>1 scan logic)
 		if (parts[i].vz != 0.0f)
 		{
 			float newZ = parts[i].z + parts[i].vz;
@@ -2776,14 +2775,12 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			int tgtY = (int)(parts[i].y + 0.5f);
 			int oldZ = (int)(parts[i].z + 0.5f);
 			int newZi = (int)(newZ + 0.5f);
-			// Always update float Z for sub-cell movement
 			if (newZi == oldZ)
 			{
-				parts[i].z = newZ;
+				parts[i].z = newZ; // sub-cell Z movement, no collision
 			}
 			else
 			{
-				// Crossing integer Z boundary - check collision
 				int ev = eval_move(parts[i].type, tgtX, tgtY, nullptr, newZi);
 				if (ev)
 				{
@@ -2791,45 +2788,43 @@ void SimulationImpl::UpdateParticles(int start, int end)
 				}
 				else
 				{
-					// Blocked - try Z-axis neighbours (mirror XY powder slide)
+					// Blocked — scan X and Y like XY powder slide for empty Z+dz spot
 					int dz = (parts[i].vz > 0) ? 1 : -1;
+					int t = parts[i].type;
+					const int rt = 10; // scan radius (like Falldown>1)
+					int r = rng.between(0, 1) * 2 - 1; // random +-1 scan direction
 					bool moved = false;
-					// Priority 1: same XY, adjacent Z (already tried, blocked)
-					// Priority 2: diagonal in XZ plane (X+-1, Z+dz) - like XY diagonal fall
-					for (int dx = -1; dx <= 1 && !moved; dx += 2)
+					// Priority 1: scan X axis for empty at (scanX, y, z+dz)
+					for (int scanX = tgtX + r; scanX >= 0 && scanX >= tgtX-rt && scanX < tgtX+rt && scanX < XRES; scanX += r)
 					{
-						if (eval_move(parts[i].type, tgtX+dx, tgtY, nullptr, oldZ+dz))
+						int occ = GetPmap3D(scanX, tgtY, oldZ + dz);
+						if ((!occ || TYP(occ) != t) && eval_move(parts[i].type, scanX, tgtY, nullptr, oldZ+dz))
 						{
-							parts[i].x = (float)(tgtX+dx);
-							parts[i].z = (float)(oldZ+dz);
+							parts[i].x = (float)scanX;
+							parts[i].z = (float)(oldZ + dz);
 							moved = true;
+							break;
 						}
+						// Stop scanning if blocked by wall or different solid
+						if (occ && (TYP(occ) != t || bmap[tgtY/CELL][scanX/CELL])) break;
 					}
-					// Priority 3: diagonal in YZ plane (Y+-1, Z+dz)
-					for (int dy = -1; dy <= 1 && !moved; dy += 2)
+					// Priority 2: scan Y axis for empty at (x, scanY, z+dz)
+					if (!moved)
 					{
-						if (eval_move(parts[i].type, tgtX, tgtY+dy, nullptr, oldZ+dz))
+						for (int scanY = tgtY + r; scanY >= 0 && scanY >= tgtY-rt && scanY < tgtY+rt && scanY < YRES; scanY += r)
 						{
-							parts[i].y = (float)(tgtY+dy);
-							parts[i].z = (float)(oldZ+dz);
-							moved = true;
-						}
-					}
-					// Priority 4: corner diagonals (X+-1, Y+-1, Z+dz)
-					for (int dx = -1; dx <= 1 && !moved; dx += 2)
-					{
-						for (int dy = -1; dy <= 1 && !moved; dy += 2)
-						{
-							if (eval_move(parts[i].type, tgtX+dx, tgtY+dy, nullptr, oldZ+dz))
+							int occ = GetPmap3D(tgtX, scanY, oldZ + dz);
+							if ((!occ || TYP(occ) != t) && eval_move(parts[i].type, tgtX, scanY, nullptr, oldZ+dz))
 							{
-								parts[i].x = (float)(tgtX+dx);
-								parts[i].y = (float)(tgtY+dy);
-								parts[i].z = (float)(oldZ+dz);
+								parts[i].y = (float)scanY;
+								parts[i].z = (float)(oldZ + dz);
 								moved = true;
+								break;
 							}
+							if (occ && (TYP(occ) != t || bmap[scanY/CELL][tgtX/CELL])) break;
 						}
 					}
-					if (!moved) parts[i].vz = 0; // completely blocked
+					if (!moved) parts[i].vz = 0;
 				}
 			}
 		}
