@@ -1367,7 +1367,7 @@ bool Simulation::IsWallBlocking(int x, int y, int type) const
 0 = No move/Bounce
 2 = Both particles occupy the same space.
  */
-int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr) const
+int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ) const
 {
 	unsigned r;
 	int result;
@@ -2537,7 +2537,8 @@ Simulation::PlanMoveResult Simulation::PlanMove(Sim &sim, int i, int x, int y)
 			}
 			//block if particle can't move (0), or some special cases where it returns 1 (can_move = 3 but returns 1 meaning particle will be eaten)
 			//also photons are still blocked (slowed down) by any particle (even ones it can move through), and absorb wall also blocks particles
-			int eval = sim.eval_move(t, fin_x, fin_y, nullptr);
+			int moveZ = (int)(parts[i].z + 0.5f);
+int eval = sim.eval_move(t, fin_x, fin_y, nullptr, moveZ);
 			if (!eval || (can_move[t][TYP(pmap[fin_y][fin_x])] == 3 && eval == 1) || (t == PT_PHOT && pmap[fin_y][fin_x]) || bmap[fin_y/CELL][fin_x/CELL]==WL_DESTROYALL || closedEholeStart!=(bmap[fin_y/CELL][fin_x/CELL] == WL_EHOLE && !emap[fin_y/CELL][fin_x/CELL]))
 			{
 				// found an obstacle

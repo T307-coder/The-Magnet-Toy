@@ -338,7 +338,7 @@ void CubeTest_Render()
 	// Draw particles as small cubes
 	glEnable(GL_LIGHTING);
 
-	const float hs = 1.5f; // half-size of cube
+	const float hs = 0.5f; // half-size: 1-unit cubes
 	for (int i = 0; i < sim->parts.active; i++)
 	{
 		if (!sim->parts[i].type) continue;

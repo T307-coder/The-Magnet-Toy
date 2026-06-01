@@ -213,7 +213,7 @@ public:
 	int do_move(int i, int x, int y, float nxf, float nyf);
 	bool move(int i, int x, int y, float nxf, float nyf);
 	int try_move(int i, int x, int y, int nx, int ny);
-	int eval_move(int pt, int nx, int ny, unsigned *rr) const;
+	int eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ = -1) const;
 
 	struct PlanMoveResult
 	{
