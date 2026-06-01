@@ -207,6 +207,16 @@ public:
 	void BuildSpatialMap();
 	int  FindParticle3D(int x, int y, int z) const;
 
+	// ═══════════════════════════════════════════════════════════
+	// 3D Unified Occupancy Query API (Phase 1 — XYZ 平权化)
+	// Bridges 2D pmap (Z≈0) and 3D spatialMap (all Z).
+	// Z≈0 (±1 tolerance): reads 2D pmap (fast array).
+	// Other Z: reads spatialMap (hash, O(1) average).
+	// Returns PMAP-format particle reference, or 0 if empty.
+	// ═══════════════════════════════════════════════════════════
+	int  GetPmap3D(int x, int y, int z) const;
+	bool IsOccupied3D(int x, int y, int z) const;
+
 	void Load(const GameSave *save, bool includePressure, Vec2<int> blockP); // block coordinates
 	std::unique_ptr<GameSave> Save(bool includePressure, Rect<int> partR); // particle coordinates
 	void SaveSimOptions(GameSave &gameSave);

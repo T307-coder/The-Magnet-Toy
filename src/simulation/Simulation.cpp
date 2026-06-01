@@ -1,4 +1,4 @@
-#include "Simulation.h"
+﻿#include "Simulation.h"
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
@@ -2123,10 +2123,10 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	float setZ = 0;
 	if (p == -2)
 	{
-		if (view2D == 1) { // XZ plane: x→x, y→z, locked Y
+		if (view2D == 1) { // XZ plane: x鈫抶, y鈫抸, locked Y
 			setZ = (float)(YRES - 1 - y);
 			y = (int)(lockVal + 0.5f);
-		} else if (view2D == 2) { // YZ plane: x→z, y→y, locked X
+		} else if (view2D == 2) { // YZ plane: x鈫抸, y鈫抷, locked X
 			setZ = (float)x;
 			x = (int)(lockVal + 0.5f);
 		} else {
@@ -2170,7 +2170,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		// In XZ/YZ slice views, pmap is degenerate (many 3D particles share
 		// the same pmap cell) and walls are a 2D concept. Skip these checks.
-		// In XY view, also check Z �?don't block if existing particle is on a different layer.
+		// In XY view, also check Z 鈥?don't block if existing particle is on a different layer.
 		if (view2D == 0)
 		{
 			if (pmap[y][x])
@@ -4049,6 +4049,58 @@ void Simulation::UpdateGravityMask()
 		check(p);
 	}
 }
+// 3D spatial index: rebuild O(n), lookup O(1) average
+void Simulation::BuildSpatialMap()
+{
+spatialMap.clear();
+for (int i = 0; i < parts.active; i++)
+{
+if (!parts[i].type) continue;
+int x = (int)(parts[i].x + 0.5f);
+int y = (int)(parts[i].y + 0.5f);
+int z = (int)(parts[i].z + 0.5f);
+if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=384) continue;
+spatialMap[PackXYZ(x, y, z)] = i;
+}
+}
+
+int Simulation::FindParticle3D(int x, int y, int z) const
+{
+auto it = spatialMap.find(PackXYZ(x, y, z));
+return (it != spatialMap.end()) ? it->second : -1;
+}
+
+// --- 3D Unified Occupancy Query API (Phase 1: XYZ equal-rights) ----------
+// Bridges 2D pmap (Z~0) and 3D spatialMap (all Z).
+// Z~0 (+-1 tolerance): reads 2D pmap (fast array).
+// Other Z: reads spatialMap (hash, O(1) average).
+// Returns PMAP-format particle reference, or 0 if empty.
+
+int Simulation::GetPmap3D(int x, int y, int z) const
+{
+if (x < 0 || y < 0 || x >= XRES || y >= YRES || z < 0 || z >= 384)
+return 0;
+
+// Z~0: fast path via 2D pmap (backward compatible)
+if (z >= -1 && z <= 1)
+return pmap[y][x];
+
+// Other Z layers: query the 3D spatial hash
+auto it = spatialMap.find(PackXYZ(x, y, z));
+if (it != spatialMap.end())
+{
+int i = it->second;
+if (i >= 0 && i < NPART && parts[i].type)
+return PMAP(i, parts[i].type);
+}
+return 0;
+}
+
+bool Simulation::IsOccupied3D(int x, int y, int z) const
+{
+return GetPmap3D(x, y, z) != 0;
+}
+
 
 //updates pmap, gol, and some other simulation stuff (but not particles)
 void Simulation::BeforeSim(bool willUpdate)
