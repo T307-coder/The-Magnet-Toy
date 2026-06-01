@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <vector>
 #include <array>
+#include <unordered_map>
 #include <memory>
 #include <optional>
 
@@ -197,6 +198,14 @@ public:
 	int NUM_PARTS;
 	int sandcolour;
 	int sandcolour_interface;
+
+	// 3D spatial index: maps packed (x,y,z) → particle index
+	std::unordered_map<uint64_t, int> spatialMap;
+	static uint64_t PackXYZ(int x, int y, int z) {
+		return ((uint64_t)(uint16_t)x << 32) | ((uint64_t)(uint16_t)y << 16) | (uint16_t)z;
+	}
+	void BuildSpatialMap();
+	int  FindParticle3D(int x, int y, int z) const;
 
 	void Load(const GameSave *save, bool includePressure, Vec2<int> blockP); // block coordinates
 	std::unique_ptr<GameSave> Save(bool includePressure, Rect<int> partR); // particle coordinates

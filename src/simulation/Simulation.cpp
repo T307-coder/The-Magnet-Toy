@@ -2170,7 +2170,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		// In XZ/YZ slice views, pmap is degenerate (many 3D particles share
 		// the same pmap cell) and walls are a 2D concept. Skip these checks.
-		// In XY view, also check Z â€” don't block if existing particle is on a different layer.
+		// In XY view, also check Z â€?don't block if existing particle is on a different layer.
 		if (view2D == 0)
 		{
 			if (pmap[y][x])
@@ -4164,7 +4164,7 @@ void Simulation::BeforeSim(bool willUpdate)
 		// check for stacking and create BHOL if found
 		if (force_stacking_check || rng.chance(1, 10))
 		{
-			CheckStacking();
+			//CheckStacking(); // TODO: 3D BHOL disabled
 		}
 
 		// LOVE and LOLZ element handling
