@@ -2252,6 +2252,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].x = (float)x;
 	parts[i].y = (float)y;
 	parts[i].z = (p == -2) ? setZ : 0.0f;
+		if (p == -2) parts[i].vz = rng.between(-5, 5) * 0.05f; // 3D brush: small random Z velocity
 	parts[i].tmp5 = 0;
 	parts[i].tmp6 = 0;
 
