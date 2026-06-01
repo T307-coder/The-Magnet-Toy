@@ -2765,7 +2765,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			continue;
 
 		MovementPhase(i, neighbourhood);
-		// Z-axis powder-slide (mirrors MovementPhase Falldown>1 scan logic)
+		// Z-axis powder-slide (mirrors MovementPhase scan, with pmap self-avoidance)
 		if (parts[i].vz != 0.0f)
 		{
 			float newZ = parts[i].z + parts[i].vz;
@@ -2777,24 +2777,33 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			int newZi = (int)(newZ + 0.5f);
 			if (newZi == oldZ)
 			{
-				parts[i].z = newZ; // sub-cell Z movement, no collision
+				parts[i].z = newZ; // sub-cell, no collision
 			}
 			else
 			{
+				// CRITICAL: like XY move(), clear old pmap so eval_move doesn't see self
+				int savedPmap = 0; bool hadPmap = false;
+				if (oldZ >= -1 && oldZ <= 1 && pmap[tgtY][tgtX] && ID(pmap[tgtY][tgtX]) == i)
+					{ savedPmap = pmap[tgtY][tgtX]; pmap[tgtY][tgtX] = 0; hadPmap = true; }
+				
 				int ev = eval_move(parts[i].type, tgtX, tgtY, nullptr, newZi);
 				if (ev)
 				{
 					parts[i].z = newZ;
+					// pmap stays cleared — RecalcFreeParticles will repopulate next frame
 				}
 				else
 				{
+					// Restore pmap since we didn't move
+					if (hadPmap) pmap[tgtY][tgtX] = savedPmap;
+					
 					// Blocked — scan X and Y like XY powder slide for empty Z+dz spot
 					int dz = (parts[i].vz > 0) ? 1 : -1;
 					int t = parts[i].type;
-					const int rt = 10; // scan radius (like Falldown>1)
-					int r = rng.between(0, 1) * 2 - 1; // random +-1 scan direction
+					const int rt = 10;
+					int r = rng.between(0, 1) * 2 - 1;
 					bool moved = false;
-					// Priority 1: scan X axis for empty at (scanX, y, z+dz)
+					// Priority 1: scan X axis
 					for (int scanX = tgtX + r; scanX >= 0 && scanX >= tgtX-rt && scanX < tgtX+rt && scanX < XRES; scanX += r)
 					{
 						int occ = GetPmap3D(scanX, tgtY, oldZ + dz);
@@ -2802,13 +2811,11 @@ void SimulationImpl::UpdateParticles(int start, int end)
 						{
 							parts[i].x = (float)scanX;
 							parts[i].z = (float)(oldZ + dz);
-							moved = true;
-							break;
+							moved = true; break;
 						}
-						// Stop scanning if blocked by wall or different solid
 						if (occ && (TYP(occ) != t || bmap[tgtY/CELL][scanX/CELL])) break;
 					}
-					// Priority 2: scan Y axis for empty at (x, scanY, z+dz)
+					// Priority 2: scan Y axis
 					if (!moved)
 					{
 						for (int scanY = tgtY + r; scanY >= 0 && scanY >= tgtY-rt && scanY < tgtY+rt && scanY < YRES; scanY += r)
@@ -2818,8 +2825,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 							{
 								parts[i].y = (float)scanY;
 								parts[i].z = (float)(oldZ + dz);
-								moved = true;
-								break;
+								moved = true; break;
 							}
 							if (occ && (TYP(occ) != t || bmap[scanY/CELL][tgtX/CELL])) break;
 						}
