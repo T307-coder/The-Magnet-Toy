@@ -2765,7 +2765,8 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			continue;
 
 		MovementPhase(i, neighbourhood);
-		// Z-axis movement with 3D powder spread (XYZ equal-rights Phase 5)
+		// Z-axis movement with powder-slide physics (XYZ equal-rights Phase 5)
+		// Mirrors MovementPhase Falldown>1 logic: when Z blocked, scan neighbours
 		if (parts[i].vz != 0.0f)
 		{
 			float newZ = parts[i].z + parts[i].vz;
@@ -2775,9 +2776,14 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			int tgtY = (int)(parts[i].y + 0.5f);
 			int oldZ = (int)(parts[i].z + 0.5f);
 			int newZi = (int)(newZ + 0.5f);
-			// Always update Z; only do collision check when crossing integer Z boundary
-			if (newZi != oldZ)
+			// Always update float Z for sub-cell movement
+			if (newZi == oldZ)
 			{
+				parts[i].z = newZ;
+			}
+			else
+			{
+				// Crossing integer Z boundary - check collision
 				int ev = eval_move(parts[i].type, tgtX, tgtY, nullptr, newZi);
 				if (ev)
 				{
@@ -2785,29 +2791,46 @@ void SimulationImpl::UpdateParticles(int start, int end)
 				}
 				else
 				{
-					// Blocked - try Z-axis neighbours (3D pyramid formation)
+					// Blocked - try Z-axis neighbours (mirror XY powder slide)
 					int dz = (parts[i].vz > 0) ? 1 : -1;
 					bool moved = false;
-					for (int tryX = tgtX-1; tryX <= tgtX+1 && !moved; tryX++)
+					// Priority 1: same XY, adjacent Z (already tried, blocked)
+					// Priority 2: diagonal in XZ plane (X+-1, Z+dz) - like XY diagonal fall
+					for (int dx = -1; dx <= 1 && !moved; dx += 2)
 					{
-						for (int tryY = tgtY-1; tryY <= tgtY+1 && !moved; tryY++)
+						if (eval_move(parts[i].type, tgtX+dx, tgtY, nullptr, oldZ+dz))
 						{
-							int tryZ = oldZ + dz;
-							if (eval_move(parts[i].type, tryX, tryY, nullptr, tryZ))
+							parts[i].x = (float)(tgtX+dx);
+							parts[i].z = (float)(oldZ+dz);
+							moved = true;
+						}
+					}
+					// Priority 3: diagonal in YZ plane (Y+-1, Z+dz)
+					for (int dy = -1; dy <= 1 && !moved; dy += 2)
+					{
+						if (eval_move(parts[i].type, tgtX, tgtY+dy, nullptr, oldZ+dz))
+						{
+							parts[i].y = (float)(tgtY+dy);
+							parts[i].z = (float)(oldZ+dz);
+							moved = true;
+						}
+					}
+					// Priority 4: corner diagonals (X+-1, Y+-1, Z+dz)
+					for (int dx = -1; dx <= 1 && !moved; dx += 2)
+					{
+						for (int dy = -1; dy <= 1 && !moved; dy += 2)
+						{
+							if (eval_move(parts[i].type, tgtX+dx, tgtY+dy, nullptr, oldZ+dz))
 							{
-								parts[i].x = (float)tryX;
-								parts[i].y = (float)tryY;
-								parts[i].z = (float)tryZ;
+								parts[i].x = (float)(tgtX+dx);
+								parts[i].y = (float)(tgtY+dy);
+								parts[i].z = (float)(oldZ+dz);
 								moved = true;
 							}
 						}
 					}
 					if (!moved) parts[i].vz = 0; // completely blocked
 				}
-			}
-			else
-			{
-				parts[i].z = newZ; // same integer Z, just update float
 			}
 		}
 	}
