@@ -1,4 +1,4 @@
-﻿#include "Simulation.h"
+#include "Simulation.h"
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
@@ -33,7 +33,7 @@ namespace
 	{
 		struct Neighbourhood
 		{
-			std::array<int, 8> surround;
+			std::array<int, 26> surround; // 3x3x3-1 = 26 neighbors (XYZ equal-rights Phase 3)
 			int surround_space = 0;
 			int nt = 0; //if nt is greater than 1 after this, then there is a particle around the current particle, that is NOT the current particle's type, for water movement.
 			float pGravX = 0;
@@ -2126,10 +2126,10 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	float setZ = 0;
 	if (p == -2)
 	{
-		if (view2D == 1) { // XZ plane: x鈫抶, y鈫抸, locked Y
+		if (view2D == 1) { // XZ plane: x→x, y→z, locked Y
 			setZ = (float)(YRES - 1 - y);
 			y = (int)(lockVal + 0.5f);
-		} else if (view2D == 2) { // YZ plane: x鈫抸, y鈫抷, locked X
+		} else if (view2D == 2) { // YZ plane: x→z, y→y, locked X
 			setZ = (float)x;
 			x = (int)(lockVal + 0.5f);
 		} else {
@@ -2173,7 +2173,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		// In XZ/YZ slice views, pmap is degenerate (many 3D particles share
 		// the same pmap cell) and walls are a 2D concept. Skip these checks.
-		// In XY view, also check Z 鈥?don't block if existing particle is on a different layer.
+		// In XY view, also check Z �?don't block if existing particle is on a different layer.
 		if (view2D == 0)
 		{
 			if (pmap[y][x])
@@ -2588,21 +2588,25 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
 	Neighbourhood n;
-	auto j = 0;
-	for (auto nx=-1; nx<2; nx++)
-	{
-		for (auto ny=-1; ny<2; ny++)
+		auto j = 0;
+		auto z = int(parts[i].z + 0.5f);
+		for (auto nz=-1; nz<2; nz++)
 		{
-			if (nx||ny)
+			for (auto ny=-1; ny<2; ny++)
 			{
-				auto r = pmap[y+ny][x+nx];
-				n.surround[j] = r;
-				j++;
-				n.surround_space += (!TYP(r)); // count empty space
-				n.nt += (TYP(r)!=t); // count empty space and particles of different type
+				for (auto nx=-1; nx<2; nx++)
+				{
+					if (nx||ny||nz)
+					{
+						auto r = GetPmap3D(x+nx, y+ny, z+nz);
+						n.surround[j] = r;
+						j++;
+						n.surround_space += (!TYP(r)); // count empty space
+						n.nt += (TYP(r)!=t); // count empty space and particles of different type
+					}
+				}
 			}
 		}
-	}
 	if (!(elements[t].Properties & TYPE_SOLID) && (elements[t].Gravity || elements[t].NewtonianGravity))
 	{
 		GetGravityField(x, y, elements[t].Gravity, elements[t].NewtonianGravity, n.pGravX, n.pGravY);
@@ -2801,9 +2805,9 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 			// Heat transfer with other elements
 			auto hc_total = 0.0f; // Total heat capacity of elements involved
 			auto c_heat = 0.0f; // Total heat distributed between elements
-			int surround_hconduct[8]; // IDs of elements which exchange heat
+			int surround_hconduct[26]; // IDs of elements which exchange heat (3D)
 
-			for (auto j=0; j<8; j++)
+			for (auto j=0; j<26; j++)
 			{
 				surround_hconduct[j] = i;
 				auto r = neighbourhood.surround[j];
@@ -2838,7 +2842,7 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 			float pt = restrict_flt(c_heat / hc_total, MIN_TEMP, MAX_TEMP);
 
 			parts[i].temp = pt;
-			for (auto j=0; j<8; j++)
+			for (auto j=0; j<26; j++)
 			{
 				parts[surround_hconduct[j]].temp = pt;
 			}
