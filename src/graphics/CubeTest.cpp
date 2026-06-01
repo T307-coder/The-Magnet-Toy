@@ -164,7 +164,22 @@ void CubeTest_Render()
 	glGetDoublev(GL_MODELVIEW_MATRIX, g_modelview);
 	glGetIntegerv(GL_VIEWPORT, g_viewport);
 
+	// ---- Lighting ----
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	glEnable(GL_COLOR_MATERIAL);
+	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+	glEnable(GL_NORMALIZE);
+	// Directional light from upper-left-front (in TPT coords, before Y-flip)
+	GLfloat lightPos[] = { 0.6f, 0.8f, 0.4f, 0.0f }; // w=0 → directional
+	GLfloat lightAmb[] = { 0.15f, 0.15f, 0.18f, 1.0f };
+	GLfloat lightDif[] = { 0.75f, 0.75f, 0.70f, 1.0f };
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmb);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDif);
+
 	// ---- Three orthogonal grid planes (XY floor, XZ back, YZ left) ----
+	glDisable(GL_LIGHTING); // grids and lines don't need lighting
 	glBegin(GL_LINES);
 	// XY plane (floor): Z=0
 	glColor3f(0.25f, 0.25f, 0.35f);
@@ -321,8 +336,8 @@ void CubeTest_Render()
 	}
 
 	// Draw particles as small cubes
+	glEnable(GL_LIGHTING);
 
-	// Draw particles as small cubes
 	const float hs = 1.5f; // half-size of cube
 	for (int i = 0; i < sim->parts.active; i++)
 	{
@@ -336,27 +351,34 @@ void CubeTest_Render()
 		float cz = sim->parts[i].z;
 		glBegin(GL_QUADS);
 		// front (+Z)
+		glNormal3f(0, 0, 1);
 		glVertex3f(cx-hs, cy-hs, cz+hs); glVertex3f(cx+hs, cy-hs, cz+hs);
 		glVertex3f(cx+hs, cy+hs, cz+hs); glVertex3f(cx-hs, cy+hs, cz+hs);
 		// back (-Z)
+		glNormal3f(0, 0, -1);
 		glVertex3f(cx-hs, cy-hs, cz-hs); glVertex3f(cx-hs, cy+hs, cz-hs);
 		glVertex3f(cx+hs, cy+hs, cz-hs); glVertex3f(cx+hs, cy-hs, cz-hs);
 		// top (+Y)
+		glNormal3f(0, 1, 0);
 		glVertex3f(cx-hs, cy+hs, cz-hs); glVertex3f(cx-hs, cy+hs, cz+hs);
 		glVertex3f(cx+hs, cy+hs, cz+hs); glVertex3f(cx+hs, cy+hs, cz-hs);
 		// bottom (-Y)
+		glNormal3f(0, -1, 0);
 		glVertex3f(cx-hs, cy-hs, cz-hs); glVertex3f(cx+hs, cy-hs, cz-hs);
 		glVertex3f(cx+hs, cy-hs, cz+hs); glVertex3f(cx-hs, cy-hs, cz+hs);
 		// right (+X)
+		glNormal3f(1, 0, 0);
 		glVertex3f(cx+hs, cy-hs, cz-hs); glVertex3f(cx+hs, cy+hs, cz-hs);
 		glVertex3f(cx+hs, cy+hs, cz+hs); glVertex3f(cx+hs, cy-hs, cz+hs);
 		// left (-X)
+		glNormal3f(-1, 0, 0);
 		glVertex3f(cx-hs, cy-hs, cz-hs); glVertex3f(cx-hs, cy-hs, cz+hs);
 		glVertex3f(cx-hs, cy+hs, cz+hs); glVertex3f(cx-hs, cy+hs, cz-hs);
 		glEnd();
 	}
 
 	// ---- Brush coordinate overlay (screen-space) ----
+	glDisable(GL_LIGHTING);
 #ifdef _WIN32
 	if (g_fontBase && g_brushX >= 0)
 	{
