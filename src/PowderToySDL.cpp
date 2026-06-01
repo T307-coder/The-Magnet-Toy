@@ -315,11 +315,14 @@ static void EventProcess(const SDL_Event &event)
 		break;
 	case SDL_KEYDOWN:
 		if (SDL_GetModState() & KMOD_GUI) break;
-		// Arrow keys: rotate view 90° relative to current view
-		if (event.key.keysym.scancode == SDL_SCANCODE_UP)    { CubeTest_RotateView(0); break; }
-		if (event.key.keysym.scancode == SDL_SCANCODE_DOWN)  { CubeTest_RotateView(1); break; }
-		if (event.key.keysym.scancode == SDL_SCANCODE_LEFT)  { CubeTest_RotateView(2); break; }
-		if (event.key.keysym.scancode == SDL_SCANCODE_RIGHT) { CubeTest_RotateView(3); break; }
+		// Arrow keys: rotate view 90° (only when NOT in free cam mode)
+		if (!CubeTest_IsFreeCam())
+		{
+			if (event.key.keysym.scancode == SDL_SCANCODE_UP)    { CubeTest_RotateView(0); break; }
+			if (event.key.keysym.scancode == SDL_SCANCODE_DOWN)  { CubeTest_RotateView(1); break; }
+			if (event.key.keysym.scancode == SDL_SCANCODE_LEFT)  { CubeTest_RotateView(2); break; }
+			if (event.key.keysym.scancode == SDL_SCANCODE_RIGHT) { CubeTest_RotateView(3); break; }
+		}
 		// 'Z' passes through to engine for zoom toggle (original TPT behavior)
 		// Ctrl+Z = undo, handled by engine
 		// 'C' held: free-look 3D camera (only without Ctrl, so Ctrl+C = copy)

@@ -28,7 +28,7 @@ static GLuint g_fontBase = 0;
 static int g_brushX = -1, g_brushY = -1;
 static int g_brushShape = 0;  // 0=cube, 1=sphere
 static float g_brushRX = 8.0f, g_brushRY = 8.0f, g_brushRZ = 8.0f; // per-axis radii
-static bool g_showZGrid = false;
+static bool g_showZGrid = true; // Z-grid on by default for spatial reference
 // View mode and full 3D brush position
 static int g_viewMode = 0;
 static float g_brushPX = 0, g_brushPY = 0, g_brushPZ = 0;
@@ -48,6 +48,14 @@ static float g_toolStartX, g_toolStartY, g_toolStartZ; // anchor point for line/
 // Cached matrices for gluUnProject
 static double g_proj[16], g_modelview[16];
 static int    g_viewport[4];
+
+// First-person free camera (V toggles)
+static bool g_freeCam = false;
+static float g_camPX = 192.0f, g_camPY = 192.0f, g_camPZ = 192.0f; // center of volume
+static float g_camYaw = 0.0f, g_camPitch = 0.0f; // radians, yaw=0 → +Z, pitch=0 → horizontal
+static float g_brushDist = 60.0f; // brush distance from camera
+static bool g_camKeyFwd = false, g_camKeyBack = false, g_camKeyLeft = false, g_camKeyRight = false;
+static bool g_camKeyUp = false, g_camKeyDown = false; // pgup/pgdn
 
 #ifdef _WIN32
 bool CubeTest_Init()
@@ -86,23 +94,70 @@ void CubeTest_Render()
 	const Simulation *sim = g_sim;
 
 	SDL_GL_MakeCurrent(g_win, g_gl);
+
+	// Free cam: apply held-key movement every frame
+	if (g_freeCam)
+	{
+		float speed = 1.0f;
+		float fwdX = sinf(g_camYaw), fwdZ = cosf(g_camYaw);
+		float rgtX = cosf(g_camYaw), rgtZ = -sinf(g_camYaw);
+		if (g_camKeyFwd)  { g_camPX += fwdX * speed; g_camPZ += fwdZ * speed; }
+		if (g_camKeyBack) { g_camPX -= fwdX * speed; g_camPZ -= fwdZ * speed; }
+		if (g_camKeyLeft) { g_camPX += rgtX * speed; g_camPZ += rgtZ * speed; }
+		if (g_camKeyRight){ g_camPX -= rgtX * speed; g_camPZ -= rgtZ * speed; }
+		if (g_camKeyUp)   { g_camPY -= speed; }
+		if (g_camKeyDown) { g_camPY += speed; }
+		if (g_camPX < 0) g_camPX = 0; if (g_camPX >= XRES) g_camPX = XRES-1;
+		if (g_camPY < 0) g_camPY = 0; if (g_camPY >= YRES) g_camPY = YRES-1;
+		if (g_camPZ < 0) g_camPZ = 0; if (g_camPZ >= ZMAX) g_camPZ = ZMAX-1;
+	}
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glViewport(0, 0, g_w, g_h);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	float aspect = (float)g_w / (float)g_h;
-	gluPerspective(45.0, aspect, 10.0, 10000.0);
+	if (g_freeCam)
+		gluPerspective(60.0, aspect, 1.0, 5000.0); // wider FOV for first-person
+	else
+		gluPerspective(45.0, aspect, 10.0, 10000.0);
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glTranslatef(0, 0, -g_dist);
-	glRotatef(g_rotX, 1, 0, 0);
-	glRotatef(g_rotY, 0, 1, 0);
-	// Pivot to center the 3D volume (X:0..XRES, Y:0..YRES, Z:0..ZMAX)
-	// Y flipped so TPT Y=0 is at screen top
-	glTranslatef(-XRES / 2.0f, YRES / 2.0f, -ZMAX / 2.0f);
-	glScalef(1, -1, 1);
+	if (g_freeCam)
+	{
+		// First-person camera: TPT coords → Y-flipped OpenGL space
+		float lx = cosf(g_camPitch) * sinf(g_camYaw);
+		float ly = -sinf(g_camPitch); // positive pitch → look upward (decrease TPT Y)
+		float lz = cosf(g_camPitch) * cosf(g_camYaw);
+
+		// gluLookAt with Y-flipped coords (must match glScalef below)
+		// Camera looks from (cx,-cy,cz) toward (cx+lx, -(cy+ly), cz+lz)
+		gluLookAt(g_camPX, -g_camPY, g_camPZ,
+		          g_camPX + lx, -(g_camPY + ly), g_camPZ + lz,
+		          0, 1, 0);
+		// Y-flip for OpenGL — applied BEFORE look-at in vertex pipeline
+		glScalef(1, -1, 1);
+
+		// Brush position in TPT coords (clamped to volume)
+		g_brushPX = g_camPX + lx * g_brushDist;
+		g_brushPY = g_camPY + ly * g_brushDist;
+		g_brushPZ = g_camPZ + lz * g_brushDist;
+		if (g_brushPX < 0) g_brushPX = 0; if (g_brushPX >= XRES) g_brushPX = XRES-1;
+		if (g_brushPY < 0) g_brushPY = 0; if (g_brushPY >= YRES) g_brushPY = YRES-1;
+		if (g_brushPZ < 0) g_brushPZ = 0; if (g_brushPZ >= ZMAX) g_brushPZ = ZMAX-1;
+	}
+	else
+	{
+		glTranslatef(0, 0, -g_dist);
+		glRotatef(g_rotX, 1, 0, 0);
+		glRotatef(g_rotY, 0, 1, 0);
+		// Pivot to center the 3D volume (X:0..XRES, Y:0..YRES, Z:0..ZMAX)
+		// Y flipped so TPT Y=0 is at screen top
+		glTranslatef(-XRES / 2.0f, YRES / 2.0f, -ZMAX / 2.0f);
+		glScalef(1, -1, 1);
+	}
 
 	// Cache matrices for gluUnProject (3D window mouse → world coords)
 	glGetDoublev(GL_PROJECTION_MATRIX, g_proj);
@@ -486,6 +541,9 @@ void CubeTest_SetBrush(int x, int y, int rx, int ry)
 
 void CubeTest_SetBrushPos(int x, int y)
 {
+	// In free cam mode, brush is controlled by camera, not 2D mouse
+	if (g_freeCam) return;
+
 	// TPT window: simulation area is at top-left (y=0..YRES-1),
 	// menu bar (MENUSIZE=40) is at bottom. No Y offset needed.
 	int sx = x, sy = y;
@@ -907,7 +965,30 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 	if (e.type == SDL_MOUSEMOTION && e.motion.windowID == wid)
 	{
 		static int lastMx3D = 0, lastMy3D = 0;
-		if (g_camControl)
+		if (g_freeCam)
+		{
+			// Free cam: mouse rotates view (yaw/pitch)
+			float dx = (float)e.motion.xrel;
+			float dy = (float)e.motion.yrel;
+			g_camYaw   -= dx * 0.004f;
+			g_camPitch -= dy * 0.004f;
+			// Clamp pitch to avoid flipping
+			const float maxPitch = 3.14159265f * 0.49f;
+			if (g_camPitch >  maxPitch) g_camPitch =  maxPitch;
+			if (g_camPitch < -maxPitch) g_camPitch = -maxPitch;
+			// Keep yaw in [0, 2π)
+			while (g_camYaw < 0) g_camYaw += 6.2831853f;
+			while (g_camYaw >= 6.2831853f) g_camYaw -= 6.2831853f;
+
+			// Continuous placement/deletion while mouse moves
+			if (g_lineMode || g_rectMode)
+				{ /* preview updates via render */ }
+			else if (g_placing)
+				PlaceParticleAtBrush();
+			else if (g_deleting)
+				BrushAction((int)(g_brushPX+0.5f),(int)(g_brushPY+0.5f),(int)(g_brushPZ+0.5f),1);
+		}
+		else if (g_camControl)
 		{
 			if (lastMx3D) CubeTest_Rotate(e.motion.x - lastMx3D, e.motion.y - lastMy3D);
 			lastMx3D = e.motion.x; lastMy3D = e.motion.y;
@@ -1055,7 +1136,14 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 	if (e.type == SDL_MOUSEWHEEL && e.wheel.windowID == wid)
 	{
 		int d = e.wheel.y;
-		if (SDL_GetModState() & KMOD_CTRL)
+		if (g_freeCam && (SDL_GetModState() & KMOD_CTRL))
+		{
+			// Free cam: Ctrl+scroll adjusts brush distance
+			g_brushDist += (float)d * 5.0f;
+			if (g_brushDist < 10.0f)  g_brushDist = 10.0f;
+			if (g_brushDist > 500.0f) g_brushDist = 500.0f;
+		}
+		else if (SDL_GetModState() & KMOD_CTRL)
 			CubeTest_Zoom(d * 30);
 		else if (g_xHeld)
 			CubeTest_ResizeBrush(d, 3); // Z axis
@@ -1074,6 +1162,18 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		if (sc == SDL_SCANCODE_LSHIFT || sc == SDL_SCANCODE_RSHIFT) g_shiftHeld = down;
 		if (sc == SDL_SCANCODE_LALT || sc == SDL_SCANCODE_RALT)     g_altHeld = down;
 		if (sc == SDL_SCANCODE_X)                                   g_xHeld = down;
+
+		// Free cam movement keys + V toggle
+		if (down && sc == SDL_SCANCODE_V) { CubeTest_ToggleFreeCam(); }
+		if (g_freeCam)
+		{
+			if (sc == SDL_SCANCODE_UP)       g_camKeyFwd  = down;
+			if (sc == SDL_SCANCODE_DOWN)     g_camKeyBack = down;
+			if (sc == SDL_SCANCODE_LEFT)     g_camKeyLeft = down;
+			if (sc == SDL_SCANCODE_RIGHT)    g_camKeyRight = down;
+			if (sc == SDL_SCANCODE_PAGEUP)   g_camKeyUp   = down;
+			if (sc == SDL_SCANCODE_PAGEDOWN) g_camKeyDown = down;
+		}
 	}
 }
 
@@ -1104,4 +1204,25 @@ float CubeTest_Get2DLockedVal()
 	if (mode == 0) return g_brushPZ; // XY: Z locked
 	if (mode == 1) return g_brushPY; // XZ: Y locked
 	return g_brushPX; // YZ: X locked
+}
+
+bool CubeTest_IsFreeCam() { return g_freeCam; }
+
+void CubeTest_ToggleFreeCam()
+{
+	g_freeCam = !g_freeCam;
+	if (g_freeCam)
+	{
+		g_camPX = XRES / 2.0f;
+		g_camPY = YRES / 2.0f;
+		g_camPZ = ZMAX / 2.0f;
+		g_camYaw = 0.0f;
+		g_camPitch = 0.0f;
+		g_brushDist = 60.0f;
+		SDL_SetRelativeMouseMode(SDL_TRUE);
+	}
+	else
+	{
+		SDL_SetRelativeMouseMode(SDL_FALSE);
+	}
 }

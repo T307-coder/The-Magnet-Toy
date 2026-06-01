@@ -25,3 +25,5 @@ void CubeTest_ToggleCamControl(); // 'C' key toggles camera-drag mode
 Uint32 CubeTest_GetWindowID();    // SDL window ID of 3D viewport, 0 if closed
 int  CubeTest_Get2DViewMode();    // 0=XY 1=XZ 2=YZ — main 2D window displays this plane
 float CubeTest_Get2DLockedVal();   // locked axis value for 2D slice filtering
+bool  CubeTest_IsFreeCam();        // V toggles first-person camera
+void  CubeTest_ToggleFreeCam();    // enter/exit free camera mode
