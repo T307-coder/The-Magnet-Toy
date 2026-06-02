@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "FILT.h"
 
 static int update(UPDATE_FUNC_ARGS);
@@ -100,7 +100,7 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			if (rx || ry)
 			{
-				int r = pmap[y+ry][x+rx];
+				int r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					continue;
 				bool boolMode = accepted_conductor(sim, r);

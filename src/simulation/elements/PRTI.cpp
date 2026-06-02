@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "simulation/orbitalparts.h"
 #include "PIPE.h"
 #include "SOAP.h"
@@ -77,7 +77,7 @@ static int update(UPDATE_FUNC_ARGS)
 		int ry = portal_ry[count];
 		if (rx || ry)
 		{
-			int r = pmap[y+ry][x+rx];
+			int r = TPT_PM(x+rx, y+ry);
 			if (!r || TYP(r) == PT_STOR)
 				fe = 1;
 			if (!r || (!(elements[TYP(r)].Properties & (TYPE_PART | TYPE_LIQUID | TYPE_GAS | TYPE_ENERGY)) && TYP(r)!=PT_SPRK && TYP(r)!=PT_STOR))

@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 
@@ -66,7 +66,7 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			if (rx || ry)
 			{
-				int r = pmap[y+ry][x+rx];
+				int r = TPT_PM(x+rx, y+ry);
 				if (TYP(r) == PT_SPRK && parts[ID(r)].life == 3) //spark found, start creating
 				{
 					bool overwrite = parts[ID(r)].ctype == PT_PSCN;

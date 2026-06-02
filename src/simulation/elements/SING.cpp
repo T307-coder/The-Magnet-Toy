@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 static void create(ELEMENT_CREATE_FUNC_ARGS);
@@ -116,7 +116,7 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			if (rx || ry)
 			{
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					continue;
 				if (TYP(r)!=PT_DMND&& sim->rng.chance(1, 3))

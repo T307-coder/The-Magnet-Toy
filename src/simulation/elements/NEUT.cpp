@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "FIRE.h"
 #include "PLNT.h"
 
@@ -62,7 +62,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		for (int ry = -1; ry <= 1; ry++)
 		{
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			switch (TYP(r))
 			{
 			case PT_WATR:

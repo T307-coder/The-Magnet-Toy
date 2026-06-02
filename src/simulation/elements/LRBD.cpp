@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 
@@ -56,7 +56,7 @@ static int update(UPDATE_FUNC_ARGS)
 			for (auto ry = -1; ry <= 1; ry++)
 			{
 				if (!rx && !ry) continue;
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (r)
 				{
 					int rt = TYP(r);
@@ -107,7 +107,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
 		if (!rx && !ry) continue;
-		auto r = pmap[y+ry][x+rx];
+		auto r = TPT_PM(x+rx, y+ry);
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))
 		{
 			int diff = parts[i].tmp4 - parts[ID(r)].tmp4;

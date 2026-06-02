@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 
@@ -60,7 +60,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				auto r = sim->photons[y+ry][x+rx];
 				if (!r)
-					r = pmap[y+ry][x+rx];
+					r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					continue;
 				int rt = TYP(r);
@@ -87,7 +87,7 @@ static int update(UPDATE_FUNC_ARGS)
 				{
 					auto r = sim->photons[y+ry][x+rx];
 					if (!r || (restrictElement && ((TYP(r) == restrictElement) == (parts[i].tmp2 == 1))))
-						r = pmap[y+ry][x+rx];
+						r = TPT_PM(x+rx, y+ry);
 					if (!r || (restrictElement && ((TYP(r) == restrictElement) == (parts[i].tmp2 == 1))))
 						continue;
 					if (TYP(r) != PT_CONV && TYP(r) != PT_DMND && TYP(r) != ctype)

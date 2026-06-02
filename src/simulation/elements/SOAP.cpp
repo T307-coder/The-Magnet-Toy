@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "SOAP.h"
 
 static int update(UPDATE_FUNC_ARGS);
@@ -162,7 +162,7 @@ static int update(UPDATE_FUNC_ARGS)
 				{
 					if (rx || ry)
 					{
-						auto r = pmap[y+ry][x+rx];
+						auto r = TPT_PM(x+rx, y+ry);
 						if (!r)
 							continue;
 						if ((parts[ID(r)].type == PT_SOAP) && (parts[ID(r)].ctype&1) && !(parts[ID(r)].ctype&4))
@@ -181,7 +181,7 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						if (rx || ry)
 						{
-							auto r = pmap[y+ry][x+rx];
+							auto r = TPT_PM(x+rx, y+ry);
 							if (!r && !sim->bmap[(y+ry)/CELL][(x+rx)/CELL])
 								continue;
 							if (parts[i].temp>FREEZING)
@@ -263,7 +263,7 @@ static int update(UPDATE_FUNC_ARGS)
 			for (auto ry=-2; ry<3; ry++)
 				if (rx || ry)
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					if (!r)
 						continue;
 					if (TYP(r) == PT_OIL)
@@ -285,7 +285,7 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			if (rx || ry)
 			{
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					continue;
 				if (TYP(r)!=PT_SOAP)

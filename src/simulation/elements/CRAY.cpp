@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "FILT.h"
 
 static int update(UPDATE_FUNC_ARGS);
@@ -64,7 +64,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				int r = sim->photons[y+ry][x+rx];
 				if (!r)
-					r = pmap[y+ry][x+rx];
+					r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					continue;
 				if (TYP(r)!=PT_CRAY && TYP(r)!=PT_PSCN && TYP(r)!=PT_INST && TYP(r)!=PT_METL && TYP(r)!=PT_SPRK && TYP(r)<PT_NUM)
@@ -83,7 +83,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					int r = pmap[y+ry][x+rx];
+					int r = TPT_PM(x+rx, y+ry);
 					if (!r)
 						continue;
 					if (TYP(r)==PT_SPRK && parts[ID(r)].life==3) { //spark found, start creating

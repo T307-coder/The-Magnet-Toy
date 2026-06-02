@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "simulation/MagnetismCommon.h"
 #include "simulation/ElectricityCommon.h"
 #include "simulation/Air.h"
@@ -63,7 +63,7 @@ static int update(UPDATE_FUNC_ARGS)
 		rndstore >>= 4;
 		auto ry = (rndstore % 9)-4;
 		if ((!rx != !ry)) {
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if(!r) continue;
 			if(TYP(r)==PT_BMTL && parts[ID(r)].tmp)
 			{
@@ -80,7 +80,7 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			auto rx = checkCoordsX[j];
 			auto ry = checkCoordsY[j];
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if(!r) continue;
 			if(TYP(r)==PT_SPRK && parts[ID(r)].life && parts[ID(r)].life<4)
 			{
@@ -107,7 +107,7 @@ static int update(UPDATE_FUNC_ARGS)
 			for (auto ry = -1; ry <= 1; ry++)
 			{
 				if (!rx && !ry) continue;
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (r)
 				{
 					int rt = TYP(r);
@@ -140,7 +140,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
 		if (!rx && !ry) continue;
-		auto r = pmap[y+ry][x+rx];
+		auto r = TPT_PM(x+rx, y+ry);
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))
 		{
 			int diff = parts[i].tmp4 - parts[ID(r)].tmp4;

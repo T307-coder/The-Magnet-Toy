@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "simulation/orbitalparts.h"
 #include "PRTI.h"
 
@@ -69,7 +69,7 @@ static int update(UPDATE_FUNC_ARGS)
 		auto ry = portal_ry[count];
 		if (rx || ry)
 		{
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if (!r)
 			{
 				fe = 1;

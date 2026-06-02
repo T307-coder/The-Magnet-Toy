@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include <algorithm>
 
 struct StackData;
@@ -90,7 +90,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if ((rx || ry) && (!rx || !ry))
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					if (!r)
 						continue;
 					if (TYP(r)==PT_SPRK && parts[ID(r)].life==3) {
@@ -111,7 +111,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if ((rx || ry) && (!rx || !ry))
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					if (!r)
 						continue;
 					if (TYP(r) == PT_PSTN && !parts[ID(r)].life)

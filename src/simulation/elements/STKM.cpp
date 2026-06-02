@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "STKM.h"
 
 static int update(UPDATE_FUNC_ARGS);
@@ -412,7 +412,7 @@ int Element_STKM_run_stickman(playerst *playerp, UPDATE_FUNC_ARGS)
 		for (ry=-2; ry<3; ry++)
 			if (x+rx>=0 && y+ry>0 && x+rx<XRES && y+ry<YRES && (rx || ry))
 			{
-				r = pmap[y+ry][x+rx];
+				r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					r = sim->photons[y+ry][x+rx];
 

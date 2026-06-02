@@ -1853,14 +1853,22 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 	if (nzf >= 0) parts[i].z = roundf(nzf); // snap Z to integer (Z is a layer index)
 	bool onBasePlane = (z >= -1 && z <= 1);
 	int newZ = (nzf >= 0) ? (int)roundf(nzf) : z;
+	bool newOffPlane = (newZ < -1 || newZ > 1);
 	if (ny != y || nx != x || newZ != z)
 	{
-		// Real-time spatialMap maintenance (XYZ symmetric, unlike pmap which is z鈮? only)
-		if (!onBasePlane)
+		// Real-time spatialMap maintenance (XYZ symmetric, unlike pmap which is z≈0 only)
+		if (!onBasePlane || newOffPlane)
 		{
 			std::lock_guard<std::shared_mutex> lock(spatialMutex);
-			spatialMap.erase(PackXYZ(x, y, z));
-			if (t) spatialMap[PackXYZ(nx, ny, newZ)] = i;
+			if (!onBasePlane)
+				spatialMap.erase(PackXYZ(x, y, z));
+			if (t && newOffPlane)
+			{
+				// Don't overwrite existing particle at destination
+				auto existing = spatialMap.find(PackXYZ(nx, ny, newZ));
+				if (existing == spatialMap.end() || existing.second() == i)
+					spatialMap[PackXYZ(nx, ny, newZ)] = i;
+			}
 		}
 
 		// pmap for base-plane particles (fast 2D cache)
@@ -2263,7 +2271,9 @@ bool Simulation::part_change_type(int i, int x, int y, int t)
 		if (photons[y][x] && ID(photons[y][x]) == i)
 			photons[y][x] = 0;
 		std::lock_guard<std::shared_mutex> lock(spatialMutex);
-		spatialMap[PackXYZ(x, y, z)] = i;
+		// Don't overwrite existing entry at this cell
+		if (spatialMap.find(PackXYZ(x, y, z)) == spatialMap.end())
+			spatialMap[PackXYZ(x, y, z)] = i;
 	}
 	return false;
 }
@@ -2436,9 +2446,11 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		// Non-XY brush or non-zero Z: no pmap entry, use spatialMap instead
 		int iz = (int)(parts[i].z + 0.5f);
-		if (iz >= 0 && iz < 384) {
+		if (iz >= 0 && iz < ZRES) {
 			std::lock_guard<std::shared_mutex> lock(spatialMutex);
-			spatialMap[PackXYZ(x, y, iz)] = i;
+			// Don't overwrite existing entry
+			if (spatialMap.find(PackXYZ(x, y, iz)) == spatialMap.end())
+				spatialMap[PackXYZ(x, y, iz)] = i;
 		}
 	}
 	else if (elements[t].Properties & TYPE_ENERGY)
@@ -3009,41 +3021,44 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 	if (transitionOccurred) return;
 	if (!parts[i].vx && !parts[i].vy && !parts[i].vz) return;
 
-	{
-		std::lock_guard<std::mutex> lock(simMutex);
-		MovementPhase(i, neighbourhood);
-	}
-
+	// Z movement BEFORE MovementPhase (MovementPhase damps vz via Collision)
 	if (parts[i].vz != 0.0f)
 	{
-		float newZ = parts[i].z + parts[i].vz;
-		// Z boundary: symmetric with XY
-		if (edgeMode == EDGE_LOOP)
+		float newZf = parts[i].z + parts[i].vz;
+		int oz = (int)(parts[i].z + 0.5f);
+		int nz = (int)(newZf + 0.5f);
+		if (nz == oz)
 		{
-			parts[i].z = remainder_p(newZ + 0.5f, (float)ZRES) - 0.5f;
-		}
-		else if (newZ < 0)
-		{
-			parts[i].z = 0;
-			parts[i].vz = 0;
-		}
-		else if (newZ >= ZRES)
-		{
-			parts[i].z = float(ZRES - 1);
-			parts[i].vz = 0;
+			// Same integer layer: sub-layer drift (XY equivalent: PlanMove sub-pixel accumulation)
+			parts[i].z = newZf;
 		}
 		else
 		{
-			int tx = (int)(parts[i].x + 0.5f);
-			int ty = (int)(parts[i].y + 0.5f);
-			int oz = (int)(parts[i].z + 0.5f);
-			int nzi = (int)(newZ + 0.5f);
-			if (nzi == oz) { parts[i].z = roundf(newZ); }
-			else if (eval_move(parts[i].type, tx, ty, nullptr, nzi))
-				{ parts[i].z = roundf(newZ); }
+			// Crossing integer layer: use do_move for full collision pipeline (XYZ平等)
+			int x = (int)(parts[i].x + 0.5f);
+			int y = (int)(parts[i].y + 0.5f);
+			// Pre-check: only try to move into empty cells (spatialMap single-entry limit)
+			auto canMoveZ = [&](int targetZ) -> bool {
+				if (targetZ < 0 || targetZ >= ZRES) return false;
+				return GetPmap3D(x, y, targetZ, i) == 0;
+			};
+			std::lock_guard<std::mutex> lock(simMutex);
+			if (canMoveZ(nz) && do_move(i, x, y, oz, (float)x, (float)y, newZf))
+			{ }
+			else if (canMoveZ(nz + 1) && do_move(i, x, y, oz, (float)x, (float)y, newZf + 1.0f))
+			{ }
+			else if (canMoveZ(nz - 1) && do_move(i, x, y, oz, (float)x, (float)y, newZf - 1.0f))
+			{ }
 			else
-				{ parts[i].vz = 0; }
+			{
+				parts[i].vz *= elements[t].Collision;
+			}
 		}
+	}
+
+	{
+		std::lock_guard<std::mutex> lock(simMutex);
+		MovementPhase(i, neighbourhood);
 	}
 }
 
@@ -4075,25 +4090,58 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 						rt = int(parts[i].tmp*0.20f+5.0f);
 
 					auto nx = -1, ny = -1;
-					// ---- X spread (horizontal, perpendicular to gravity) ----
-					for (auto j=clear_x+r; j>=0 && j>=clear_x-rt && j<clear_x+rt && j<XRES; j+=r)
+					// XYZ平等: randomly choose X or Z as first horizontal spread axis
+					bool tryXfirst = rng.chance(1, 2);
+					for (int axis = 0; axis < 2 && s == 0; axis++)
 					{
-						if ((TYP(GetPmap3D(j, fin_y, z))!=t || bmap[fin_y/CELL][j/CELL])
-							&& (s=do_move(i, x, y, z, (float)j, fin_yf)))
+						bool doX = (axis == 0) ? tryXfirst : !tryXfirst;
+						if (doX)
 						{
-							nx = (int)(parts[i].x+0.5f);
-							ny = (int)(parts[i].y+0.5f);
-							break;
+							// ---- X spread (horizontal, perpendicular to gravity) ----
+							for (auto j=clear_x+r; j>=0 && j>=clear_x-rt && j<clear_x+rt && j<XRES; j+=r)
+							{
+								if ((TYP(GetPmap3D(j, fin_y, z))!=t || bmap[fin_y/CELL][j/CELL])
+									&& (s=do_move(i, x, y, z, (float)j, fin_yf)))
+								{
+									nx = (int)(parts[i].x+0.5f);
+									ny = (int)(parts[i].y+0.5f);
+									break;
+								}
+								if (fin_y!=clear_y && (TYP(GetPmap3D(j, clear_y, z))!=t || bmap[clear_y/CELL][j/CELL])
+									&& (s=do_move(i, x, y, z, (float)j, clear_yf)))
+								{
+									nx = (int)(parts[i].x+0.5f);
+									ny = (int)(parts[i].y+0.5f);
+									break;
+								}
+								if (TYP(GetPmap3D(j, clear_y, z))!=t || (bmap[clear_y/CELL][j/CELL] && bmap[clear_y/CELL][j/CELL]!=WL_STREAM))
+									break;
+							}
 						}
-						if (fin_y!=clear_y && (TYP(GetPmap3D(j, clear_y, z))!=t || bmap[clear_y/CELL][j/CELL])
-							&& (s=do_move(i, x, y, z, (float)j, clear_yf)))
+						else
 						{
-							nx = (int)(parts[i].x+0.5f);
-							ny = (int)(parts[i].y+0.5f);
-							break;
+							// ---- Z spread (horizontal, orthogonal to gravity) XYZ对称 ----
+							int rz = (parts[i].vz != 0.0f) ? (parts[i].vz > 0 ? 1 : -1) : (rng.chance(1, 2) ? 1 : -1);
+							for (auto j = z + rz; j >= 0 && j >= z - rt && j < z + rt && j < ZRES; j += rz)
+							{
+								if ((TYP(GetPmap3D(clear_x, fin_y, j)) != t)
+									&& (s = do_move(i, x, y, z, clear_xf, fin_yf, (float)j)))
+								{
+									nx = (int)(parts[i].x + 0.5f);
+									ny = (int)(parts[i].y + 0.5f);
+									break;
+								}
+								if (fin_y != clear_y && (TYP(GetPmap3D(clear_x, clear_y, j)) != t)
+									&& (s = do_move(i, x, y, z, clear_xf, clear_yf, (float)j)))
+								{
+									nx = (int)(parts[i].x + 0.5f);
+									ny = (int)(parts[i].y + 0.5f);
+									break;
+								}
+								if (TYP(GetPmap3D(clear_x, clear_y, j)) != t)
+									break;
+							}
 						}
-						if (TYP(GetPmap3D(j, clear_y, z))!=t || (bmap[clear_y/CELL][j/CELL] && bmap[clear_y/CELL][j/CELL]!=WL_STREAM))
-							break;
 					}
 
 					r = (parts[i].vy>0) ? 1 : -1;
@@ -4106,40 +4154,16 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 							if (TYP(GetPmap3D(nx, j, z))!=t || (bmap[j/CELL][nx/CELL] && bmap[j/CELL][nx/CELL]!=WL_STREAM))
 								break;
 						}
-					// ---- Z spread: XYZ symmetric — if X spread failed, try Z (horizontal, orthogonal to gravity) ----
-					if (s != 1 && s != -1)
+					// ---- Z spread Y settle: if Z spread found a spot earlier, settle in Y at new Z ----
+					if (s == 1 && !tryXfirst)
 					{
-						int rz = (parts[i].vz != 0.0f) ? (parts[i].vz > 0 ? 1 : -1) : (rng.chance(1, 2) ? 1 : -1);
-						for (auto j = z + rz; j >= 0 && j >= z - rt && j < z + rt && j < ZRES; j += rz)
+						auto nz = (int)(parts[i].z + 0.5f);
+						for (auto j = ny + r; j >= 0 && j < YRES && j >= ny - rt && j < ny + rt; j += r)
 						{
-							if ((TYP(GetPmap3D(clear_x, fin_y, j)) != t)
-								&& (s = do_move(i, x, y, z, clear_xf, fin_yf, (float)j)))
-							{
-								nx = (int)(parts[i].x + 0.5f);
-								ny = (int)(parts[i].y + 0.5f);
+							if ((TYP(GetPmap3D(nx, j, nz)) != t || bmap[j / CELL][nx / CELL]) && do_move(i, nx, ny, nz, (float)nx, (float)j))
 								break;
-							}
-							if (fin_y != clear_y && (TYP(GetPmap3D(clear_x, clear_y, j)) != t)
-								&& (s = do_move(i, x, y, z, clear_xf, clear_yf, (float)j)))
-							{
-								nx = (int)(parts[i].x + 0.5f);
-								ny = (int)(parts[i].y + 0.5f);
+							if (TYP(GetPmap3D(nx, j, nz)) != t || (bmap[j / CELL][nx / CELL] && bmap[j / CELL][nx / CELL] != WL_STREAM))
 								break;
-							}
-							if (TYP(GetPmap3D(clear_x, clear_y, j)) != t)
-								break;
-						}
-						// Z spread succeeded: Y settle (mirrors X→Y settle, but at new Z)
-						if (s == 1)
-						{
-							auto nz = (int)(parts[i].z + 0.5f);
-							for (auto j = ny + r; j >= 0 && j < YRES && j >= ny - rt && j < ny + rt; j += r)
-							{
-								if ((TYP(GetPmap3D(nx, j, nz)) != t || bmap[j / CELL][nx / CELL]) && do_move(i, nx, ny, nz, (float)nx, (float)j))
-									break;
-								if (TYP(GetPmap3D(nx, j, nz)) != t || (bmap[j / CELL][nx / CELL] && bmap[j / CELL][nx / CELL] != WL_STREAM))
-									break;
-							}
 						}
 					}
 					else if (s==-1) {} // particle is out of bounds
@@ -4558,7 +4582,7 @@ void Simulation::CheckStacking()
 		int x = (int)(parts[i].x + 0.5f);
 		int y = (int)(parts[i].y + 0.5f);
 		int z = (int)(parts[i].z + 0.5f);
-		if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=384) continue;
+		if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=ZRES) continue;
 		count3D[PackXYZ(x, y, z)]++;
 	}
 
@@ -4585,7 +4609,7 @@ void Simulation::CheckStacking()
 			int x = (int)(parts[i].x+0.5f);
 			int y = (int)(parts[i].y+0.5f);
 			int z = (int)(parts[i].z+0.5f);
-			if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=384) continue;
+			if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=ZRES) continue;
 			if (elements[t].Properties & TYPE_ENERGY) continue;
 
 			auto it = count3D.find(PackXYZ(x, y, z));
@@ -4662,7 +4686,7 @@ void Simulation::BuildSpatialMap()
 		int x = (int)(parts[i].x + 0.5f);
 		int y = (int)(parts[i].y + 0.5f);
 		int z = (int)(parts[i].z + 0.5f);
-		if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=384) continue;
+		if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=ZRES) continue;
 		spatialMap[PackXYZ(x, y, z)] = i;
 	}
 }
@@ -4681,18 +4705,19 @@ int Simulation::FindParticle3D(int x, int y, int z) const
 
 int Simulation::GetPmap3D(int x, int y, int z, int skipSelf) const
 {
-	if (x < 0 || y < 0 || x >= XRES || y >= YRES || z < 0 || z >= 384)
+	if (x < 0 || y < 0 || x >= XRES || y >= YRES || z < 0 || z >= ZRES)
 		return 0;
 
-	// Z≈0: fast path via 2D pmap (backward compatible, O(1))
-	if (z >= -1 && z <= 1)
+	// z=0: pmap (backward compatible, fast)
+	// z≠0: spatialMap (exact Z layer — pmap is 2D and can't distinguish Z layers)
+	if (z == 0)
 	{
 		unsigned r = pmap[y][x];
-		if (r && ID(r) == skipSelf) return 0; // skip self
+		if (r && ID(r) == skipSelf) return 0;
 		return r;
 	}
 
-	// Other Z layers: spatial hash (O(1) average)
+	// All non-zero Z: spatial hash
 	std::shared_lock lock(spatialMutex);
 	auto it = spatialMap.find(PackXYZ(x, y, z));
 	if (it != spatialMap.end())

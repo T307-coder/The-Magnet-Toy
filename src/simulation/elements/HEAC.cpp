@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "simulation/Air.h"
 
 static int update(UPDATE_FUNC_ARGS);

@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 
@@ -63,7 +63,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					int r = pmap[y+ry][x+rx];
+					int r = TPT_PM(x+rx, y+ry);
 					if (!r)
 						r = sim->photons[y+ry][x+rx];
 					if (!r)
@@ -89,7 +89,7 @@ static int update(UPDATE_FUNC_ARGS)
 		for (int ry = -rd; ry <= rd; ry++)
 			if (x + rx >= 0 && y + ry >= 0 && x + rx < XRES && y + ry < YRES && (rx || ry))
 			{
-				int r = pmap[y+ry][x+rx];
+				int r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					r = sim->photons[y+ry][x+rx];
 				if (!r)
@@ -112,7 +112,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					int r = pmap[y+ry][x+rx];
+					int r = TPT_PM(x+rx, y+ry);
 					if (!r)
 						continue;
 					auto nx = x + rx;

@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include <algorithm>
 
 static int update(UPDATE_FUNC_ARGS);
@@ -59,7 +59,7 @@ static int update(UPDATE_FUNC_ARGS)
 	rndstore >>= 2;
 	if (rx || ry)
 	{
-		auto r = pmap[y+ry][x+rx];
+		auto r = TPT_PM(x+rx, y+ry);
 		//@ VINE -> PLNT
 		if (!(rndstore % 15))
 			sim->part_change_type(i, x, y, PT_PLNT);

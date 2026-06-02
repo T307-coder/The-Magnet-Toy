@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "VIRS.h"
 
 static int graphics(GRAPHICS_FUNC_ARGS);
@@ -87,7 +87,7 @@ int Element_VIRS_update(UPDATE_FUNC_ARGS)
 		{
 			if (rx || ry)
 			{
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					continue;
 

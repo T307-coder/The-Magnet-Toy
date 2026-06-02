@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "FIRE.h"
 #include "FILT.h"
 
@@ -71,7 +71,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		for (auto ry = -1; ry <= 1; ry++)
 		{
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if (!r)
 				continue;
 			if (TYP(r)==PT_ISOZ || TYP(r)==PT_ISZS)

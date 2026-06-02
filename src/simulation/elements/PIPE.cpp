@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "PIPE.h"
 #include "SOAP.h"
 
@@ -131,7 +131,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 				{
 					if (rx || ry)
 					{
-						auto r = pmap[y+ry][x+rx];
+						auto r = TPT_PM(x+rx, y+ry);
 						if (TYP(r) == PT_BRCK)
 						{
 							if (parts[i].tmp & PPIP_TMPFLAG_PAUSED)
@@ -178,7 +178,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 					if (rx || ry)
 					{
 						count++;
-						auto r = pmap[y+ry][x+rx];
+						auto r = TPT_PM(x+rx, y+ry);
 						if (!r)
 							continue;
 						if (TYP(r) == PT_HEAC)
@@ -238,7 +238,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 				auto rnd = rndstore&7;
 				auto rx = Element_PIPE_offsets[rnd].X;
 				auto ry = Element_PIPE_offsets[rnd].Y;
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if(!r)
 					r = sim->photons[y+ry][x+rx];
 				if (surround_space && !r && TYP(parts[i].ctype))  //creating at end
@@ -274,7 +274,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					if (!r)
 					{
 						// BRCK border
@@ -300,7 +300,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 				{
 					if (rx || ry)
 					{
-						if (!pmap[y+ry][x+rx] && sim->bmap[(y+ry)/CELL][(x+rx)/CELL]!=WL_ALLOWAIR && sim->bmap[(y+ry)/CELL][(x+rx)/CELL]!=WL_WALL && sim->bmap[(y+ry)/CELL][(x+rx)/CELL]!=WL_WALLELEC && (sim->bmap[(y+ry)/CELL][(x+rx)/CELL]!=WL_EWALL || sim->emap[(y+ry)/CELL][(x+rx)/CELL]))
+						if (!TPT_PM(x+rx, y+ry) && sim->bmap[(y+ry)/CELL][(x+rx)/CELL]!=WL_ALLOWAIR && sim->bmap[(y+ry)/CELL][(x+rx)/CELL]!=WL_WALL && sim->bmap[(y+ry)/CELL][(x+rx)/CELL]!=WL_WALLELEC && (sim->bmap[(y+ry)/CELL][(x+rx)/CELL]!=WL_EWALL || sim->emap[(y+ry)/CELL][(x+rx)/CELL]))
 							parts[i].life=50;
 					}
 				}
@@ -315,7 +315,7 @@ int Element_PIPE_update(UPDATE_FUNC_ARGS)
 				{
 					if (rx || ry)
 					{
-						auto r = pmap[y+ry][x+rx];
+						auto r = TPT_PM(x+rx, y+ry);
 						if ((TYP(r)==PT_PIPE || TYP(r) == PT_PPIP) && parts[i].life)
 							issingle = 0;
 					}
@@ -558,7 +558,7 @@ static void pushParticle(Simulation * sim, int i, int count, int original)
 			rndstore = rndstore>>3;
 			auto rx = Element_PIPE_offsets[rnd].X;
 			auto ry = Element_PIPE_offsets[rnd].Y;
-			auto r = sim->pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if (!r)
 				continue;
 			else if ((TYP(r) == PT_PIPE || TYP(r) == PT_PPIP) && (sim->parts[ID(r)].tmp&PFLAG_COLORS) != notctype && !TYP(sim->parts[ID(r)].ctype))

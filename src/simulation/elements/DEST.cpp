@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 static int graphics(GRAPHICS_FUNC_ARGS);
@@ -53,7 +53,7 @@ static int update(UPDATE_FUNC_ARGS)
 	auto &elements = sd.elements;
 	int rx = sim->rng.between(-2, 2);
 	int ry = sim->rng.between(-2, 2);
-	int r = pmap[y+ry][x+rx];
+	int r = TPT_PM(x+rx, y+ry);
 	if (!r)
 		return 0;
 	int rt = TYP(r);

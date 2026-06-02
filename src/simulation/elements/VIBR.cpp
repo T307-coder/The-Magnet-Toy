@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "VIBR.h"
 
 void Element::Element_VIBR()
@@ -91,7 +91,7 @@ int Element_VIBR_update(UPDATE_FUNC_ARGS)
 			auto rx = orbit_rx[rndstore & 7];
 			auto ry = orbit_ry[rndstore & 7];
 			rndstore = rndstore >> 3;
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if (TYP(r) && TYP(r) != PT_BREC && (elements[TYP(r)].Properties&PROP_CONDUCTS) && !parts[ID(r)].life)
 			{
 				parts[ID(r)].life = 4;
@@ -104,7 +104,7 @@ int Element_VIBR_update(UPDATE_FUNC_ARGS)
 		{
 			auto rx = rndstore%7-3;
 			auto ry = (rndstore>>3)%7-3;
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if (TYP(r) && TYP(r) != PT_VIBR && TYP(r) != PT_BVBR && (!sd.IsHeatInsulator(parts[ID(r)])))
 			{
 				parts[ID(r)].temp = restrict_flt(parts[ID(r)].temp + parts[i].tmp * 3, MIN_TEMP, MAX_TEMP);
@@ -149,7 +149,7 @@ int Element_VIBR_update(UPDATE_FUNC_ARGS)
 		{
 			if (rx || ry)
 			{
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					continue;
 				if (parts[i].life)
@@ -200,7 +200,7 @@ int Element_VIBR_update(UPDATE_FUNC_ARGS)
 		rndstore >>= 3;
 		if (rx || ry)
 		{
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if (TYP(r) != PT_VIBR && TYP(r) != PT_BVBR)
 				continue;
 			if (parts[i].tmp > parts[ID(r)].tmp)

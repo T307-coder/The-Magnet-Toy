@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 
@@ -75,7 +75,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					if (!r || (parts[i].tmp >=maxtmp))
 						continue;
 					if (TYP(r)==PT_MERC&& sim->rng.chance(1, 3))
@@ -98,7 +98,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					if (parts[i].tmp<=maxtmp)
 						continue;
 					if ((!r)&&parts[i].tmp>=1)//if nothing then create MERC
@@ -120,7 +120,7 @@ static int update(UPDATE_FUNC_ARGS)
 		auto ry = sim->rng.between(-2, 2);
 		if (rx || ry)
 		{
-			auto r = pmap[y+ry][x+rx];
+			auto r = TPT_PM(x+rx, y+ry);
 			if (!r)
 				continue;
 			if (TYP(r)==PT_MERC&&(parts[i].tmp>parts[ID(r)].tmp)&&parts[i].tmp>0)//diffusion
@@ -173,7 +173,7 @@ static int update(UPDATE_FUNC_ARGS)
 			for (auto ry = -1; ry <= 1; ry++)
 			{
 				if (!rx && !ry) continue;
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (r)
 				{
 					int rt = TYP(r);
@@ -223,7 +223,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
 		if (!rx && !ry) continue;
-		auto r = pmap[y+ry][x+rx];
+		auto r = TPT_PM(x+rx, y+ry);
 		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))
 		{
 			int diff = parts[i].tmp4 - parts[ID(r)].tmp4;

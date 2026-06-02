@@ -17,7 +17,7 @@ constexpr int YCELLS = CELLS.Y;
 constexpr int NCELL  = XCELLS * YCELLS;
 constexpr int XRES   = RES.X;
 constexpr int YRES   = RES.Y;
-constexpr int ZRES   = XRES; // XYZ symmetry: Z dimension equals XY
+constexpr int ZRES   = YRES; // XYZ symmetry: Z dimension equals Y (cubic compatible)
 constexpr int NPART  = XRES * YRES;
 
 // 3D tile constants for parallel simulation

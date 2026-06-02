@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "PLNT.h"
 #include <algorithm>
 
@@ -268,7 +268,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					switch (TYP(r))
 					{
 						case PT_WATR:
@@ -331,7 +331,7 @@ static int update(UPDATE_FUNC_ARGS)
 				{
 					if (rx || ry)
 					{
-						auto r = pmap[y+ry][x+rx];
+						auto r = TPT_PM(x+rx, y+ry);
 						//@ PLNT + SMKE/CO2 -> PLNT + O2
 						if (!r)
 							sim->create_part(-1,x+rx,y+ry,PT_O2);

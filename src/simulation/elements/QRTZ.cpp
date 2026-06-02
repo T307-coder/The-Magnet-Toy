@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "QRTZ.h"
 
 static void create(ELEMENT_CREATE_FUNC_ARGS);
@@ -74,7 +74,7 @@ int Element_QRTZ_update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					if (!r)
 						continue;
 					else if (TYP(r)==PT_SLTW && sim->rng.chance(1, 500))
@@ -133,7 +133,7 @@ int Element_QRTZ_update(UPDATE_FUNC_ARGS)
 					}
 				}
 				//diffusion
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					continue;
 				else if (TYP(r)==PT_QRTZ && (parts[i].tmp>parts[ID(r)].tmp) && parts[ID(r)].tmp>=0)

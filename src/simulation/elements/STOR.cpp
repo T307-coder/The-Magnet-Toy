@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "SOAP.h"
 
 static int update(UPDATE_FUNC_ARGS);
@@ -65,7 +65,7 @@ static int update(UPDATE_FUNC_ARGS)
 		{
 			if (rx || ry)
 			{
-				auto r = pmap[y+ry][x+rx];
+				auto r = TPT_PM(x+rx, y+ry);
 				if (!r)
 					r= sim->photons[y+ry][x+rx];
 				if (!r)

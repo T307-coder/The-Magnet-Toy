@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "simulation/MagnetismCommon.h"
 #include "simulation/ElectricityCommon.h"
 
@@ -58,7 +58,7 @@ static int update(UPDATE_FUNC_ARGS)
 			{
 				if (rx || ry)
 				{
-					auto r = pmap[y+ry][x+rx];
+					auto r = TPT_PM(x+rx, y+ry);
 					switch (TYP(r))
 					{
 					case PT_SALT:

@@ -1,4 +1,4 @@
-#include "simulation/ElementCommon.h"
+﻿#include "simulation/ElementCommon.h"
 #include "simulation/ElectricityCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
@@ -49,51 +49,55 @@ void Element::Element_WATR()
 
 static int update(UPDATE_FUNC_ARGS)
 {
+	int z = int(parts[i].z + 0.5f);
 	for (auto rx = -1; rx <= 1; rx++)
 	{
 		for (auto ry = -1; ry <= 1; ry++)
 		{
-			if (rx || ry)
+			for (auto rz = -1; rz <= 1; rz++) // XYZ平等: full 3D neighbour scan
 			{
-				auto r = pmap[y+ry][x+rx];
-				if (!r)
-					continue;
-				if (TYP(r)==PT_SALT && sim->rng.chance(1, 50))
+				if (rx || ry || rz)
 				{
-					//@ WATR + SALT -> SLTW + SALT
-					sim->part_change_type(i,x,y,PT_SLTW);
-					// on average, convert 3 WATR to SLTW before SALT turns into SLTW
-					if (sim->rng.chance(1, 3))
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_SLTW);
-				}
-				else if ((TYP(r)==PT_RBDM||TYP(r)==PT_LRBD) && (sim->legacy_enable||parts[i].temp>(273.15f+12.0f)) && sim->rng.chance(1, 100))
-				{
-					//@ WATR + RBDM/LRBD -> FIRE + RBDM/LRBD
-					sim->part_change_type(i,x,y,PT_FIRE);
-					parts[i].life = 4;
-					parts[i].ctype = PT_WATR;
-				}
-				else if (TYP(r)==PT_FIRE && parts[ID(r)].ctype!=PT_WATR)
-				{
-					sim->kill_part(ID(r));
-					if (sim->rng.chance(1, 30))
+					auto r = TPT_PM3D(x+rx, y+ry, z+rz);
+					if (!r)
+						continue;
+					if (TYP(r)==PT_SALT && sim->rng.chance(1, 50))
 					{
-						sim->kill_part(i);
-						return 1;
+						//@ WATR + SALT -> SLTW + SALT
+						sim->part_change_type(i,x,y,PT_SLTW);
+						// on average, convert 3 WATR to SLTW before SALT turns into SLTW
+						if (sim->rng.chance(1, 3))
+							sim->part_change_type(ID(r),x+rx,y+ry,PT_SLTW);
 					}
-				}
-				else if (TYP(r)==PT_SLTW && sim->rng.chance(1, 2000))
-				{
-					//@ WATR + SLTW -> 2xSLTW
-					sim->part_change_type(i,x,y,PT_SLTW);
-				}
-				else if (TYP(r)==PT_ROCK && fabs(parts[i].vx)+fabs(parts[i].vy) >= 0.5 && sim->rng.chance(1, 1000)) // ROCK erosion
-				{
-					//@ WATR + ROCK -> WATR + SAND/STNE
-					if (sim->rng.chance(1,3))
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_SAND);
-					else
-						sim->part_change_type(ID(r),x+rx,y+ry,PT_STNE);
+					else if ((TYP(r)==PT_RBDM||TYP(r)==PT_LRBD) && (sim->legacy_enable||parts[i].temp>(273.15f+12.0f)) && sim->rng.chance(1, 100))
+					{
+						//@ WATR + RBDM/LRBD -> FIRE + RBDM/LRBD
+						sim->part_change_type(i,x,y,PT_FIRE);
+						parts[i].life = 4;
+						parts[i].ctype = PT_WATR;
+					}
+					else if (TYP(r)==PT_FIRE && parts[ID(r)].ctype!=PT_WATR)
+					{
+						sim->kill_part(ID(r));
+						if (sim->rng.chance(1, 30))
+						{
+							sim->kill_part(i);
+							return 1;
+						}
+					}
+					else if (TYP(r)==PT_SLTW && sim->rng.chance(1, 2000))
+					{
+						//@ WATR + SLTW -> 2xSLTW
+						sim->part_change_type(i,x,y,PT_SLTW);
+					}
+					else if (TYP(r)==PT_ROCK && fabs(parts[i].vx)+fabs(parts[i].vy) >= 0.5 && sim->rng.chance(1, 1000)) // ROCK erosion
+					{
+						//@ WATR + ROCK -> WATR + SAND/STNE
+						if (sim->rng.chance(1,3))
+							sim->part_change_type(ID(r),x+rx,y+ry,PT_SAND);
+						else
+							sim->part_change_type(ID(r),x+rx,y+ry,PT_STNE);
+					}
 				}
 			}
 		}
