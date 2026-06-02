@@ -3408,19 +3408,27 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 		}
 		if (ny!=y || nx!=x)
 		{
-			if (pmap[y][x] && ID(pmap[y][x]) == i)
-				pmap[y][x] = 0;
-			else if (photons[y][x] && ID(photons[y][x]) == i)
-				photons[y][x] = 0;
+			// Only update pmap for particles on the base Z plane
+			if (z >= -1 && z <= 1)
+			{
+				if (pmap[y][x] && ID(pmap[y][x]) == i)
+					pmap[y][x] = 0;
+				else if (photons[y][x] && ID(photons[y][x]) == i)
+					photons[y][x] = 0;
+			}
 			if (nx<CELL || nx>=XRES-CELL || ny<CELL || ny>=YRES-CELL)
 			{
 				kill_part(i);
 				return;
 			}
-			if (elements[t].Properties & TYPE_ENERGY)
-				photons[ny][nx] = PMAP(i, t);
-			else if (t)
-				pmap[ny][nx] = PMAP(i, t);
+			if (z >= -1 && z <= 1)
+			{
+				if (elements[t].Properties & TYPE_ENERGY)
+					photons[ny][nx] = PMAP(i, t);
+				else if (t)
+					pmap[ny][nx] = PMAP(i, t);
+			}
+			// z鈮? particles use spatialMap (rebuilt next frame)
 		}
 	}
 	else if (elements[t].Properties & TYPE_ENERGY)
@@ -3701,21 +3709,21 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					auto nx = -1, ny = -1;
 					for (auto j=clear_x+r; j>=0 && j>=clear_x-rt && j<clear_x+rt && j<XRES; j+=r)
 					{
-						if ((TYP(pmap[fin_y][j])!=t || bmap[fin_y/CELL][j/CELL])
+						if ((TYP(GetPmap3D(j, fin_y, z))!=t || bmap[fin_y/CELL][j/CELL])
 							&& (s=do_move(i, x, y, z, z, (float)j, fin_yf)))
 						{
 							nx = (int)(parts[i].x+0.5f);
 							ny = (int)(parts[i].y+0.5f);
 							break;
 						}
-						if (fin_y!=clear_y && (TYP(pmap[clear_y][j])!=t || bmap[clear_y/CELL][j/CELL])
+						if (fin_y!=clear_y && (TYP(GetPmap3D(j, clear_y, z))!=t || bmap[clear_y/CELL][j/CELL])
 							&& (s=do_move(i, x, y, z, z, (float)j, clear_yf)))
 						{
 							nx = (int)(parts[i].x+0.5f);
 							ny = (int)(parts[i].y+0.5f);
 							break;
 						}
-						if (TYP(pmap[clear_y][j])!=t || (bmap[clear_y/CELL][j/CELL] && bmap[clear_y/CELL][j/CELL]!=WL_STREAM))
+						if (TYP(GetPmap3D(j, clear_y, z))!=t || (bmap[clear_y/CELL][j/CELL] && bmap[clear_y/CELL][j/CELL]!=WL_STREAM))
 							break;
 					}
 
@@ -3724,9 +3732,9 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					if (s==1)
 						for (auto j=ny+r; j>=0 && j<YRES && j>=ny-rt && j<ny+rt; j+=r)
 						{
-							if ((TYP(pmap[j][nx])!=t || bmap[j/CELL][nx/CELL]) && do_move(i, nx, ny, z, (float)nx, (float)j))
+							if ((TYP(GetPmap3D(nx, j, z))!=t || bmap[j/CELL][nx/CELL]) && do_move(i, nx, ny, z, (float)nx, (float)j))
 								break;
-							if (TYP(pmap[j][nx])!=t || (bmap[j/CELL][nx/CELL] && bmap[j/CELL][nx/CELL]!=WL_STREAM))
+							if (TYP(GetPmap3D(nx, j, z))!=t || (bmap[j/CELL][nx/CELL] && bmap[j/CELL][nx/CELL]!=WL_STREAM))
 								break;
 						}
 					else if (s==-1) {} // particle is out of bounds
