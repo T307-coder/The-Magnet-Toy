@@ -1861,13 +1861,20 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 		{
 			std::lock_guard<std::shared_mutex> lock(spatialMutex);
 			if (!onBasePlane)
-				spatialMap.erase(PackXYZ(x, y, z));
+			{
+				// Only erase if WE own the entry (match pmap's ID-check policy).
+				// Without this, a displaced particle would erase the displacer's entry.
+				auto oldEntry = spatialMap.find(PackXYZ(x, y, z));
+				if (oldEntry != spatialMap.end() && oldEntry.second() == i)
+					spatialMap.erase(oldEntry);
+			}
 			if (t && newOffPlane)
 			{
-				// Don't overwrite existing particle at destination
-				auto existing = spatialMap.find(PackXYZ(nx, ny, newZ));
-				if (existing == spatialMap.end() || existing.second() == i)
-					spatialMap[PackXYZ(nx, ny, newZ)] = i;
+				// Unconditional overwrite (same policy as pmap): last mover wins.
+				// The displaced particle becomes a temporary ghost — exactly like
+				// pmap on z=0. It will try to move when its own MovementPhase runs,
+				// and per-frame spatialMap rebuild ensures no permanent ghosting.
+				spatialMap[PackXYZ(nx, ny, newZ)] = i;
 			}
 		}
 
@@ -3154,11 +3161,18 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		parts.Flatten();
 	}
 
-	// 4b. Phase B: pmap rebuild + tile population (single pass, after Flatten so indices are stable)
+	// 4b. Phase B: pmap rebuild + spatialMap rebuild + tile population (single pass, after Flatten so indices are stable)
 	memset(pmap, 0, sizeof(pmap));
 	memset(pmap_count, 0, sizeof(pmap_count));
 	memset(photons, 0, sizeof(photons));
 	NUM_PARTS = 0;
+
+	// Rebuild spatialMap from scratch every frame (same policy as pmap).
+	// This prevents permanent "ghost" particles when two particles end up
+	// at the same XYZ cell (via can_move=1 swap). Without per-frame rebuild,
+	// spatialMap's incremental update + overwrite protection would leave the
+	// displaced particle permanently invisible, causing cascading穿模.
+	spatialMap.clear();
 
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
@@ -3188,6 +3202,15 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			}
 		}
 		NUM_PARTS++;
+
+		// --- spatialMap rebuild (all Z, XYZ对称) ---
+		// Same "last writer wins" policy as pmap: if two particles share
+		// the same cell, the one processed later in this loop wins the slot.
+		// This matches original TPT behaviour where pmap is rebuilt per-frame.
+		if (x >= 0 && y >= 0 && z >= 0 && x < XRES && y < YRES && z < ZRES)
+		{
+			spatialMap[PackXYZ(x, y, z)] = i;
+		}
 
 		if (elementRecount && t >= 0 && t < PT_NUM && elements[t].Enabled)
 			elementCount[t]++;
@@ -4293,6 +4316,13 @@ void Simulation::RecalcFreeParticles(bool do_life_dec)
 	memset(pmap_count, 0, sizeof(pmap_count));
 	memset(photons, 0, sizeof(photons));
 
+	// Rebuild spatialMap from scratch every frame (same policy as pmap).
+	// This prevents permanent "ghost" particles when two particles end up
+	// at the same XYZ cell (via can_move=1 swap). Without per-frame rebuild,
+	// the displaced particle stays invisible in spatialMap forever, causing
+	// cascading穿模 (multiple particles piling up at the same position).
+	spatialMap.clear();
+
 	NUM_PARTS = 0;
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
@@ -4308,10 +4338,10 @@ void Simulation::RecalcFreeParticles(bool do_life_dec)
 		auto y = int(parts[i].y+0.5f);
 		auto z = int(parts[i].z+0.5f);
 		bool inBounds = false;
-		// 3D: only particles on the default Z-plane (z鈮?) go into 2D pmap.
+		// 3D: only particles on the default Z-plane (z≈0) go into 2D pmap.
 		// Particles at other Z layers use the 3D spatial index instead,
 		// preventing cross-layer interaction through pmap.
-		bool onDefaultZ = (z >= -1 && z <= 1); // allow 卤1 tolerance
+		bool onDefaultZ = (z >= -1 && z <= 1); // allow ±1 tolerance
 		if (x>=0 && y>=0 && x<XRES && y<YRES)
 		{
 			if (elements[t].Properties & TYPE_ENERGY)
@@ -4329,6 +4359,15 @@ void Simulation::RecalcFreeParticles(bool do_life_dec)
 			}
 			inBounds = true;
 		}
+
+		// Rebuild spatialMap for ALL Z layers (XYZ平等).
+		// Same "last writer wins" policy as pmap: if two particles share
+		// the same cell, the one processed later in this loop wins.
+		if (x >= 0 && y >= 0 && z >= 0 && x < XRES && y < YRES && z < ZRES)
+		{
+			spatialMap[PackXYZ(x, y, z)] = i;
+		}
+
 		NUM_PARTS ++;
 
 		if (elementRecount && t >= 0 && t < PT_NUM && elements[t].Enabled)
