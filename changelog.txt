@@ -1,10 +1,11 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-Electromagnetism mod initial release.
-Magnetic & electric fields with Lorentz force, dielectrophoresis, induction.
-B-field via Biot-Savart + FFT Poisson solver. Ferromagnetic elements (IRON, BMTL, BRMT, BREC, TTAN, TESC, GOLD, TUNG, PTNM, LITH).
-Electric field with Coulomb interaction. Circuit-compatible conductors (METL, PSCN, NSCN, INST, SWCH, INWR).
-ELEC/PROT charged particles. ELMG/MGPN magnetic sources. SPRK induction via dB/dt.
-UBFM/EBFM uniform B/E field elements.
-Q key to toggle ELEC/PROT field production. Lua bindings for magnetism/electricity control.
+v1.1.2 — Async fields, field extrapolation, induced SPRK fix.
+Default async B/E field solver (same Exchange pattern as Newtonian gravity).
+T key: temporal field extrapolation (grid-level, factor 0.5).
+O key: source position prediction (particle-level, writes at predicted next-frame positions).
+Induced SPRK (dB/dt) no longer contribute to Biot-Savart current field.
+Induced flag propagates through all SPRK conduction paths.
+Q key: toggle ELEC/PROT field production.
+Full coverage: all conductors, magnetic monopoles (MGPN/ELMG/MAGN), gravity sources (NBHL/GBMB).
