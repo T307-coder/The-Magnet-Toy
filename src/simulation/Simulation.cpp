@@ -3693,8 +3693,8 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				auto pGravY = neighbourhood.pGravY;
 				auto pGravZ = neighbourhood.pGravZ;
 				auto r = rng.between(0, 1) * 2 - 1;// position search direction (left/right first)
-				if ((clear_x!=x || clear_y!=y || clear_z!=z || neighbourhood.nt || neighbourhood.surround_space) &&
-					(fabsf(parts[i].vx)>0.01f || fabsf(parts[i].vy)>0.01f || fabsf(parts[i].vz)>0.01f))
+				if ((clear_x!=x || clear_y!=y || neighbourhood.nt || neighbourhood.surround_space) &&
+					(fabsf(parts[i].vx)>0.01f || fabsf(parts[i].vy)>0.01f))
 				{
 					// allow diagonal movement if target position is blocked
 					// but no point trying this if particle is stuck in a block of identical particles
