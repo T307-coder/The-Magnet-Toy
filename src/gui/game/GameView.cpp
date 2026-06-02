@@ -2431,6 +2431,7 @@ void GameView::OnDraw()
 				sampleInfo << ", Temp: ";
 				format::RenderTemperature(sampleInfo, sample.particle.temp, c->GetTemperatureScale());
 				sampleInfo << ", Life: " << sample.particle.life;
+				sampleInfo << ", VX:" << sample.particle.vx << " VY:" << sample.particle.vy;
 				if (sample.particle.type != PT_RFRG && sample.particle.type != PT_RFGL && sample.particle.type != PT_LIFE)
 				{
 					if (sample.particle.type == PT_CONV)

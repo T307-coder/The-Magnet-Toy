@@ -33,7 +33,7 @@ namespace
 	{
 		struct Neighbourhood
 		{
-			std::array<int, 26> surround; // 3x3x3-1 = 26 neighbors (XYZ equal-rights Phase 3)
+			std::array<int, 8> surround;
 			int surround_space = 0;
 			int nt = 0; //if nt is greater than 1 after this, then there is a particle around the current particle, that is NOT the current particle's type, for water movement.
 			float pGravX = 0;
@@ -1375,9 +1375,10 @@ int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ) const
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 0;
 
-	// Phase 2: Z-aware occupancy via GetPmap3D (moveZ>=0: specific layer; moveZ==-1: Z=0)
-	int zCheck = (moveZ >= 0) ? moveZ : 0;
-	r = GetPmap3D(nx, ny, zCheck);
+	if (moveZ >= 0)
+		r = GetPmap3D(nx, ny, moveZ);
+	else
+		r = pmap[ny][nx];
 	if (r)
 		r = (r&~PMAPMASK) | parts[ID(r)].type;
 	if (rr)
@@ -1459,7 +1460,7 @@ int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ) const
 	return result;
 }
 
-int Simulation::try_move(int i, int x, int y, int nx, int ny)
+int Simulation::try_move(int i, int x, int y, int nx, int ny, int nz)
 {
 	unsigned r = 0, e;
 
@@ -1468,11 +1469,10 @@ int Simulation::try_move(int i, int x, int y, int nx, int ny)
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 1;
 
-	int nz = (int)(parts[i].z + 0.5f);
 	e = eval_move(parts[i].type, nx, ny, &r, nz);
 
 	/* half-silvered mirror */
-	if (!e && parts[i].type==PT_PHOT && ((TYP(r)==PT_BMTL && rng.chance(1, 2)) || TYP(GetPmap3D(x, y, nz))==PT_BMTL))
+	if (!e && parts[i].type==PT_PHOT && ((TYP(r)==PT_BMTL && rng.chance(1, 2)) || TYP(pmap[y][x])==PT_BMTL))
 		e = 2;
 
 	auto &sd = SimulationData::CRef();
@@ -1664,12 +1664,16 @@ int Simulation::try_move(int i, int x, int y, int nx, int ny)
 	{
 	case PT_VOID:
 	case PT_PVOD:
+		// 3D: only consume particles on the same Z layer
+		if (fabsf(parts[i].z - parts[ID(r)].z) > 1.5f) break;
 		// this is where void eats particles
 		// void ctype already checked in eval_move
 		kill_part(i);
 		return 0;
 	case PT_BHOL:
 	case PT_NBHL:
+		// 3D: only consume particles on the same Z layer as the black hole
+		if (fabsf(parts[i].z - parts[ID(r)].z) > 1.5f) break;
 		// this is where blackhole eats particles
 		if (!legacy_enable)
 		{
@@ -1679,7 +1683,8 @@ int Simulation::try_move(int i, int x, int y, int nx, int ny)
 		return 0;
 	case PT_WHOL:
 	case PT_NWHL:
-		// whitehole eats anar
+		// 3D: only affect particles on the same Z layer
+		if (fabsf(parts[i].z - parts[ID(r)].z) > 1.5f) break;
 		if (parts[i].type == PT_ANAR)
 		{
 			if (!legacy_enable)
@@ -1893,7 +1898,7 @@ int Simulation::is_blocking(int t, int x, int y) const
 	if (t & REFRACT) {
 		if (x<0 || y<0 || x>=XRES || y>=YRES)
 			return 0;
-		if (TYP(GetPmap3D(x, y, 0)) == PT_GLAS || TYP(GetPmap3D(x, y, 0)) == PT_BGLA)
+		if (TYP(pmap[y][x]) == PT_GLAS || TYP(pmap[y][x]) == PT_BGLA)
 			return 1;
 		return 0;
 	}
@@ -2251,8 +2256,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].type = t;
 	parts[i].x = (float)x;
 	parts[i].y = (float)y;
-	parts[i].z = (p == -2) ? setZ : 0.0f;
-		if (p == -2) parts[i].vz = rng.between(-20, 20) * 0.05f; // 3D brush: ~ +-1.0 random Z velocity
+	if (p == -2) parts[i].z = setZ;
 	parts[i].tmp5 = 0;
 	parts[i].tmp6 = 0;
 
@@ -2467,11 +2471,18 @@ Simulation::PlanMoveResult Simulation::PlanMove(Sim &sim, int i, int x, int y)
 	auto &sd = SimulationData::CRef();
 	auto &can_move = sd.can_move;
 	auto t = parts[i].type;
-	int fin_x, fin_y, clear_x, clear_y;
-	float fin_xf, fin_yf, clear_xf, clear_yf;
+	int fin_x, fin_y, fin_z, clear_x, clear_y, clear_z;
+	float fin_xf, fin_yf, fin_zf, clear_xf, clear_yf, clear_zf;
 	auto vx = parts[i].vx;
 	auto vy = parts[i].vy;
+	auto vz = parts[i].vz;
+	auto z = int(parts[i].z + 0.5f);
 	auto mv = fmaxf(fabsf(vx), fabsf(vy));
+	// Z: simple computation (powder velocities are small, no path interpolation needed)
+	clear_zf = parts[i].z;
+	clear_z = z;
+	fin_zf = clear_zf + vz;
+	fin_z = (int)(fin_zf + 0.5f);
 	if (mv < ISTP || std::isnan(mv))
 	{
 		clear_x = x;
@@ -2541,8 +2552,7 @@ Simulation::PlanMoveResult Simulation::PlanMove(Sim &sim, int i, int x, int y)
 			}
 			//block if particle can't move (0), or some special cases where it returns 1 (can_move = 3 but returns 1 meaning particle will be eaten)
 			//also photons are still blocked (slowed down) by any particle (even ones it can move through), and absorb wall also blocks particles
-			int moveZ = (int)(parts[i].z + 0.5f);
-int eval = sim.eval_move(t, fin_x, fin_y, nullptr, moveZ);
+			int eval = sim.eval_move(t, fin_x, fin_y, nullptr);
 			if (!eval || (can_move[t][TYP(pmap[fin_y][fin_x])] == 3 && eval == 1) || (t == PT_PHOT && pmap[fin_y][fin_x]) || bmap[fin_y/CELL][fin_x/CELL]==WL_DESTROYALL || closedEholeStart!=(bmap[fin_y/CELL][fin_x/CELL] == WL_EHOLE && !emap[fin_y/CELL][fin_x/CELL]))
 			{
 				// found an obstacle
@@ -2562,14 +2572,19 @@ int eval = sim.eval_move(t, fin_x, fin_y, nullptr, moveZ);
 	return {
 		fin_x,
 		fin_y,
+		fin_z,
 		clear_x,
 		clear_y,
+		clear_z,
 		fin_xf,
 		fin_yf,
+		fin_zf,
 		clear_xf,
 		clear_yf,
+		clear_zf,
 		vx,
 		vy,
+		vz,
 	};
 }
 
@@ -2589,38 +2604,21 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
 	Neighbourhood n;
-		auto j = 0;
-		auto z = int(parts[i].z + 0.5f);
-		// XY neighbors (indices 0-7): backward-compatible surround_space / nt
+	auto j = 0;
+	for (auto nx=-1; nx<2; nx++)
+	{
 		for (auto ny=-1; ny<2; ny++)
 		{
-			for (auto nx=-1; nx<2; nx++)
+			if (nx||ny)
 			{
-				if (nx||ny)
-				{
-					auto r = GetPmap3D(x+nx, y+ny, z);
-					n.surround[j] = r;
-					j++;
-					n.surround_space += (!TYP(r));
-					n.nt += (TYP(r)!=t);
-				}
+				auto r = pmap[y+ny][x+nx];
+				n.surround[j] = r;
+				j++;
+				n.surround_space += (!TYP(r)); // count empty space
+				n.nt += (TYP(r)!=t); // count empty space and particles of different type
 			}
 		}
-		// Z-axis neighbors (indices 8-25): 3D extension for heat conduction only
-		for (auto nz=-1; nz<2; nz++)
-		{
-			if (nz==0) continue; // XY already handled above
-			for (auto ny=-1; ny<2; ny++)
-			{
-				for (auto nx=-1; nx<2; nx++)
-				{
-					auto r = GetPmap3D(x+nx, y+ny, z+nz);
-					n.surround[j] = r;
-					j++;
-					// NOT counted in surround_space/nt (3D extension only)
-				}
-			}
-		}
+	}
 	if (!(elements[t].Properties & TYPE_SOLID) && (elements[t].Gravity || elements[t].NewtonianGravity))
 	{
 		GetGravityField(x, y, elements[t].Gravity, elements[t].NewtonianGravity, n.pGravX, n.pGravY);
@@ -2722,9 +2720,6 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		//particle gets velocity from the vx and vy maps
 		parts[i].vx += elements[t].Advection*vx[y/CELL][x/CELL] + neighbourhood.pGravX;
 		parts[i].vy += elements[t].Advection*vy[y/CELL][x/CELL] + neighbourhood.pGravY;
-		parts[i].vz += customGravityZ;
-		parts[i].vz += customGravityZ;
-
 
 		if (elements[t].Diffusion)//the random diffusion that gasses have
 		{
@@ -2761,77 +2756,28 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		if (transitionOccurred)
 			continue;
 
-		if (!parts[i].vx&&!parts[i].vy&&!parts[i].vz)//if its not moving, skip to next particle, movement code it next
+		if (!parts[i].vx&&!parts[i].vy&&!parts[i].vz)//if its not moving, skip to next particle
 			continue;
 
 		MovementPhase(i, neighbourhood);
-		// Z-axis powder-slide (mirrors MovementPhase scan, with pmap self-avoidance)
+
+		// Z movement for non-powder particles (powders handle Z in MovementPhase)
 		if (parts[i].vz != 0.0f)
 		{
 			float newZ = parts[i].z + parts[i].vz;
-			if (newZ < 0) { newZ = 0; parts[i].vz = 0; }
-			if (newZ >= 384) { newZ = 383.99f; parts[i].vz = 0; }
-			int tgtX = (int)(parts[i].x + 0.5f);
-			int tgtY = (int)(parts[i].y + 0.5f);
-			int oldZ = (int)(parts[i].z + 0.5f);
-			int newZi = (int)(newZ + 0.5f);
-			if (newZi == oldZ)
-			{
-				parts[i].z = newZ; // sub-cell, no collision
-			}
+			if (newZ < 0) { parts[i].z = 0; parts[i].vz = 0; }
+			else if (newZ >= 384) { parts[i].z = 383.99f; parts[i].vz = 0; }
 			else
 			{
-				// CRITICAL: like XY move(), clear old pmap so eval_move doesn't see self
-				int savedPmap = 0; bool hadPmap = false;
-				if (oldZ >= -1 && oldZ <= 1 && pmap[tgtY][tgtX] && ID(pmap[tgtY][tgtX]) == i)
-					{ savedPmap = pmap[tgtY][tgtX]; pmap[tgtY][tgtX] = 0; hadPmap = true; }
-				
-				int ev = eval_move(parts[i].type, tgtX, tgtY, nullptr, newZi);
-				if (ev)
-				{
-					parts[i].z = newZ;
-					// pmap stays cleared — RecalcFreeParticles will repopulate next frame
-				}
+				int tx = (int)(parts[i].x + 0.5f);
+				int ty = (int)(parts[i].y + 0.5f);
+				int oz = (int)(parts[i].z + 0.5f);
+				int nzi = (int)(newZ + 0.5f);
+				if (nzi == oz) { parts[i].z = newZ; }
+				else if (eval_move(parts[i].type, tx, ty, nullptr, nzi))
+					{ parts[i].z = newZ; }
 				else
-				{
-					// Restore pmap since we didn't move
-					if (hadPmap) pmap[tgtY][tgtX] = savedPmap;
-					
-					// Blocked — scan X and Y like XY powder slide for empty Z+dz spot
-					int dz = (parts[i].vz > 0) ? 1 : -1;
-					int t = parts[i].type;
-					const int rt = 10;
-					int r = rng.between(0, 1) * 2 - 1;
-					bool moved = false;
-					// Priority 1: scan X axis
-					for (int scanX = tgtX + r; scanX >= 0 && scanX >= tgtX-rt && scanX < tgtX+rt && scanX < XRES; scanX += r)
-					{
-						int occ = GetPmap3D(scanX, tgtY, oldZ + dz);
-						if ((!occ || TYP(occ) != t) && eval_move(parts[i].type, scanX, tgtY, nullptr, oldZ+dz))
-						{
-							parts[i].x = (float)scanX;
-							parts[i].z = (float)(oldZ + dz);
-							moved = true; break;
-						}
-						if (occ && (TYP(occ) != t || bmap[tgtY/CELL][scanX/CELL])) break;
-					}
-					// Priority 2: scan Y axis
-					if (!moved)
-					{
-						for (int scanY = tgtY + r; scanY >= 0 && scanY >= tgtY-rt && scanY < tgtY+rt && scanY < YRES; scanY += r)
-						{
-							int occ = GetPmap3D(tgtX, scanY, oldZ + dz);
-							if ((!occ || TYP(occ) != t) && eval_move(parts[i].type, tgtX, scanY, nullptr, oldZ+dz))
-							{
-								parts[i].y = (float)scanY;
-								parts[i].z = (float)(oldZ + dz);
-								moved = true; break;
-							}
-							if (occ && (TYP(occ) != t || bmap[scanY/CELL][tgtX/CELL])) break;
-						}
-					}
-					if (!moved) parts[i].vz = 0;
-				}
+					{ parts[i].vz = 0; }
 			}
 		}
 	}
@@ -2892,9 +2838,9 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 			// Heat transfer with other elements
 			auto hc_total = 0.0f; // Total heat capacity of elements involved
 			auto c_heat = 0.0f; // Total heat distributed between elements
-			int surround_hconduct[26]; // IDs of elements which exchange heat (3D)
+			int surround_hconduct[8]; // IDs of elements which exchange heat
 
-			for (auto j=0; j<26; j++)
+			for (auto j=0; j<8; j++)
 			{
 				surround_hconduct[j] = i;
 				auto r = neighbourhood.surround[j];
@@ -2929,7 +2875,7 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 			float pt = restrict_flt(c_heat / hc_total, MIN_TEMP, MAX_TEMP);
 
 			parts[i].temp = pt;
-			for (auto j=0; j<26; j++)
+			for (auto j=0; j<8; j++)
 			{
 				parts[surround_hconduct[j]].temp = pt;
 			}
@@ -3293,24 +3239,40 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 	auto t = parts[i].type;
 	auto x = int(parts[i].x+0.5f);
 	auto y = int(parts[i].y+0.5f);
-	int fin_x, fin_y, clear_x, clear_y;
-	float fin_xf, fin_yf, clear_xf, clear_yf;
+	auto z = int(parts[i].z+0.5f);
+	int fin_x, fin_y, fin_z, clear_x, clear_y, clear_z;
+	float fin_xf, fin_yf, fin_zf, clear_xf, clear_yf, clear_zf;
 	{
 		auto mr = PlanMove<true>(*this, i, x, y);
 		fin_x    = mr.fin_x;
 		fin_y    = mr.fin_y;
+		fin_z    = mr.fin_z;
 		clear_x  = mr.clear_x;
 		clear_y  = mr.clear_y;
+		clear_z  = mr.clear_z;
 		fin_xf   = mr.fin_xf;
 		fin_yf   = mr.fin_yf;
+		fin_zf   = mr.fin_zf;
 		clear_xf = mr.clear_xf;
 		clear_yf = mr.clear_yf;
+		clear_zf = mr.clear_zf;
 		parts[i].vx = mr.vx;
 		parts[i].vy = mr.vy;
+		parts[i].vz = mr.vz;
 	}
 
 	auto stagnant = parts[i].flags & FLAG_STAGNANT;
 	parts[i].flags &= ~FLAG_STAGNANT;
+
+	// DUST sliding diagnostic
+	if (t == PT_DUST && (fin_x != x || fin_y != y)) {
+		FILE *df = fopen("dust_slide.log", "a");
+		if (df) {
+			fprintf(df, "i=%d vx=%.3f vy=%.3f x=%d->%d y=%d->%d clrX=%d clrY=%d\n",
+				i, parts[i].vx, parts[i].vy, x, fin_x, y, fin_y, clear_x, clear_y);
+			fclose(df);
+		}
+	}
 
 	if (t==PT_STKM || t==PT_STKM2 || t==PT_FIGH)
 	{
@@ -3539,11 +3501,13 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 			else if (do_move(i, x, y, float(fin_x), float(2*y-fin_y)))
 			{
 				parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 			}
 			else
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 			}
 		}
 	}
@@ -3564,44 +3528,76 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 			}
 			else if (fin_y!=y && do_move(i, x, y, clear_xf, fin_yf))
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
+			}
+			// XYZ equal-rights: Z-only fallback, same priority as X-only/Y-only
+			else if (fin_z != z && eval_move(t, x, y, nullptr, fin_z))
+			{
+				parts[i].z = fin_zf;
+				parts[i].vx *= elements[t].Collision;
+				parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 			}
 			else
 			{
 				auto pGravX = neighbourhood.pGravX;
 				auto pGravY = neighbourhood.pGravY;
 				auto r = rng.between(0, 1) * 2 - 1;// position search direction (left/right first)
-				if ((clear_x!=x || clear_y!=y || neighbourhood.nt || neighbourhood.surround_space) &&
-					(fabsf(parts[i].vx)>0.01f || fabsf(parts[i].vy)>0.01f))
+				if ((clear_x!=x || clear_y!=y || clear_z!=z || neighbourhood.nt || neighbourhood.surround_space) &&
+					(fabsf(parts[i].vx)>0.01f || fabsf(parts[i].vy)>0.01f || fabsf(parts[i].vz)>0.01f))
 				{
 					// allow diagonal movement if target position is blocked
 					// but no point trying this if particle is stuck in a block of identical particles
 					auto dx = parts[i].vx - parts[i].vy*r;
 					auto dy = parts[i].vy + parts[i].vx*r;
+					auto dz = (parts[i].vz != 0.0f) ? (parts[i].vz > 0 ? 1.0f : -1.0f) : 0.0f;
 
-					auto mv = std::max(fabsf(dx), fabsf(dy));
-					dx /= mv;
-					dy /= mv;
+					auto mv2 = std::max({fabsf(dx), fabsf(dy), fabsf(dz)});
+					dx /= mv2;
+					dy /= mv2;
+					dz /= mv2;
 					if (do_move(i, x, y, clear_xf+dx, clear_yf+dy))
 					{
 						parts[i].vx *= elements[t].Collision;
 						parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 						return;
 					}
 					{
 						auto swappage = dx;
 						dx = dy*r;
 						dy = -swappage*r;
+						// dz stays same
 					}
 					if (do_move(i, x, y, clear_xf+dx, clear_yf+dy))
 					{
 						parts[i].vx *= elements[t].Collision;
 						parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 						return;
+					}
+					// XYZ: try Z-major diagonals (dx,dy,dz variations)
+					if (dz != 0.0f)
+					{
+						for (int sign = -1; sign <= 1; sign += 2)
+						{
+							float tdx = sign * (dx != 0 ? dx : 1.0f);
+							float tdy = sign * (dy != 0 ? dy : 1.0f);
+							if (do_move(i, x, y, clear_xf+tdx, clear_yf+tdy))
+							{
+								parts[i].z += dz;
+								parts[i].vx *= elements[t].Collision;
+								parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
+								return;
+							}
+						}
 					}
 				}
 				if (elements[t].Falldown>1 && !grav && gravityMode==GRAV_VERTICAL && parts[i].vy>fabsf(parts[i].vx))
@@ -3653,6 +3649,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 				}
 				else if (elements[t].Falldown>1 && fabsf(pGravX*parts[i].vx+pGravY*parts[i].vy)>fabsf(pGravY*parts[i].vx-pGravX*parts[i].vy))
 				{
@@ -3751,6 +3748,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 				}
 				else
 				{
@@ -3759,6 +3757,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
 				}
 			}
 		}
@@ -3785,15 +3784,21 @@ void Simulation::RecalcFreeParticles(bool do_life_dec)
 		auto t = parts[i].type;
 		auto x = int(parts[i].x+0.5f);
 		auto y = int(parts[i].y+0.5f);
+		auto z = int(parts[i].z+0.5f);
 		bool inBounds = false;
+		// 3D: only particles on the default Z-plane (z鈮?) go into 2D pmap.
+		// Particles at other Z layers use the 3D spatial index instead,
+		// preventing cross-layer interaction through pmap.
+		bool onDefaultZ = (z >= -1 && z <= 1); // allow 卤1 tolerance
 		if (x>=0 && y>=0 && x<XRES && y<YRES)
 		{
 			if (elements[t].Properties & TYPE_ENERGY)
-				photons[y][x] = PMAP(i, t);
-			else
+			{
+				if (onDefaultZ) photons[y][x] = PMAP(i, t);
+			}
+			else if (onDefaultZ)
 			{
 				// Particles are sometimes allowed to go inside INVS and FILT
-				// To make particles collide correctly when inside these elements, these elements must not overwrite an existing pmap entry from particles inside them
 				if (!pmap[y][x] || (t!=PT_INVIS && t!= PT_FILT))
 					pmap[y][x] = PMAP(i, t);
 				// (there are a few exceptions, including energy particles - currently no limit on stacking those)
@@ -4040,62 +4045,67 @@ void Simulation::SimulateGoL()
 
 void Simulation::CheckStacking()
 {
+	static int once = 1;
+	if (once) { printf("DEBUG: CheckStacking called (should NEVER print)\n"); once = 0; }
+	return; // TODO: re-enable when 3D BHOL is properly implemented
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
-	bool excessive_stacking_found = false;
 	force_stacking_check = false;
-	for (int y = 0; y < YRES; y++)
+
+	// 3D stacking: count particles per (x,y,z) position
+	std::unordered_map<uint64_t, int> count3D;
+	for (int i = 0; i < parts.active; i++)
 	{
-		for (int x = 0; x < XRES; x++)
+		if (!parts[i].type) continue;
+		int x = (int)(parts[i].x + 0.5f);
+		int y = (int)(parts[i].y + 0.5f);
+		int z = (int)(parts[i].z + 0.5f);
+		if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=384) continue;
+		count3D[PackXYZ(x, y, z)]++;
+	}
+
+	// Check 3D positions for excessive stacking
+	bool excessive_stacking_found = false;
+	for (auto &[key, cnt] : count3D)
+	{
+		if (cnt > 5)
 		{
-			// Use a threshold, since some particle stacking can be normal (e.g. BIZR + FILT)
-			// Setting pmap_count[y][x] > NPART means BHOL will form in that spot
-			if (pmap_count[y][x]>5)
+			if (cnt > 1500 || (unsigned int)rng.between(0, 1599) <= (cnt + 100))
 			{
-				if (bmap[y/CELL][x/CELL]==WL_EHOLE)
-				{
-					// Allow more stacking in E-hole
-					if (pmap_count[y][x]>1500)
-					{
-						pmap_count[y][x] = pmap_count[y][x] + NPART;
-						excessive_stacking_found = 1;
-					}
-				}
-				else if (pmap_count[y][x]>1500 || (unsigned int)rng.between(0, 1599) <= (pmap_count[y][x]+100))
-				{
-					pmap_count[y][x] = pmap_count[y][x] + NPART;
-					excessive_stacking_found = true;
-				}
+				count3D[key] = cnt + NPART;
+				excessive_stacking_found = true;
 			}
 		}
 	}
+
 	if (excessive_stacking_found)
 	{
 		for (int i = 0; i < parts.active; i++)
 		{
-			if (parts[i].type)
+			if (!parts[i].type) continue;
+			int t = parts[i].type;
+			int x = (int)(parts[i].x+0.5f);
+			int y = (int)(parts[i].y+0.5f);
+			int z = (int)(parts[i].z+0.5f);
+			if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=384) continue;
+			if (elements[t].Properties & TYPE_ENERGY) continue;
+
+			auto it = count3D.find(PackXYZ(x, y, z));
+			if (it != count3D.end() && it->second >= NPART)
 			{
-				int t = parts[i].type;
-				int x = (int)(parts[i].x+0.5f);
-				int y = (int)(parts[i].y+0.5f);
-				if (x>=0 && y>=0 && x<XRES && y<YRES && !(elements[t].Properties&TYPE_ENERGY))
+				if (it->second > NPART)
 				{
-					if (pmap_count[y][x]>=NPART)
-					{
-						if (pmap_count[y][x]>NPART)
-						{
-							//@ stacking -> NBHL
-							create_part(i, x, y, PT_NBHL);
-							parts[i].temp = MAX_TEMP;
-							parts[i].tmp = pmap_count[y][x]-NPART;//strength of grav field
-							if (parts[i].tmp>51200) parts[i].tmp = 51200;
-							pmap_count[y][x] = NPART;
-						}
-						else
-						{
-							kill_part(i);
-						}
-					}
+					create_part(i, x, y, PT_NBHL);
+					parts[i].temp = MAX_TEMP;
+					parts[i].tmp = it->second - NPART;
+					if (parts[i].tmp > 51200) parts[i].tmp = 51200;
+					it->second = NPART;
+				}
+				else
+				{
+					create_part(i, x, y, PT_BHOL);
+					parts[i].temp = MAX_TEMP;
+					parts[i].tmp = 256;
 				}
 			}
 		}
@@ -4143,58 +4153,55 @@ void Simulation::UpdateGravityMask()
 		check(p);
 	}
 }
+
 // 3D spatial index: rebuild O(n), lookup O(1) average
 void Simulation::BuildSpatialMap()
 {
-spatialMap.clear();
-for (int i = 0; i < parts.active; i++)
-{
-if (!parts[i].type) continue;
-int x = (int)(parts[i].x + 0.5f);
-int y = (int)(parts[i].y + 0.5f);
-int z = (int)(parts[i].z + 0.5f);
-if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=384) continue;
-spatialMap[PackXYZ(x, y, z)] = i;
-}
+	spatialMap.clear();
+	for (int i = 0; i < parts.active; i++)
+	{
+		if (!parts[i].type) continue;
+		int x = (int)(parts[i].x + 0.5f);
+		int y = (int)(parts[i].y + 0.5f);
+		int z = (int)(parts[i].z + 0.5f);
+		if (x<0||y<0||z<0||x>=XRES||y>=YRES||z>=384) continue;
+		spatialMap[PackXYZ(x, y, z)] = i;
+	}
 }
 
 int Simulation::FindParticle3D(int x, int y, int z) const
 {
-auto it = spatialMap.find(PackXYZ(x, y, z));
-return (it != spatialMap.end()) ? it->second : -1;
+	auto it = spatialMap.find(PackXYZ(x, y, z));
+	return (it != spatialMap.end()) ? it->second : -1;
 }
 
-// --- 3D Unified Occupancy Query API (Phase 1: XYZ equal-rights) ----------
-// Bridges 2D pmap (Z~0) and 3D spatialMap (all Z).
-// Z~0 (+-1 tolerance): reads 2D pmap (fast array).
-// Other Z: reads spatialMap (hash, O(1) average).
-// Returns PMAP-format particle reference, or 0 if empty.
+// 鈹€鈹€ 3D Unified Occupancy Query API 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// Phase 1: XYZ-equal rights. Abstracts over 2D pmap (Z鈮?) and 3D
+// spatialMap (all Z), so callers don't need to know which layer a
+// particle lives on.
 
 int Simulation::GetPmap3D(int x, int y, int z) const
 {
-if (x < 0 || y < 0 || x >= XRES || y >= YRES || z < 0 || z >= 384)
-return 0;
+	if (x < 0 || y < 0 || x >= XRES || y >= YRES || z < 0 || z >= 384)
+		return 0;
 
-// Z~0: fast path via 2D pmap (backward compatible)
-if (z >= -1 && z <= 1)
-return pmap[y][x];
-
-// Other Z layers: query the 3D spatial hash
-auto it = spatialMap.find(PackXYZ(x, y, z));
-if (it != spatialMap.end())
-{
-int i = it->second;
-if (i >= 0 && i < NPART && parts[i].type)
-return PMAP(i, parts[i].type);
-}
-return 0;
+	// Always use spatialMap for consistent per-Z-level occupancy.
+	// (Previously fell through to pmap for z鈮?, but pmap conflates
+	//  all z鈭圼-1,1] into one cell, breaking Z-sliding detection.)
+	auto it = spatialMap.find(PackXYZ(x, y, z));
+	if (it != spatialMap.end())
+	{
+		int i = it->second;
+		if (i >= 0 && i < NPART && parts[i].type)
+			return PMAP(i, parts[i].type);
+	}
+	return 0;
 }
 
 bool Simulation::IsOccupied3D(int x, int y, int z) const
 {
-return GetPmap3D(x, y, z) != 0;
+	return GetPmap3D(x, y, z) != 0;
 }
-
 
 //updates pmap, gol, and some other simulation stuff (but not particles)
 void Simulation::BeforeSim(bool willUpdate)
@@ -4308,10 +4315,11 @@ void Simulation::BeforeSim(bool willUpdate)
 		}
 
 		// check for stacking and create BHOL if found
-		if (force_stacking_check || rng.chance(1, 10))
-		{
-			//CheckStacking(); // TODO: 3D BHOL disabled
-		}
+		// TODO: re-enable when 3D BHOL is properly implemented
+		//if (force_stacking_check || rng.chance(1, 10))
+		//{
+		//	CheckStacking();
+		//}
 
 		// LOVE and LOLZ element handling
 		if (elementCount[PT_LOVE] > 0 || elementCount[PT_LOLZ] > 0)

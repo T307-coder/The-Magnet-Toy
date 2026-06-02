@@ -182,7 +182,7 @@ public:
 	int gravityMode = GRAV_VERTICAL;
 	float customGravityX = 0;
 	float customGravityY = 0;
-	float customGravityZ = 0;
+	float customGravityZ = 0.0f;
 	int legacy_enable = 0;
 	int water_equal_test = 0;
 	int pretty_powder = 0;
@@ -237,9 +237,9 @@ public:
 
 	struct PlanMoveResult
 	{
-		int fin_x, fin_y, clear_x, clear_y;
-		float fin_xf, fin_yf, clear_xf, clear_yf;
-		float vx, vy;
+		int fin_x, fin_y, fin_z, clear_x, clear_y, clear_z;
+		float fin_xf, fin_yf, fin_zf, clear_xf, clear_yf, clear_zf;
+		float vx, vy, vz;
 	};
 	template<bool UpdateEmap, class Sim>
 	static PlanMoveResult PlanMove(Sim &sim, int i, int x, int y);
