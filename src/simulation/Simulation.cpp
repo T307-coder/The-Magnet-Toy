@@ -3898,7 +3898,9 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				{
 					// if interpolation was done, try moving to last clear position
 					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
-					// XYZ: try adjacent Z layers when XY is blocked (slope-like 3D spread)
+					// XYZ: try adjacent layers/columns when XY is blocked
+					else if (do_move(i, x, y, z, (float)(x+1), (float)y)) {}
+					else if (do_move(i, x, y, z, (float)(x-1), (float)y)) {}
 					else if (do_move(i, x, y, z, (float)x, (float)y, float(z+1))) {}
 					else if (do_move(i, x, y, z, (float)x, (float)y, float(z-1))) {}
 					else parts[i].flags |= FLAG_STAGNANT;
