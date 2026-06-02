@@ -3888,49 +3888,46 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					(fabsf(parts[i].vx)>0.01f || fabsf(parts[i].vy)>0.01f))
 				{
 					// allow diagonal movement if target position is blocked
-					// but no point trying this if particle is stuck in a block of identical particles
 					auto dx = parts[i].vx - parts[i].vy*r;
 					auto dy = parts[i].vy + parts[i].vx*r;
 
 					auto mv = std::max(fabsf(dx), fabsf(dy));
 					dx /= mv;
 					dy /= mv;
-					// XY diagonal 1
-					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy, float(z)))
+
+					// XYZ symmetric: 4 diagonal directions, randomly shuffled each frame
+					// A1: primary XY, A2: swapped XY, A3: Z+1, A4: Z-1
+					auto dx2 = dy*r;
+					auto dy2 = -dx*r; // (dx was consumed, but dy*r and -(vx-vy*r)*r are correct)
+					// Recompute swapped from original vx,vy,r: dx2 = vx*r + vy, dy2 = vy*r - vx
+					dx2 = parts[i].vx*r + parts[i].vy;
+					dy2 = parts[i].vy*r - parts[i].vx;
+					auto mv2 = std::max(fabsf(dx2), fabsf(dy2));
+					if (mv2 > 0.0001f) { dx2 /= mv2; dy2 /= mv2; }
+
+					struct { float dx, dy, dz; } att[4] = {
+						{dx,  dy,  0},
+						{dx2, dy2, 0},
+						{dx2, dy2, 1},
+						{dx2, dy2, -1},
+					};
+
+					// Random shuffle for XYZ symmetry — no axis gets priority
+					for (int j = 3; j > 0; --j)
 					{
-						parts[i].vx *= elements[t].Collision;
-						parts[i].vy *= elements[t].Collision;
-						parts[i].vz *= elements[t].Collision;
-						return;
+						int k = rng.between(0, j);
+						auto tmp = att[j]; att[j] = att[k]; att[k] = tmp;
 					}
-					// XY diagonal 2: swap XY
+
+					for (int j = 0; j < 4; ++j)
 					{
-						auto swappage = dx;
-						dx = dy*r;
-						dy = -swappage*r;
-					}
-					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy, float(z)))
-					{
-						parts[i].vx *= elements[t].Collision;
-						parts[i].vy *= elements[t].Collision;
-						parts[i].vz *= elements[t].Collision;
-						return;
-					}
-					// Z diagonal 1: try z+1
-					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy, float(z+1)))
-					{
-						parts[i].vx *= elements[t].Collision;
-						parts[i].vy *= elements[t].Collision;
-						parts[i].vz *= elements[t].Collision;
-						return;
-					}
-					// Z diagonal 2: try z-1 (symmetric)
-					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy, float(z-1)))
-					{
-						parts[i].vx *= elements[t].Collision;
-						parts[i].vy *= elements[t].Collision;
-						parts[i].vz *= elements[t].Collision;
-						return;
+						if (do_move(i, x, y, z, clear_xf+att[j].dx, clear_yf+att[j].dy, float(z)+att[j].dz))
+						{
+							parts[i].vx *= elements[t].Collision;
+							parts[i].vy *= elements[t].Collision;
+							parts[i].vz *= elements[t].Collision;
+							return;
+						}
 					}
 				}
 				if (elements[t].Falldown>1 && !grav && gravityMode==GRAV_VERTICAL && parts[i].vy>fabsf(parts[i].vx))
