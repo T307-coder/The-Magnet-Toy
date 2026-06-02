@@ -555,6 +555,49 @@ void CubeTest_Render()
 		glPopMatrix();
 	}
 
+	// ---- Particle info at brush position (like 2D hover) ----
+	if (g_fontBase && sim)
+	{
+		int bx = (int)(g_brushPX + 0.5f);
+		int by = (int)(g_brushPY + 0.5f);
+		int bz = (int)(g_brushPZ + 0.5f);
+		int pi = sim->FindParticle3D(bx, by, bz);
+		if (pi >= 0 && pi < NPART && sim->parts.data[pi].type)
+		{
+			auto &p = sim->parts.data[pi];
+			auto &sd = SimulationData::CRef();
+			auto t = p.type;
+			const char *name = "?";
+			ByteString nameUtf8;
+			if (t > 0 && t < PT_NUM) { nameUtf8 = sd.elements[t].Name.ToUtf8(); name = nameUtf8.c_str(); }
+			char buf[256];
+			snprintf(buf, sizeof(buf),
+				"[%d] %s  T:%.0fC  life:%d  (%d,%d,%d)  v:(%.1f,%.1f,%.1f)",
+				pi, name,
+				p.temp - 273.15f, p.life, bx, by, bz,
+				(double)p.vx, (double)p.vy, (double)p.vz);
+
+			glMatrixMode(GL_PROJECTION);
+			glPushMatrix();
+			glLoadIdentity();
+			glOrtho(0, g_w, g_h, 0, -1, 1);
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+			glDisable(GL_DEPTH_TEST);
+			glDisable(GL_LIGHTING);
+			glColor3f(1.0f, 1.0f, 0.5f);
+			glRasterPos2i(10, 55);
+			glListBase(g_fontBase);
+			glCallLists((GLsizei)strlen(buf), GL_UNSIGNED_BYTE, buf);
+			glEnable(GL_DEPTH_TEST);
+			glMatrixMode(GL_PROJECTION);
+			glPopMatrix();
+			glMatrixMode(GL_MODELVIEW);
+			glPopMatrix();
+		}
+	}
+
 	SDL_GL_SwapWindow(g_win);
 }
 
