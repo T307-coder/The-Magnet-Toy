@@ -11,7 +11,7 @@ void CubeTest_SetBrushPos(int x, int y);  // mouse move → brush position (auto
 void CubeTest_SetBrushRadius(int rx, int ry); // brush changed → radius
 void CubeTest_ToggleZGrid(); // G key toggles Z-axis grid lines
 void CubeTest_ResetView();   // R key resets camera to front view
-void CubeTest_ToggleFullscreen(); // F key toggles fullscreen
+void CubeTest_ToggleFullscreen(); // F11 toggles fullscreen
 void CubeTest_RaiseWindow();     // Backtick: raise 3D window
 void CubeTest_Zoom(int delta);    // Ctrl+scroll: zoom 3D camera
 void CubeTest_ResizeBrush(int delta, int axis); // axis: 0=all 1=X 2=Y 3=Z

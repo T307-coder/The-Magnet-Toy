@@ -334,8 +334,8 @@ static void EventProcess(const SDL_Event &event)
 		// 'R' resets brush to current mouse position
 		if (event.key.keysym.scancode == SDL_SCANCODE_R)
 			{ CubeTest_SetBrushPos(mousex, mousey); break; }
-		// 'F' toggles 3D window fullscreen
-		if (event.key.keysym.scancode == SDL_SCANCODE_F)
+		// F11: toggle 3D window fullscreen
+		if (event.key.keysym.scancode == SDL_SCANCODE_F11)
 			{ CubeTest_ToggleFullscreen(); break; }
 		// Backtick `: raise 3D window (focus toggle from 2D)
 		if (event.key.keysym.scancode == SDL_SCANCODE_GRAVE)
