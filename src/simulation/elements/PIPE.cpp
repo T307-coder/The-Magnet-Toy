@@ -540,6 +540,7 @@ static void transfer_pipe_to_pipe(Particle *src, Particle *dest, bool STOR)
 
 static void pushParticle(Simulation * sim, int i, int count, int original)
 {
+	auto &parts = sim->parts; // for TPT_PM macro (needs parts[i].z)
 	unsigned int notctype = nextColor(sim->parts[i].tmp);
 	if (!TYP(sim->parts[i].ctype) || count >= 2)//don't push if there is nothing there, max speed of 2 per frame
 		return;
