@@ -405,8 +405,8 @@ static int update(UPDATE_FUNC_ARGS)
 				// Propagate induced-flag: if source SPRK was induced, new SPRK is too
 				if (parts[i].tmp3 == 1)
 					parts[ID(r)].tmp3 = 1;
-				// Biot-Savart: SPRK current element (weaker than induction, material-dependent via life)
-				if (sim->magnetismEnabled && sim->sprkCurrentEnabled)
+				// Biot-Savart: SPRK current element (skip induced SPRK to avoid feedback)
+				if (sim->magnetismEnabled && sim->sprkCurrentEnabled && parts[i].tmp3 != 1)
 				{
 					constexpr float SPRK_BIOT_BASE = 4.0f;
 					constexpr int SPRK_BIOT_R = 5;
