@@ -3700,47 +3700,46 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					// but no point trying this if particle is stuck in a block of identical particles
 					auto dx = parts[i].vx - parts[i].vy*r;
 					auto dy = parts[i].vy + parts[i].vx*r;
-					auto dz = (parts[i].vz != 0.0f) ? (parts[i].vz > 0 ? 1.0f : -1.0f) : 0.0f;
 
-					auto mv2 = std::max({fabsf(dx), fabsf(dy), fabsf(dz)});
-					dx /= mv2;
-					dy /= mv2;
-					dz /= mv2;
-					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy))
+					auto mv = std::max(fabsf(dx), fabsf(dy));
+					dx /= mv;
+					dy /= mv;
+					// XY diagonal 1
+					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy, float(z)))
 					{
 						parts[i].vx *= elements[t].Collision;
 						parts[i].vy *= elements[t].Collision;
-				parts[i].vz *= elements[t].Collision;
+						parts[i].vz *= elements[t].Collision;
 						return;
 					}
+					// XY diagonal 2: swap XY
 					{
 						auto swappage = dx;
 						dx = dy*r;
 						dy = -swappage*r;
-						// dz stays same
 					}
-					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy))
+					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy, float(z)))
 					{
 						parts[i].vx *= elements[t].Collision;
 						parts[i].vy *= elements[t].Collision;
-				parts[i].vz *= elements[t].Collision;
+						parts[i].vz *= elements[t].Collision;
 						return;
 					}
-					// XYZ: try Z-diagonals only when boxed in (no empty XY neighbours)
-					if (!neighbourhood.surround_space)
+					// Z diagonal 1: try z+1
+					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy, float(z+1)))
 					{
-						for (int sign = -1; sign <= 1; sign += 2)
-						{
-							float tdx = sign * (dx != 0 ? dx : 1.0f);
-							float tdy = sign * (dy != 0 ? dy : 1.0f);
-							if (do_move(i, x, y, z, clear_xf+tdx, clear_yf+tdy, float(z+sign)))
-							{
-								parts[i].vx *= elements[t].Collision;
-								parts[i].vy *= elements[t].Collision;
-								parts[i].vz *= elements[t].Collision;
-								return;
-							}
-						}
+						parts[i].vx *= elements[t].Collision;
+						parts[i].vy *= elements[t].Collision;
+						parts[i].vz *= elements[t].Collision;
+						return;
+					}
+					// Z diagonal 2: try z-1 (symmetric)
+					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy, float(z-1)))
+					{
+						parts[i].vx *= elements[t].Collision;
+						parts[i].vy *= elements[t].Collision;
+						parts[i].vz *= elements[t].Collision;
+						return;
 					}
 				}
 				if (elements[t].Falldown>1 && !grav && gravityMode==GRAV_VERTICAL && parts[i].vy>fabsf(parts[i].vx))
