@@ -3492,12 +3492,12 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 		if (stagnant)//FLAG_STAGNANT set, was reflected on previous frame
 		{
 			// cast coords as int then back to float for compatibility with existing saves
-			if (!do_move(i, x, y, z, z, (float)fin_x, (float)fin_y) && parts[i].type) {
+			if (!do_move(i, x, y, z, (float)fin_x, (float)fin_y) && parts[i].type) {
 				kill_part(i);
 				return;
 			}
 		}
-		else if (!do_move(i, x, y, z, z, fin_xf, fin_yf))
+		else if (!do_move(i, x, y, z, fin_xf, fin_yf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
@@ -3579,7 +3579,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 	else if (elements[t].Falldown==0)
 	{
 		// gasses and solids (but not powders)
-		if (!do_move(i, x, y, z, z, fin_xf, fin_yf))
+		if (!do_move(i, x, y, z, fin_xf, fin_yf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
@@ -3588,11 +3588,11 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 			if (fin_x<x-ISTP) fin_x=x-ISTP;
 			if (fin_y>y+ISTP) fin_y=y+ISTP;
 			if (fin_y<y-ISTP) fin_y=y-ISTP;
-			if (do_move(i, x, y, z, z, float(2*x-fin_x), float(fin_y)))
+			if (do_move(i, x, y, z, float(2*x-fin_x), float(fin_y)))
 			{
 				parts[i].vx *= elements[t].Collision;
 			}
-			else if (do_move(i, x, y, z, z, float(fin_x), float(2*y-fin_y)))
+			else if (do_move(i, x, y, z, float(fin_x), float(2*y-fin_y)))
 			{
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
@@ -3614,17 +3614,17 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				return;
 		}
 		// liquids and powders
-		if (!do_move(i, x, y, z, z, fin_xf, fin_yf))
+		if (!do_move(i, x, y, z, fin_xf, fin_yf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
-			if (fin_x!=x && do_move(i, x, y, z, z, fin_xf, clear_yf))
+			if (fin_x!=x && do_move(i, x, y, z, fin_xf, clear_yf))
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
 			}
-			else if (fin_y!=y && do_move(i, x, y, z, z, clear_xf, fin_yf))
+			else if (fin_y!=y && do_move(i, x, y, z, clear_xf, fin_yf))
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
@@ -3655,7 +3655,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					dx /= mv2;
 					dy /= mv2;
 					dz /= mv2;
-					if (do_move(i, x, y, z, z, clear_xf+dx, clear_yf+dy))
+					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy))
 					{
 						parts[i].vx *= elements[t].Collision;
 						parts[i].vy *= elements[t].Collision;
@@ -3668,7 +3668,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 						dy = -swappage*r;
 						// dz stays same
 					}
-					if (do_move(i, x, y, z, z, clear_xf+dx, clear_yf+dy))
+					if (do_move(i, x, y, z, clear_xf+dx, clear_yf+dy))
 					{
 						parts[i].vx *= elements[t].Collision;
 						parts[i].vy *= elements[t].Collision;
@@ -3682,7 +3682,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 						{
 							float tdx = sign * (dx != 0 ? dx : 1.0f);
 							float tdy = sign * (dy != 0 ? dy : 1.0f);
-							if (do_move(i, x, y, z, z, clear_xf+tdx, clear_yf+tdy))
+							if (do_move(i, x, y, z, clear_xf+tdx, clear_yf+tdy))
 							{
 								parts[i].z += dz;
 								parts[i].vx *= elements[t].Collision;
@@ -3710,14 +3710,14 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					for (auto j=clear_x+r; j>=0 && j>=clear_x-rt && j<clear_x+rt && j<XRES; j+=r)
 					{
 						if ((TYP(GetPmap3D(j, fin_y, z))!=t || bmap[fin_y/CELL][j/CELL])
-							&& (s=do_move(i, x, y, z, z, (float)j, fin_yf)))
+							&& (s=do_move(i, x, y, z, (float)j, fin_yf)))
 						{
 							nx = (int)(parts[i].x+0.5f);
 							ny = (int)(parts[i].y+0.5f);
 							break;
 						}
 						if (fin_y!=clear_y && (TYP(GetPmap3D(j, clear_y, z))!=t || bmap[clear_y/CELL][j/CELL])
-							&& (s=do_move(i, x, y, z, z, (float)j, clear_yf)))
+							&& (s=do_move(i, x, y, z, (float)j, clear_yf)))
 						{
 							nx = (int)(parts[i].x+0.5f);
 							ny = (int)(parts[i].y+0.5f);
@@ -3738,7 +3738,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 								break;
 						}
 					else if (s==-1) {} // particle is out of bounds
-					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, z, clear_xf, clear_yf)) {}
+					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
@@ -3792,7 +3792,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 							break;
 						if (TYP(pmap[ny][nx])!=t || bmap[ny/CELL][nx/CELL])
 						{
-							s = do_move(i, x, y, z, z, nxf, nyf);
+							s = do_move(i, x, y, z, nxf, nyf);
 							if (s)
 							{
 								// Movement was successful
@@ -3837,7 +3837,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 						}
 					}
 					else if (s==-1) {} // particle is out of bounds
-					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, z, clear_xf, clear_yf)) {} // try moving to the last clear position
+					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {} // try moving to the last clear position
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
@@ -3846,7 +3846,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				else
 				{
 					// if interpolation was done, try moving to last clear position
-					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, z, clear_xf, clear_yf)) {}
+					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
