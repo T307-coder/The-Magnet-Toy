@@ -40,6 +40,11 @@ static bool g_altHeld = false;    // Alt → Y-axis scroll
 static bool g_xHeld = false;      // X key → Z-axis scroll
 static const int ZMAX = 384;     // Z extent (matches YRES for cubic volume)
 
+// FPS counter
+static int g_frameCount = 0;
+static Uint32 g_lastFpsTime = 0;
+static float g_currentFps = 0.0f;
+
 // Tool modes for 3D drawing (matching 2D tool concepts)
 static bool g_lineMode = false;   // Shift+left/right: 3D line
 static bool g_rectMode = false;   // Ctrl+left/right: 3D cuboid
@@ -514,6 +519,39 @@ void CubeTest_Render()
 		glPopMatrix();
 	}
 #endif
+
+	// ---- FPS display ----
+	g_frameCount++;
+	Uint32 now = SDL_GetTicks();
+	if (now - g_lastFpsTime >= 1000)
+	{
+		g_currentFps = g_frameCount * 1000.0f / (now - g_lastFpsTime);
+		g_frameCount = 0;
+		g_lastFpsTime = now;
+	}
+	if (g_fontBase && g_currentFps > 0)
+	{
+		char fpsBuf[32];
+		snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.0f", g_currentFps);
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glLoadIdentity();
+		glOrtho(0, g_w, g_h, 0, -1, 1);
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_LIGHTING);
+		glColor3f(0.0f, 1.0f, 0.0f);
+		glRasterPos2i(10, 30);
+		glListBase(g_fontBase);
+		glCallLists((GLsizei)strlen(fpsBuf), GL_UNSIGNED_BYTE, fpsBuf);
+		glEnable(GL_DEPTH_TEST);
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+	}
 
 	SDL_GL_SwapWindow(g_win);
 }

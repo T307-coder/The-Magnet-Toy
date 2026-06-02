@@ -1353,11 +1353,16 @@ void GameModel::FrameStep(int frames)
 
 void GameModel::ClearSimulation()
 {
-	//Load defaults
-	sim->gravityMode = GRAV_VERTICAL;
+	//Load defaults — 3D mode: disable 2D subsystems pending 3D rewrite
+	sim->gravityMode = GRAV_OFF;
 	sim->customGravityX = 0.0f;
 	sim->customGravityY = 0.0f;
-	sim->air->airMode = AIR_ON;
+	sim->air->airMode = AIR_OFF;
+	sim->magnetismEnabled = false;
+	sim->inductionEnabled = false;
+	sim->currentBFieldEnabled = false;
+	sim->sprkCurrentEnabled = false;
+	sim->electricityEnabled = false;
 	sim->legacy_enable = false;
 	sim->water_equal_test = false;
 	sim->SetEdgeMode(edgeMode);
