@@ -1031,11 +1031,17 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		if (e.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
 		{ g_w = e.window.data1; g_h = e.window.data2; }
 		else if (e.window.event == SDL_WINDOWEVENT_CLOSE)
-		{ SDL_ShowCursor(SDL_ENABLE); CubeTest_Shutdown(); }
+		{ SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_ENABLE); CubeTest_Shutdown(); }
 		else if (e.window.event == SDL_WINDOWEVENT_ENTER)
-		{ SDL_ShowCursor(SDL_DISABLE); } // hide cursor over 3D window
+		{
+			SDL_ShowCursor(SDL_DISABLE);
+			if (g_freeCam) SDL_SetRelativeMouseMode(SDL_TRUE);
+		}
 		else if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST)
-		{ SDL_ShowCursor(SDL_ENABLE);  } // show cursor when leaving
+		{
+			SDL_SetRelativeMouseMode(SDL_FALSE);
+			SDL_ShowCursor(SDL_ENABLE);
+		}
 	}
 	// 3D window mouse motion: camera drag if C held, else brush/tool
 	if (e.type == SDL_MOUSEMOTION && e.motion.windowID == wid)
@@ -1248,6 +1254,8 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 			}
 			if (down && sc == SDL_SCANCODE_GRAVE) // Backtick ` = toggle focus to 2D window
 			{
+				SDL_SetRelativeMouseMode(SDL_FALSE); // release mouse for 2D brush
+				SDL_ShowCursor(SDL_ENABLE);
 				if (sdl_window) SDL_RaiseWindow(sdl_window);
 			}
 		}
@@ -1308,10 +1316,15 @@ void CubeTest_ToggleFreeCam()
 		g_camYaw = 0.0f;
 		g_camPitch = 0.0f;
 		g_brushDist = 60.0f;
-		SDL_SetRelativeMouseMode(SDL_TRUE);
+		if (g_win && (SDL_GetWindowFlags(g_win) & SDL_WINDOW_MOUSE_FOCUS))
+		{
+			SDL_SetRelativeMouseMode(SDL_TRUE);
+			SDL_ShowCursor(SDL_DISABLE);
+		}
 	}
 	else
 	{
 		SDL_SetRelativeMouseMode(SDL_FALSE);
+		SDL_ShowCursor(SDL_ENABLE);
 	}
 }
