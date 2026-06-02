@@ -2469,10 +2469,10 @@ void Simulation::GetGravityField(int x, int y, float particleGrav, float newtonG
 	switch (gravityMode)
 	{
 	default:
-	case GRAV_VERTICAL: //normal, vertical gravity (Y-down in 2D, Y+Z in 3D)
+	case GRAV_VERTICAL: //normal, vertical gravity (Y-down only; Z is layer axis)
 		pGravX = 0;
 		pGravY = particleGrav;
-		pGravZ = particleGrav; // XYZ symmetry: Z gets same gravity as Y
+		pGravZ = 0; // Z is a layer index, not a spatial gravity axis
 		break;
 	case GRAV_OFF: //no gravity
 		pGravX = 0;
