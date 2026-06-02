@@ -1842,10 +1842,17 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 	parts[i].y = nyf;
 	if (nzf >= 0) parts[i].z = roundf(nzf); // snap Z to integer (Z is a layer index)
 	bool onBasePlane = (z >= -1 && z <= 1);
-	if (ny != y || nx != x)
+	int newZ = (nzf >= 0) ? (int)roundf(nzf) : z;
+	if (ny != y || nx != x || newZ != z)
 	{
-		// Only manage pmap for base-plane particles (z鈮?)
-		// Off-plane particles are tracked via spatialMap (rebuilt each frame)
+		// Real-time spatialMap maintenance (XYZ symmetric, unlike pmap which is z鈮? only)
+		if (!onBasePlane)
+		{
+			spatialMap.erase(PackXYZ(x, y, z));
+			if (t) spatialMap[PackXYZ(nx, ny, newZ)] = i;
+		}
+
+		// pmap for base-plane particles (fast 2D cache)
 		if (onBasePlane)
 		{
 			if (pmap[y][x] && ID(pmap[y][x]) == i)
