@@ -3726,14 +3726,14 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				parts[i].vz *= elements[t].Collision;
 						return;
 					}
-					// XYZ: try Z-major diagonals (only when particle has Z velocity)
-					if (dz != 0.0f)
+					// XYZ: try Z-diagonals only when boxed in (no empty XY neighbours)
+					if (!neighbourhood.surround_space)
 					{
 						for (int sign = -1; sign <= 1; sign += 2)
 						{
 							float tdx = sign * (dx != 0 ? dx : 1.0f);
 							float tdy = sign * (dy != 0 ? dy : 1.0f);
-							if (do_move(i, x, y, z, clear_xf+tdx, clear_yf+tdy, parts[i].z + dz))
+							if (do_move(i, x, y, z, clear_xf+tdx, clear_yf+tdy, float(z+sign)))
 							{
 								parts[i].vx *= elements[t].Collision;
 								parts[i].vy *= elements[t].Collision;
