@@ -71,13 +71,10 @@ GameModel::GameModel(GameView *newView):
 	sim = Simulation::Factory();
 	sim->useLuaCallbacks = true;
 
-	// Activate 3D tile-based multithreading
-	{
-		auto hw = std::thread::hardware_concurrency();
-		sim->threadCount = std::max(1u, std::min(hw, 8u));
-		sim->threadPool.SetThreadCount(sim->threadCount - 1); // main thread + workers
-		sim->allowThreadedSimulation = (sim->threadCount > 1);
-	}
+	// 3D physics: single-thread only (multi-thread has spatialMap race with brush)
+	sim->threadCount = 1;
+	sim->threadPool.SetThreadCount(0);
+	sim->allowThreadedSimulation = false;
 
 	ren = new Renderer();
 

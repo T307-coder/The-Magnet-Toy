@@ -14,7 +14,7 @@
 class SpatialIndex
 {
 	static constexpr double MAX_LOAD = 0.60;
-	static constexpr size_t MIN_CAP = 256;
+	static constexpr size_t MIN_CAP = 262144; // 256K slots, ~157K entries @60% — covers all NPART (147K) off-plane
 
 	uint8_t  *meta_  = nullptr;
 	uint64_t *keys_  = nullptr;
@@ -274,6 +274,44 @@ public:
 			size_ = 0;
 			tombstones_ = 0;
 		}
+	}
+
+	// Rehash to clear tombstones — call from single-threaded context only
+	void compact()
+	{
+		if (!meta_ || tombstones_ == 0) return;
+		// Only compact if tombstones > 12.5% of capacity (avoids overhead when mostly clean)
+		if (tombstones_ * 8 <= cap_) return;
+		size_t allocSize = cap_ * (sizeof(uint8_t) + sizeof(uint64_t) + sizeof(int));
+		uint8_t  *newMeta = (uint8_t *)malloc(allocSize);
+		uint64_t *newKeys = (uint64_t *)(newMeta + cap_);
+		int      *newVals = (int *)(newMeta + cap_ + cap_ * sizeof(uint64_t));
+		memset(newMeta, 0, cap_);
+
+		for (size_t i = 0; i < cap_; ++i)
+		{
+			if (meta_[i] == 1)
+			{
+				size_t idx = hash64(keys_[i]) & mask_;
+				while (newMeta[idx])
+					idx = (idx + 1) & mask_;
+				newMeta[idx] = 1;
+				newKeys[idx] = keys_[i];
+				newVals[idx] = vals_[i];
+			}
+		}
+		free(meta_);
+		meta_  = newMeta;
+		keys_  = newKeys;
+		vals_  = newVals;
+		tombstones_ = 0;
+	}
+
+	void reserve(size_t n)
+	{
+		size_t needed = (size_t)(n / MAX_LOAD) + 1;
+		while (cap_ < needed)
+			grow();
 	}
 
 	size_t size() const { return size_; }

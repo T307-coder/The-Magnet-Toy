@@ -22,7 +22,7 @@
 #include <vector>
 #include <array>
 #include <memory>
-#include <mutex>
+#include <shared_mutex>
 #include <optional>
 
 constexpr int CHANNELS = int(MAX_TEMP - 73) / 100 + 2;
@@ -226,8 +226,9 @@ public:
 	};
 	std::vector<ThreadContext> threadContexts;
 	bool useThreadContext = false;
-	std::mutex simMutex;   // protects kill_part, move, spatialMap, pmap writes during parallel update
+	std::mutex simMutex;   // protects kill_part, move, pmap writes during parallel update
 	std::mutex pfreeMx;    // protects batch transfer between thread-local and global free lists
+	mutable std::shared_mutex spatialMutex; // protects spatialMap (shared=read, exclusive=write)
 	static constexpr int freeListTargetLength = 64;
 
 	void PartsFreeThreaded(int i);

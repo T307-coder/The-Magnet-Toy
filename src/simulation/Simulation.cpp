@@ -1318,6 +1318,8 @@ void Simulation::clear_sim(void)
 	memset(wireless, 0, sizeof(wireless));
 	memset(gol, 0, sizeof(gol));
 	memset(portalp, 0, sizeof(portalp));
+	spatialMap.clear();
+	spatialMap.reserve(NPART); // pre-allocate enough for all particles (avoids grow() race)
 	memset(fighters, 0, sizeof(fighters));
 	memset(&player, 0, sizeof(player));
 	memset(&player2, 0, sizeof(player2));
@@ -1397,6 +1399,8 @@ int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ, int s
 
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 0;
+	if (moveZ >= 0 && (moveZ < 0 || moveZ >= ZRES))
+		return 0; // Z out of bounds — symmetric with XY
 
 	if (moveZ >= 0)
 		r = GetPmap3D(nx, ny, moveZ, skipSelf);
@@ -1817,12 +1821,16 @@ int Simulation::do_move(int i, int x, int y, int z, float nxf, float nyf, float 
 	{
 		bool x_ok = (nx >= CELL && nx < XRES-CELL);
 		bool y_ok = (ny >= CELL && ny < YRES-CELL);
+		bool z_ok = (nz < 0 || (nz >= 0 && nz < ZRES));
 		if (!x_ok)
 			nxf = remainder_p(nxf-CELL+.5f, XRES-CELL*2.0f)+CELL-.5f;
 		if (!y_ok)
 			nyf = remainder_p(nyf-CELL+.5f, YRES-CELL*2.0f)+CELL-.5f;
+		if (!z_ok && nz >= 0)
+			nzf = remainder_p(nzf + 0.5f, (float)ZRES) - 0.5f;
 		nx = (int)(nxf+0.5f);
 		ny = (int)(nyf+0.5f);
+		nz = (nzf >= 0) ? (int)(nzf+0.5f) : -1;
 	}
 	if (parts[i].type == PT_NONE)
 		return 0;
@@ -1852,6 +1860,7 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 		// Real-time spatialMap maintenance (XYZ symmetric, unlike pmap which is z鈮? only)
 		if (!onBasePlane)
 		{
+			std::lock_guard<std::shared_mutex> lock(spatialMutex);
 			spatialMap.erase(PackXYZ(x, y, z));
 			if (t) spatialMap[PackXYZ(nx, ny, newZ)] = i;
 		}
@@ -1864,8 +1873,9 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 			if (photons[y][x] && ID(photons[y][x]) == i)
 				photons[y][x] = 0;
 		}
-		// kill_part if particle is out of bounds
-		if (nx < CELL || nx >= XRES - CELL || ny < CELL || ny >= YRES - CELL)
+		// kill_part if particle is out of bounds (XYZ symmetric)
+		if (nx < CELL || nx >= XRES - CELL || ny < CELL || ny >= YRES - CELL
+		    || (nzf >= 0 && (newZ < 0 || newZ >= ZRES)))
 		{
 			kill_part(i);
 			return false;
@@ -2095,6 +2105,7 @@ void Simulation::kill_part(int i)//kills particle number i
 		// Clean up spatialMap for off-plane particles
 		if (z < -1 || z > 1)
 		{
+			std::lock_guard<std::shared_mutex> lock(spatialMutex);
 			auto it = spatialMap.find(PackXYZ(x, y, z));
 			if (it != spatialMap.end() && it.second() == i)
 				spatialMap.erase(it);
@@ -2253,6 +2264,7 @@ bool Simulation::part_change_type(int i, int x, int y, int t)
 			pmap[y][x] = 0;
 		if (photons[y][x] && ID(photons[y][x]) == i)
 			photons[y][x] = 0;
+		std::lock_guard<std::shared_mutex> lock(spatialMutex);
 		spatialMap[PackXYZ(x, y, z)] = i;
 	}
 	return false;
@@ -2386,6 +2398,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 		// Clean up spatialMap for off-plane particles
 		if (oldZ < -1 || oldZ > 1)
 		{
+			std::lock_guard<std::shared_mutex> lock(spatialMutex);
 			auto it = spatialMap.find(PackXYZ(oldX, oldY, oldZ));
 			if (it != spatialMap.end() && it.second() == p)
 				spatialMap.erase(it);
@@ -2425,8 +2438,10 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		// Non-XY brush or non-zero Z: no pmap entry, use spatialMap instead
 		int iz = (int)(parts[i].z + 0.5f);
-		if (iz >= 0 && iz < 384)
+		if (iz >= 0 && iz < 384) {
+			std::lock_guard<std::shared_mutex> lock(spatialMutex);
 			spatialMap[PackXYZ(x, y, iz)] = i;
+		}
 	}
 	else if (elements[t].Properties & TYPE_ENERGY)
 		photons[y][x] = PMAP(i, t);
@@ -2701,12 +2716,16 @@ Simulation::PlanMoveResult Simulation::PlanMove(Sim &sim, int i, int x, int y)
 			{
 				bool x_ok = (fin_xf >= CELL-.5f && fin_xf < XRES-CELL-.5f);
 				bool y_ok = (fin_yf >= CELL-.5f && fin_yf < YRES-CELL-.5f);
+				bool z_ok = (fin_zf >= 0.0f && fin_zf < (float)ZRES);
 				if (!x_ok)
 					fin_xf = remainder_p(fin_xf-CELL+.5f, XRES-CELL*2.0f)+CELL-.5f;
 				if (!y_ok)
 					fin_yf = remainder_p(fin_yf-CELL+.5f, YRES-CELL*2.0f)+CELL-.5f;
+				if (!z_ok)
+					fin_zf = remainder_p(fin_zf + 0.5f, (float)ZRES) - 0.5f;
 				fin_x = (int)(fin_xf+0.5f);
 				fin_y = (int)(fin_yf+0.5f);
+				fin_z = (int)(fin_zf+0.5f);
 			}
 			if (mv <= 0.0f)
 			{
@@ -2718,10 +2737,13 @@ Simulation::PlanMoveResult Simulation::PlanMove(Sim &sim, int i, int x, int y)
 				{
 					bool x_ok = (fin_xf >= CELL-.5f && fin_xf < XRES-CELL-.5f);
 					bool y_ok = (fin_yf >= CELL-.5f && fin_yf < YRES-CELL-.5f);
+					bool z_ok = (fin_zf >= 0.0f && fin_zf < (float)ZRES);
 					if (!x_ok)
 						fin_xf = remainder_p(fin_xf-CELL+.5f, XRES-CELL*2.0f)+CELL-.5f;
 					if (!y_ok)
 						fin_yf = remainder_p(fin_yf-CELL+.5f, YRES-CELL*2.0f)+CELL-.5f;
+					if (!z_ok)
+						fin_zf = remainder_p(fin_zf + 0.5f, (float)ZRES) - 0.5f;
 				}
 				fin_x = (int)(fin_xf+0.5f);
 				fin_y = (int)(fin_yf+0.5f);
@@ -2993,25 +3015,6 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 		std::lock_guard<std::mutex> lock(simMutex);
 		MovementPhase(i, neighbourhood);
 	}
-
-	if (parts[i].vz != 0.0f)
-	{
-		float newZ = parts[i].z + parts[i].vz;
-		if (newZ < 0) { parts[i].z = 0; parts[i].vz = 0; }
-		else if (newZ >= ZRES) { parts[i].z = float(ZRES - 1); parts[i].vz = 0; }
-		else
-		{
-			int tx = (int)(parts[i].x + 0.5f);
-			int ty = (int)(parts[i].y + 0.5f);
-			int oz = (int)(parts[i].z + 0.5f);
-			int nzi = (int)(newZ + 0.5f);
-			if (nzi == oz) { parts[i].z = roundf(newZ); }
-			else if (eval_move(parts[i].type, tx, ty, nullptr, nzi))
-				{ parts[i].z = roundf(newZ); }
-			else
-				{ parts[i].vz = 0; }
-		}
-	}
 }
 
 void SimulationImpl::UpdateParticlesSerial(int start, int end)
@@ -3035,6 +3038,9 @@ void SimulationImpl::UpdateParticles(int start, int end)
 
 	// ---- Parallel path: 3D tile-based (pmap rebuild merged with tile population) ----
 	FrameTime::Span span(frameTime, "Simulation::UpdateParticles");
+
+	// Compact spatialMap if tombstones accumulate (gas/dying particles create many)
+	spatialMap.compact();
 
 	// 1. Setup per-thread contexts
 	threadContexts.resize(threadCount);
@@ -4039,6 +4045,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 						rt = int(parts[i].tmp*0.20f+5.0f);
 
 					auto nx = -1, ny = -1;
+					// ---- X spread (horizontal, perpendicular to gravity) ----
 					for (auto j=clear_x+r; j>=0 && j>=clear_x-rt && j<clear_x+rt && j<XRES; j+=r)
 					{
 						if ((TYP(GetPmap3D(j, fin_y, z))!=t || bmap[fin_y/CELL][j/CELL])
@@ -4069,6 +4076,42 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 							if (TYP(GetPmap3D(nx, j, z))!=t || (bmap[j/CELL][nx/CELL] && bmap[j/CELL][nx/CELL]!=WL_STREAM))
 								break;
 						}
+					// ---- Z spread: XYZ symmetric — if X spread failed, try Z (horizontal, orthogonal to gravity) ----
+					if (s != 1 && s != -1)
+					{
+						int rz = (parts[i].vz != 0.0f) ? (parts[i].vz > 0 ? 1 : -1) : (rng.chance(1, 2) ? 1 : -1);
+						for (auto j = z + rz; j >= 0 && j >= z - rt && j < z + rt && j < ZRES; j += rz)
+						{
+							if ((TYP(GetPmap3D(clear_x, fin_y, j)) != t)
+								&& (s = do_move(i, x, y, z, clear_xf, fin_yf, (float)j)))
+							{
+								nx = (int)(parts[i].x + 0.5f);
+								ny = (int)(parts[i].y + 0.5f);
+								break;
+							}
+							if (fin_y != clear_y && (TYP(GetPmap3D(clear_x, clear_y, j)) != t)
+								&& (s = do_move(i, x, y, z, clear_xf, clear_yf, (float)j)))
+							{
+								nx = (int)(parts[i].x + 0.5f);
+								ny = (int)(parts[i].y + 0.5f);
+								break;
+							}
+							if (TYP(GetPmap3D(clear_x, clear_y, j)) != t)
+								break;
+						}
+						// Z spread succeeded: Y settle (mirrors X→Y settle, but at new Z)
+						if (s == 1)
+						{
+							auto nz = (int)(parts[i].z + 0.5f);
+							for (auto j = ny + r; j >= 0 && j < YRES && j >= ny - rt && j < ny + rt; j += r)
+							{
+								if ((TYP(GetPmap3D(nx, j, nz)) != t || bmap[j / CELL][nx / CELL]) && do_move(i, nx, ny, nz, (float)nx, (float)j))
+									break;
+								if (TYP(GetPmap3D(nx, j, nz)) != t || (bmap[j / CELL][nx / CELL] && bmap[j / CELL][nx / CELL] != WL_STREAM))
+									break;
+							}
+						}
+					}
 					else if (s==-1) {} // particle is out of bounds
 					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
 					else parts[i].flags |= FLAG_STAGNANT;
@@ -4596,6 +4639,7 @@ void Simulation::BuildSpatialMap()
 
 int Simulation::FindParticle3D(int x, int y, int z) const
 {
+	std::shared_lock lock(spatialMutex);
 	auto it = spatialMap.find(PackXYZ(x, y, z));
 	return (it != spatialMap.end()) ? it.second() : -1;
 }
@@ -4619,6 +4663,7 @@ int Simulation::GetPmap3D(int x, int y, int z, int skipSelf) const
 	}
 
 	// Other Z layers: spatial hash (O(1) average)
+	std::shared_lock lock(spatialMutex);
 	auto it = spatialMap.find(PackXYZ(x, y, z));
 	if (it != spatialMap.end())
 	{
