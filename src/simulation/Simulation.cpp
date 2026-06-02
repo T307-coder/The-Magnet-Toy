@@ -2042,6 +2042,7 @@ void Simulation::kill_part(int i)//kills particle number i
 	
 	int x = (int)(parts[i].x + 0.5f);
 	int y = (int)(parts[i].y + 0.5f);
+	int z = (int)(parts[i].z + 0.5f);
 
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
@@ -2057,6 +2058,14 @@ void Simulation::kill_part(int i)//kills particle number i
 			pmap[y][x] = 0;
 		else if (photons[y][x] && ID(photons[y][x]) == i)
 			photons[y][x] = 0;
+
+		// Clean up spatialMap for off-plane particles
+		if (z < -1 || z > 1)
+		{
+			auto it = spatialMap.find(PackXYZ(x, y, z));
+			if (it != spatialMap.end() && it->second == i)
+				spatialMap.erase(it);
+		}
 	}
 
 	// This shouldn't happen but ... you never know?
