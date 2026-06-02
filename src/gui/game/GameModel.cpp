@@ -1862,7 +1862,7 @@ void GameModel::BeforeSim()
 		CommandInterface::Ref().HandleEvent(BeforeSimEvent{});
 	}
 	sim->BeforeSim(willUpdate);
-	sim->BuildSpatialMap();
+	// spatialMap is maintained incrementally by move(), no need to rebuild every frame
 }
 
 void GameModel::AfterSim()

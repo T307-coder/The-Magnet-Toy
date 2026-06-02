@@ -2247,12 +2247,12 @@ bool Simulation::part_change_type(int i, int x, int y, int t)
 	}
 	else
 	{
-		// Off-plane: manage spatialMap, clear pmap if we were in it
+		// Off-plane: manage spatialMap directly (no longer deferred to BuildSpatialMap)
 		if (pmap[y][x] && ID(pmap[y][x]) == i)
 			pmap[y][x] = 0;
 		if (photons[y][x] && ID(photons[y][x]) == i)
 			photons[y][x] = 0;
-		// Note: spatialMap insertion happens in BuildSpatialMap
+		spatialMap[PackXYZ(x, y, z)] = i;
 	}
 	return false;
 }
@@ -2422,7 +2422,10 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	// In XZ/YZ slice views, pmap is 2D and can't represent 3D space.
 	if ((view2D != 0 && p == -2) || (p == -2 && fabsf(parts[i].z) > 0.5f))
 	{
-		// Non-XY brush or non-zero Z: no pmap entry (3D position stored in parts[i].x/y/z)
+		// Non-XY brush or non-zero Z: no pmap entry, use spatialMap instead
+		int iz = (int)(parts[i].z + 0.5f);
+		if (iz >= 0 && iz < 384)
+			spatialMap[PackXYZ(x, y, iz)] = i;
 	}
 	else if (elements[t].Properties & TYPE_ENERGY)
 		photons[y][x] = PMAP(i, t);
@@ -2811,19 +2814,32 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 	auto j3 = 0;
 	if (z < -1 || z > 1)
 	{
-		for (auto nz=-1; nz<2; nz++)
+		// Optimization: skip expensive spatialMap lookups for stationary particles
+		bool stationary = (parts[i].vx == 0.0f && parts[i].vy == 0.0f && parts[i].vz == 0.0f);
+		if (stationary)
 		{
-			for (auto ny=-1; ny<2; ny++)
+			// Settled off-plane: no neighbours, minimal neighbourhood
+			for (int k = 0; k < 26; k++)
+				n.surround_3d[k] = 0;
+			n.surround_space_3d = 0;
+			n.nt_3d = 0;
+		}
+		else
+		{
+			for (auto nz=-1; nz<2; nz++)
 			{
-				for (auto nx=-1; nx<2; nx++)
+				for (auto ny=-1; ny<2; ny++)
 				{
-					if (nx||ny||nz)
+					for (auto nx=-1; nx<2; nx++)
 					{
-						auto r = GetPmap3D(x+nx, y+ny, z+nz, i);
-						n.surround_3d[j3] = r;
-						j3++;
-						n.surround_space_3d += (!TYP(r));
-						n.nt_3d += (TYP(r)!=t);
+						if (nx||ny||nz)
+						{
+							auto r = GetPmap3D(x+nx, y+ny, z+nz, i);
+							n.surround_3d[j3] = r;
+							j3++;
+							n.surround_space_3d += (!TYP(r));
+							n.nt_3d += (TYP(r)!=t);
+						}
 					}
 				}
 			}
@@ -3010,11 +3026,13 @@ void SimulationImpl::UpdateParticles(int start, int end)
 	// Serial path: used when threading is disabled or for sub-range updates
 	if (!allowThreadedSimulation || threadCount <= 1 || start != 0 || end != NPART)
 	{
+		if (start == 0)
+			RecalcFreeParticles(simWillUpdate);
 		UpdateParticlesSerial(start, end);
 		return;
 	}
 
-	// ---- Parallel path: 3D tile-based ----
+	// ---- Parallel path: 3D tile-based (pmap rebuild merged with tile population) ----
 	FrameTime::Span span(frameTime, "Simulation::UpdateParticles");
 
 	// 1. Setup per-thread contexts
@@ -3033,7 +3051,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 	tileOffsetY = rng.between(0, TILE_SIZE - 1);
 	tileOffsetZ = rng.between(0, TILE_SIZE - 1);
 
-	// 3. Clear and populate 3D tiles
+	// 3. Clear 3D tiles
 	tiles.clear();
 	tiles.resize(TILES_TOTAL);
 	for (int tz = 0; tz < TILES_Z; ++tz)
@@ -3048,19 +3066,93 @@ void SimulationImpl::UpdateParticles(int start, int end)
 				tiles[idx].deferredIds.clear();
 			}
 
+	// 4a. Phase A: life dec + Flatten (must run BEFORE tile population — Flatten changes indices)
+	if (simWillUpdate)
+	{
+		auto &sd = SimulationData::CRef();
+		auto &elements = sd.elements;
+		for (auto i = 0; i < parts.active; ++i)
+		{
+			if (!parts[i].type) continue;
+			auto t = parts[i].type;
+			auto x = int(parts[i].x + 0.5f);
+			auto y = int(parts[i].y + 0.5f);
+			if (t < 0 || t >= PT_NUM || !elements[t].Enabled)
+			{
+				kill_part(i);
+				continue;
+			}
+			unsigned int ep = elements[t].Properties;
+			bool inBounds = (x >= 0 && y >= 0 && x < XRES && y < YRES);
+			if (parts[i].life > 0 && (ep & PROP_LIFE_DEC) && !(inBounds && bmap[y / CELL][x / CELL] == WL_STASIS && emap[y / CELL][x / CELL] < 8))
+			{
+				parts[i].life--;
+				if (parts[i].life <= 0 && (ep & (PROP_LIFE_KILL_DEC | PROP_LIFE_KILL)))
+				{
+					kill_part(i);
+					continue;
+				}
+			}
+			else if (parts[i].life <= 0 && (ep & PROP_LIFE_KILL) && !(inBounds && bmap[y / CELL][x / CELL] == WL_STASIS && emap[y / CELL][x / CELL] < 8))
+			{
+				kill_part(i);
+				continue;
+			}
+		}
+		parts.Flatten();
+	}
+
+	// 4b. Phase B: pmap rebuild + tile population (single pass, after Flatten so indices are stable)
+	memset(pmap, 0, sizeof(pmap));
+	memset(pmap_count, 0, sizeof(pmap_count));
+	memset(photons, 0, sizeof(photons));
+	NUM_PARTS = 0;
+
+	auto &sd = SimulationData::CRef();
+	auto &elements = sd.elements;
+
 	for (auto i = 0; i < parts.active; ++i)
 	{
 		if (!parts[i].type) continue;
-		auto tx = (int(parts[i].x + 0.5f) + tileOffsetX) / TILE_SIZE;
-		auto ty = (int(parts[i].y + 0.5f) + tileOffsetY) / TILE_SIZE;
-		auto tz = (int(parts[i].z + 0.5f) + tileOffsetZ) / TILE_SIZE;
+		auto t = parts[i].type;
+		auto x = int(parts[i].x + 0.5f);
+		auto y = int(parts[i].y + 0.5f);
+		auto z = int(parts[i].z + 0.5f);
+
+		// --- pmap/photons rebuild (z≈0 only) ---
+		bool onDefaultZ = (z >= -1 && z <= 1);
+		if (x >= 0 && y >= 0 && x < XRES && y < YRES)
+		{
+			if (elements[t].Properties & TYPE_ENERGY)
+			{
+				if (onDefaultZ) photons[y][x] = PMAP(i, t);
+			}
+			else if (onDefaultZ)
+			{
+				if (!pmap[y][x] || (t != PT_INVIS && t != PT_FILT))
+					pmap[y][x] = PMAP(i, t);
+				if (t != PT_THDR && t != PT_EMBR && t != PT_FIGH && t != PT_PLSM)
+					pmap_count[y][x]++;
+			}
+		}
+		NUM_PARTS++;
+
+		if (elementRecount && t >= 0 && t < PT_NUM && elements[t].Enabled)
+			elementCount[t]++;
+
+		// --- tile index ---
+		auto tx = (x + tileOffsetX) / TILE_SIZE;
+		auto ty = (y + tileOffsetY) / TILE_SIZE;
+		auto tz = (z + tileOffsetZ) / TILE_SIZE;
 		if (tx < 0) tx = 0; if (tx >= TILES_X) tx = TILES_X - 1;
 		if (ty < 0) ty = 0; if (ty >= TILES_Y) ty = TILES_Y - 1;
 		if (tz < 0) tz = 0; if (tz >= TILES_Z) tz = TILES_Z - 1;
 		tiles[(tz * TILES_Y + ty) * TILES_X + tx].particleIds.push_back(i);
 	}
+	if (elementRecount)
+		elementRecount = false;
 
-	// 4. Dispatch tiles to thread pool
+	// 5. Dispatch tiles to thread pool
 	useThreadContext = true;
 	for (auto &tile : tiles)
 	{
@@ -3076,7 +3168,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 	threadPool.Flush();
 	useThreadContext = false;
 
-	// 5. Merge per-thread element counts and free lists back to global
+	// 6. Merge per-thread element counts and free lists back to global
 	for (auto &ctx : threadContexts)
 	{
 		for (int t = 0; t < PT_NUM; ++t)
@@ -4583,7 +4675,11 @@ void Simulation::BeforeSim(bool willUpdate)
 					if (type == PT_ELEC) q = -1.0f;
 					else if (type == PT_PROT) q = 1.0f;
 					else if (electricityEnabled && (elements[type].Properties & PROP_CONDUCTS))
+					{
+						// Skip induced SPRK: they were created by dB/dt, shouldn't feed back
+						if (type == PT_SPRK && parts[i].tmp3 == 1) continue;
 						q = parts[i].tmp4 * 0.01f;
+					}
 					if (q == 0.0f) continue;
 					bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
 					float vx = isSolid ? (float)parts[i].tmp5 : parts[i].vx;
@@ -4636,8 +4732,8 @@ void Simulation::BeforeSim(bool willUpdate)
 		gravWallChanged = false;
 	}
 
-	if (debug_nextToUpdate == 0)
-		RecalcFreeParticles(willUpdate);
+	// pmap rebuild & life dec moved into UpdateParticles (merged with tile population)
+	simWillUpdate = willUpdate;
 
 	if (willUpdate)
 	{

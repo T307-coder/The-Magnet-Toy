@@ -214,6 +214,7 @@ public:
 	int threadCount = 1;
 	ThreadPool threadPool;
 	bool allowThreadedSimulation = false;
+	bool simWillUpdate = false;   // set by BeforeSim, read by UpdateParticles
 
 	struct ThreadContext
 	{
