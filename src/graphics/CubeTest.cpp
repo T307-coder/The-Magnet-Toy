@@ -1075,7 +1075,7 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		{ g_w = e.window.data1; g_h = e.window.data2; }
 		else if (e.window.event == SDL_WINDOWEVENT_CLOSE)
 		{ SDL_SetRelativeMouseMode(SDL_FALSE); SDL_ShowCursor(SDL_ENABLE); CubeTest_Shutdown(); }
-		else if (e.window.event == SDL_WINDOWEVENT_ENTER)
+		else if (e.window.event == SDL_WINDOWEVENT_ENTER || e.window.event == SDL_WINDOWEVENT_FOCUS_GAINED)
 		{
 			SDL_ShowCursor(SDL_DISABLE);
 			if (g_freeCam) SDL_SetRelativeMouseMode(SDL_TRUE);
