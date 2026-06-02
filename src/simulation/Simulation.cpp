@@ -1399,8 +1399,6 @@ int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ, int s
 
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 0;
-	if (moveZ >= 0 && (moveZ < 0 || moveZ >= ZRES))
-		return 0; // Z out of bounds — symmetric with XY
 
 	if (moveZ >= 0)
 		r = GetPmap3D(nx, ny, moveZ, skipSelf);
@@ -3014,6 +3012,38 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 	{
 		std::lock_guard<std::mutex> lock(simMutex);
 		MovementPhase(i, neighbourhood);
+	}
+
+	if (parts[i].vz != 0.0f)
+	{
+		float newZ = parts[i].z + parts[i].vz;
+		// Z boundary: symmetric with XY
+		if (edgeMode == EDGE_LOOP)
+		{
+			parts[i].z = remainder_p(newZ + 0.5f, (float)ZRES) - 0.5f;
+		}
+		else if (newZ < 0)
+		{
+			parts[i].z = 0;
+			parts[i].vz = 0;
+		}
+		else if (newZ >= ZRES)
+		{
+			parts[i].z = float(ZRES - 1);
+			parts[i].vz = 0;
+		}
+		else
+		{
+			int tx = (int)(parts[i].x + 0.5f);
+			int ty = (int)(parts[i].y + 0.5f);
+			int oz = (int)(parts[i].z + 0.5f);
+			int nzi = (int)(newZ + 0.5f);
+			if (nzi == oz) { parts[i].z = roundf(newZ); }
+			else if (eval_move(parts[i].type, tx, ty, nullptr, nzi))
+				{ parts[i].z = roundf(newZ); }
+			else
+				{ parts[i].vz = 0; }
+		}
 	}
 }
 
