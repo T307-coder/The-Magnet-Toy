@@ -299,35 +299,22 @@ void Renderer::render_parts()
 			if(TYP(sim->photons[ny][nx]) && !(elements[t].Properties & TYPE_ENERGY) && t!=PT_STKM && t!=PT_STKM2 && t!=PT_FIGH)
 				continue;
 
-			// Fast grid path: write base colour to pre-allocated grid, skip all FX
+			// Fast grid path: strict integer grid (LED-array style)
 			if (!(colorMode & (COLOUR_HEAT | COLOUR_LIFE | COLOUR_GRAD | COLOUR_BASC)) && !findingElement)
 			{
 				RGB baseCol = elements[t].Colour;
-				auto deca = (sim->parts[i].dcolour>>24)&0xFF;
-				auto decr = (sim->parts[i].dcolour>>16)&0xFF;
-				auto decg = (sim->parts[i].dcolour>>8)&0xFF;
-				auto decb = (sim->parts[i].dcolour)&0xFF;
 				unsigned r = baseCol.Red, g = baseCol.Green, b = baseCol.Blue;
+				// Simple decoration (sand colour variation)
+				auto deca = (sim->parts[i].dcolour>>24)&0xFF;
 				if (decorationLevel != decorationDisabled && deca)
 				{
+					auto decr = (sim->parts[i].dcolour>>16)&0xFF;
+					auto decg = (sim->parts[i].dcolour>>8)&0xFF;
+					auto decb = (sim->parts[i].dcolour)&0xFF;
 					deca++;
 					r = (deca*decr + (256-deca)*r) >> 8;
 					g = (deca*decg + (256-deca)*g) >> 8;
 					b = (deca*decb + (256-deca)*b) >> 8;
-				}
-				if (decorationLevel == decorationAntiClickbait)
-				{
-					if (deca < 250 || decr > 5 || decg > 5 || decb > 5)
-						{ r = baseCol.Red; g = baseCol.Green; b = baseCol.Blue; }
-				}
-				// Hot glow for high-temperature elements
-				if ((elements[t].Properties & PROP_HOT_GLOW) && sim->parts[i].temp > (elements[t].HighTemperature-800.0f))
-				{
-					auto gradv = std::numbers::pi / (2*elements[t].HighTemperature-(elements[t].HighTemperature-800.0f));
-					auto caddress = int((sim->parts[i].temp>elements[t].HighTemperature)?elements[t].HighTemperature-(elements[t].HighTemperature-800.0f):sim->parts[i].temp-(elements[t].HighTemperature-800.0f));
-					r = std::min(255, int(r + sin(gradv*caddress) * 226));
-					g = std::min(255, int(g + (-sin(gradv*caddress*4.55f) * 34)));
-					b = std::min(255, int(b + (-sin(gradv*caddress*2.22f) * 64)));
 				}
 				partGrid[ny * XRES + nx] = RGB(r, g, b).Pack();
 				stats.foundParticles++;
