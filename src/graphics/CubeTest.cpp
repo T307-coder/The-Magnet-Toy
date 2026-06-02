@@ -14,6 +14,8 @@
 #include <vector>
 #include <memory>
 
+extern SDL_Window *sdl_window; // main TPT 2D window (PowderToySDL.cpp)
+
 static SDL_Window *g_win = nullptr;
 static SDL_GLContext g_gl = nullptr;
 static const Simulation *g_sim = nullptr;
@@ -674,6 +676,11 @@ void CubeTest_ToggleFullscreen()
 		SDL_SetWindowFullscreen(g_win, SDL_WINDOW_FULLSCREEN_DESKTOP);
 }
 
+void CubeTest_RaiseWindow()
+{
+	if (g_win) SDL_RaiseWindow(g_win);
+}
+
 void CubeTest_Zoom(int delta)
 {
 	g_dist -= (float)delta;
@@ -1231,6 +1238,19 @@ void CubeTest_HandleEvent(const SDL_Event &e)
 		if (sc == SDL_SCANCODE_LSHIFT || sc == SDL_SCANCODE_RSHIFT) g_shiftHeld = down;
 		if (sc == SDL_SCANCODE_LALT || sc == SDL_SCANCODE_RALT)     g_altHeld = down;
 		if (sc == SDL_SCANCODE_X)                                   g_xHeld = down;
+
+		// 3D window keyboard shortcuts (only when 3D window has focus)
+		if (e.key.windowID == wid)
+		{
+			if (down && sc == SDL_SCANCODE_F)
+			{
+				GameController::Ref().FrameStep(); // F = single frame step (same as 2D)
+			}
+			if (down && sc == SDL_SCANCODE_GRAVE) // Backtick ` = toggle focus to 2D window
+			{
+				if (sdl_window) SDL_RaiseWindow(sdl_window);
+			}
+		}
 
 		// Free cam movement keys + V toggle
 		if (down && sc == SDL_SCANCODE_V) { CubeTest_ToggleFreeCam(); }

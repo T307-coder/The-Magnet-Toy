@@ -337,6 +337,9 @@ static void EventProcess(const SDL_Event &event)
 		// 'F' toggles 3D window fullscreen
 		if (event.key.keysym.scancode == SDL_SCANCODE_F)
 			{ CubeTest_ToggleFullscreen(); break; }
+		// Backtick `: raise 3D window (focus toggle from 2D)
+		if (event.key.keysym.scancode == SDL_SCANCODE_GRAVE)
+			{ CubeTest_RaiseWindow(); break; }
 		// Tab: toggle 3D brush shape (cube ↔ sphere)
 		if (event.key.keysym.scancode == SDL_SCANCODE_TAB)
 			{ CubeTest_ToggleBrushShape(); break; }
