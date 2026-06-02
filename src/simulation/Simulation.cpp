@@ -2104,10 +2104,20 @@ void Simulation::kill_part(int i)//kills particle number i
 	if (t == PT_NONE)
 		return;
 
-	elementCount[t]--;
-
-	parts.Free(i);
-	NUM_PARTS -= 1;
+	if (useThreadContext)
+	{
+		auto &ctx = threadContexts[ThreadIndex()];
+		if (t > 0 && t < PT_NUM && ctx.elementCount[t] > 0)
+			ctx.elementCount[t]--;
+		ctx.NUM_PARTS -= 1;
+		PartsFreeThreaded(i);
+	}
+	else
+	{
+		elementCount[t]--;
+		parts.Free(i);
+		NUM_PARTS -= 1;
+	}
 }
 
 void Parts::Free(int i)
@@ -2115,6 +2125,74 @@ void Parts::Free(int i)
 	data[i].type = PT_NONE;
 	data[i].life = pfree;
 	pfree = i;
+}
+
+void Simulation::PartsFreeThreaded(int i)
+{
+	auto &threadContext = threadContexts[ThreadIndex()];
+	// Batch transfer to global free list when per-thread list is too long
+	if (threadContext.freeListLength >= 2 * freeListTargetLength)
+	{
+		auto oldHead = threadContext.pfree;
+		auto newHead = oldHead;
+		int toLink;
+		for (int j = 0; j < freeListTargetLength; ++j)
+		{
+			toLink = newHead;
+			newHead = parts.data[newHead].life;
+		}
+		threadContext.pfree = newHead;
+		{
+			std::lock_guard lk(pfreeMx);
+			parts.data[toLink].life = parts.pfree;
+			parts.pfree = oldHead;
+		}
+		threadContext.freeListLength -= freeListTargetLength;
+	}
+	// Add to per-thread free list
+	threadContext.freeListLength += 1;
+	parts.data[i].life = threadContext.pfree;
+	threadContext.pfree = i;
+}
+
+int Simulation::PartsAllocThreaded()
+{
+	auto &threadContext = threadContexts[ThreadIndex()];
+	// Grab batch from global free list when per-thread list is empty
+	if (threadContext.pfree == -1)
+	{
+		std::lock_guard lk(pfreeMx);
+		while (threadContext.freeListLength < freeListTargetLength)
+		{
+			if (parts.pfree != -1)
+			{
+				auto oldPfree = parts.pfree;
+				parts.pfree = parts.data[oldPfree].life;
+				parts.data[oldPfree].life = threadContext.pfree;
+				threadContext.pfree = oldPfree;
+			}
+			else if (parts.active < NPART)
+			{
+				parts.data[parts.active].life = threadContext.pfree;
+				threadContext.pfree = parts.active;
+				parts.active += 1;
+			}
+			else
+			{
+				break;
+			}
+			threadContext.freeListLength += 1;
+		}
+	}
+	// Pop from per-thread free list
+	if (threadContext.pfree != -1)
+	{
+		threadContext.freeListLength -= 1;
+		auto i = threadContext.pfree;
+		threadContext.pfree = parts.data[i].life;
+		return i;
+	}
+	return -1;
 }
 
 // Changes the type of particle number i, to t.  This also changes pmap at the same time
@@ -2285,12 +2363,15 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 				return -1;
 			}
 		}
-		i = parts.Alloc();
+		i = useThreadContext ? PartsAllocThreaded() : parts.Alloc();
 		if (i == -1)
 		{
 			return -1;
 		}
-		NUM_PARTS += 1;
+		if (useThreadContext)
+			threadContexts[ThreadIndex()].NUM_PARTS += 1;
+		else
+			NUM_PARTS += 1;
 	}
 	else
 	{
@@ -2314,7 +2395,16 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 		if (elements[oldType].ChangeType)
 			(*(elements[oldType].ChangeType))(this, p, oldX, oldY, oldType, t);
 		if (oldType)
-			elementCount[oldType]--;
+		{
+			if (useThreadContext)
+			{
+				auto &ctx = threadContexts[ThreadIndex()];
+				if (oldType > 0 && oldType < PT_NUM && ctx.elementCount[oldType] > 0)
+					ctx.elementCount[oldType]--;
+			}
+			else
+				elementCount[oldType]--;
+		}
 
 		i = p;
 	}
@@ -2361,7 +2451,14 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	if (elements[t].ChangeType)
 		(*(elements[t].ChangeType))(this, i, x, y, oldType, t);
 
-	elementCount[t]++;
+	if (useThreadContext)
+	{
+		auto &ctx = threadContexts[ThreadIndex()];
+		if (t > 0 && t < PT_NUM)
+			ctx.elementCount[t]++;
+	}
+	else
+		elementCount[t]++;
 	return i;
 }
 
@@ -2910,9 +3007,8 @@ void SimulationImpl::UpdateParticlesSerial(int start, int end)
 
 void SimulationImpl::UpdateParticles(int start, int end)
 {
-	// Serial path: used when threading is disabled, for sub-range updates, or when too many particles
-	if (!allowThreadedSimulation || threadCount <= 1 || start != 0 || end != NPART
-		|| parts.active > NPART / 4) // safety: fall back to serial when >25% full
+	// Serial path: used when threading is disabled or for sub-range updates
+	if (!allowThreadedSimulation || threadCount <= 1 || start != 0 || end != NPART)
 	{
 		UpdateParticlesSerial(start, end);
 		return;
@@ -2927,6 +3023,8 @@ void SimulationImpl::UpdateParticles(int start, int end)
 	{
 		ctx.rng.seed(rng());
 		ctx.NUM_PARTS = 0;
+		ctx.pfree = -1;
+		ctx.freeListLength = 0;
 		for (auto &c : ctx.elementCount) c = 0;
 	}
 
@@ -2978,12 +3076,22 @@ void SimulationImpl::UpdateParticles(int start, int end)
 	threadPool.Flush();
 	useThreadContext = false;
 
-	// 5. Merge per-thread element counts
+	// 5. Merge per-thread element counts and free lists back to global
 	for (auto &ctx : threadContexts)
 	{
 		for (int t = 0; t < PT_NUM; ++t)
 			elementCount[t] += ctx.elementCount[t];
 		NUM_PARTS += ctx.NUM_PARTS;
+		// Merge per-thread free list to global
+		if (ctx.pfree != -1)
+		{
+			int tail = ctx.pfree;
+			while (parts.data[tail].life != -1)
+				tail = parts.data[tail].life;
+			std::lock_guard lk(pfreeMx);
+			parts.data[tail].life = parts.pfree;
+			parts.pfree = ctx.pfree;
+		}
 	}
 }
 

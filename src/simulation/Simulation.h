@@ -41,9 +41,8 @@ class GameSave;
 
 class Parts
 {
-	int pfree;
-
 public:
+	int pfree;
 	alignas(64) std::array<Particle, NPART> data;
 	// initialized in clear_sim
 	int active;
@@ -221,10 +220,17 @@ public:
 		RNG rng;
 		std::array<int, PT_NUM> elementCount{};
 		int NUM_PARTS = 0;
+		int pfree = -1;            // per-thread free list head
+		int freeListLength = 0;    // current per-thread free list size
 	};
 	std::vector<ThreadContext> threadContexts;
 	bool useThreadContext = false;
-	std::mutex simMutex; // protects kill_part, move, spatialMap, pmap writes during parallel update
+	std::mutex simMutex;   // protects kill_part, move, spatialMap, pmap writes during parallel update
+	std::mutex pfreeMx;    // protects batch transfer between thread-local and global free lists
+	static constexpr int freeListTargetLength = 64;
+
+	void PartsFreeThreaded(int i);
+	int  PartsAllocThreaded();
 
 	RNG &GetRng()
 	{
