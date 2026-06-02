@@ -271,11 +271,14 @@ void Renderer::render_parts()
 	stats.foundParticles = 0;
 	// Clear fast-path grid buffer
 	std::fill(partGrid.begin(), partGrid.end(), 0);
+
+	// Hoist 3D view state outside particle loop (avoid per-particle extern calls)
+	int view2D = CubeTest_Get2DViewMode();
+	float lockVal = CubeTest_Get2DLockedVal();
+
 	for(i = 0; i < sim->parts.active; i++) {
 		if (sim->parts[i].type && sim->parts[i].type >= 0 && sim->parts[i].type < PT_NUM) {
 			// 3D view-dependent slice filter (exact layer ±0.5)
-			int view2D = CubeTest_Get2DViewMode();
-			float lockVal = CubeTest_Get2DLockedVal();
 			if (view2D == 0) { // XY plane (normal)
 				if (fabsf(sim->parts[i].z - lockVal) > 0.5f) continue;
 				nx = (int)(sim->parts[i].x+0.5f);
