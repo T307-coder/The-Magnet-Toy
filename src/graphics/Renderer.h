@@ -35,6 +35,9 @@ class Renderer : private RendererSettings, public RasterDrawMethods<Renderer>
 	RendererFrame warpVideo;
 	RendererStats stats;
 
+	// Pre-allocated grid buffer for integer-grid particle rendering
+	std::vector<pixel> partGrid;
+
 	Rect<int> GetClipRect() const
 	{
 		return video.Size().OriginRect();

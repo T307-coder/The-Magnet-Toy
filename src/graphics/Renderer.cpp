@@ -269,6 +269,8 @@ void Renderer::render_parts()
 			}
 	}
 	stats.foundParticles = 0;
+	// Clear fast-path grid buffer
+	std::fill(partGrid.begin(), partGrid.end(), 0);
 	for(i = 0; i < sim->parts.active; i++) {
 		if (sim->parts[i].type && sim->parts[i].type >= 0 && sim->parts[i].type < PT_NUM) {
 			// 3D view-dependent slice filter (exact layer ±0.5)
@@ -293,6 +295,41 @@ void Renderer::render_parts()
 				continue;
 			if(TYP(sim->photons[ny][nx]) && !(elements[t].Properties & TYPE_ENERGY) && t!=PT_STKM && t!=PT_STKM2 && t!=PT_FIGH)
 				continue;
+
+			// Fast grid path: write base colour to pre-allocated grid, skip all FX
+			if (!(colorMode & (COLOUR_HEAT | COLOUR_LIFE | COLOUR_GRAD | COLOUR_BASC)) && !findingElement)
+			{
+				RGB baseCol = elements[t].Colour;
+				auto deca = (sim->parts[i].dcolour>>24)&0xFF;
+				auto decr = (sim->parts[i].dcolour>>16)&0xFF;
+				auto decg = (sim->parts[i].dcolour>>8)&0xFF;
+				auto decb = (sim->parts[i].dcolour)&0xFF;
+				unsigned r = baseCol.Red, g = baseCol.Green, b = baseCol.Blue;
+				if (decorationLevel != decorationDisabled && deca)
+				{
+					deca++;
+					r = (deca*decr + (256-deca)*r) >> 8;
+					g = (deca*decg + (256-deca)*g) >> 8;
+					b = (deca*decb + (256-deca)*b) >> 8;
+				}
+				if (decorationLevel == decorationAntiClickbait)
+				{
+					if (deca < 250 || decr > 5 || decg > 5 || decb > 5)
+						{ r = baseCol.Red; g = baseCol.Green; b = baseCol.Blue; }
+				}
+				// Hot glow for high-temperature elements
+				if ((elements[t].Properties & PROP_HOT_GLOW) && sim->parts[i].temp > (elements[t].HighTemperature-800.0f))
+				{
+					auto gradv = std::numbers::pi / (2*elements[t].HighTemperature-(elements[t].HighTemperature-800.0f));
+					auto caddress = int((sim->parts[i].temp>elements[t].HighTemperature)?elements[t].HighTemperature-(elements[t].HighTemperature-800.0f):sim->parts[i].temp-(elements[t].HighTemperature-800.0f));
+					r = std::min(255, int(r + sin(gradv*caddress) * 226));
+					g = std::min(255, int(g + (-sin(gradv*caddress*4.55f) * 34)));
+					b = std::min(255, int(b + (-sin(gradv*caddress*2.22f) * 64)));
+				}
+				partGrid[ny * XRES + nx] = RGB(r, g, b).Pack();
+				stats.foundParticles++;
+				continue;
+			}
 
 			//Defaults
 			pixel_mode = 0 | PMODE_FLAT;
@@ -868,6 +905,14 @@ void Renderer::render_parts()
 			}
 		}
 	}
+
+	// Blit fast-path grid buffer to video (strict integer grid)
+	for (int gy = 0; gy < YRES; gy++)
+		for (int gx = 0; gx < XRES; gx++)
+		{
+			auto px = partGrid[gy * XRES + gx];
+			if (px) video[{ gx, gy }] = px;
+		}
 }
 
 void Renderer::draw_magnetic()
@@ -1636,6 +1681,9 @@ Renderer::Renderer()
 	memset(fire_r, 0, sizeof(fire_r));
 	memset(fire_g, 0, sizeof(fire_g));
 	memset(fire_b, 0, sizeof(fire_b));
+
+	// Pre-allocated grid buffer for particle rendering
+	partGrid.resize(XRES * YRES, 0);
 
 	//Set defauly display modes
 	prepare_alpha(CELL, 1.0f);
