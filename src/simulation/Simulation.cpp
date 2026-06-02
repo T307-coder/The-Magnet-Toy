@@ -1489,10 +1489,10 @@ int Simulation::try_move(int i, int x, int y, int z, int nx, int ny, int nz)
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 1;
 
-	e = eval_move(parts[i].type, nx, ny, &r, nz, i);
+	e = eval_move(parts[i].type, nx, ny, &r, (nz >= 0) ? nz : z, i);
 
 	/* half-silvered mirror */
-	if (!e && parts[i].type==PT_PHOT && ((TYP(r)==PT_BMTL && rng.chance(1, 2)) || TYP(pmap[y][x])==PT_BMTL))
+	if (!e && parts[i].type==PT_PHOT && ((TYP(r)==PT_BMTL && rng.chance(1, 2)) || TYP(GetPmap3D(x, y, z))==PT_BMTL))
 		e = 2;
 
 	auto &sd = SimulationData::CRef();
@@ -1756,7 +1756,7 @@ int Simulation::try_move(int i, int x, int y, int z, int nx, int ny, int nz)
 			else if (cnctGravY < 0.0f) offsetY--;
 			if ((offsetX != 0) != (offsetY != 0) && // Is this a different position (avoid diagonals, doesn't work well)
 				((nx - x) * offsetX > 0 || (ny - y) * offsetY > 0) && // Is the destination particle below the moving particle
-				(TYP(pmap[y+offsetY][x+offsetX]) == PT_CNCT || TYP(pmap[y+offsetY][x+offsetX]) == PT_ROCK)) //check below CNCT for another CNCT or ROCK
+				(TYP(GetPmap3D(x+offsetX, y+offsetY, z)) == PT_CNCT || TYP(GetPmap3D(x+offsetX, y+offsetY, z)) == PT_ROCK)) //check below CNCT for another CNCT or ROCK
 				return 0;
 		}
 		break;
@@ -1840,7 +1840,7 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 	int t = parts[i].type;
 	parts[i].x = nxf;
 	parts[i].y = nyf;
-	if (nzf >= 0) parts[i].z = nzf;
+	if (nzf >= 0) parts[i].z = roundf(nzf); // snap Z to integer (Z is a layer index)
 	bool onBasePlane = (z >= -1 && z <= 1);
 	if (ny != y || nx != x)
 	{
@@ -2854,16 +2854,16 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		{
 			float newZ = parts[i].z + parts[i].vz;
 			if (newZ < 0) { parts[i].z = 0; parts[i].vz = 0; }
-			else if (newZ >= 384) { parts[i].z = 383.99f; parts[i].vz = 0; }
+			else if (newZ >= 384) { parts[i].z = 383; parts[i].vz = 0; }
 			else
 			{
 				int tx = (int)(parts[i].x + 0.5f);
 				int ty = (int)(parts[i].y + 0.5f);
 				int oz = (int)(parts[i].z + 0.5f);
 				int nzi = (int)(newZ + 0.5f);
-				if (nzi == oz) { parts[i].z = newZ; }
+				if (nzi == oz) { parts[i].z = roundf(newZ); }
 				else if (eval_move(parts[i].type, tx, ty, nullptr, nzi))
-					{ parts[i].z = newZ; }
+					{ parts[i].z = roundf(newZ); }
 				else
 					{ parts[i].vz = 0; }
 			}
