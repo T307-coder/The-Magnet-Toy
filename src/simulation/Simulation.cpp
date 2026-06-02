@@ -1838,8 +1838,14 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 	auto &elements = sd.elements;
 	int nx = (int)(nxf+0.5f), ny = (int)(nyf+0.5f);
 	int t = parts[i].type;
-	parts[i].x = nxf;
-	parts[i].y = nyf;
+	// Snap to integer cell when crossing cell boundary (grid-aligned stacking)
+	if (nx != x || ny != y) {
+		parts[i].x = (float)nx;
+		parts[i].y = (float)ny;
+	} else {
+		parts[i].x = nxf;
+		parts[i].y = nyf;
+	}
 	if (nzf >= 0) parts[i].z = roundf(nzf); // snap Z to integer (Z is a layer index)
 	bool onBasePlane = (z >= -1 && z <= 1);
 	int newZ = (nzf >= 0) ? (int)roundf(nzf) : z;
