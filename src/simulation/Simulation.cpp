@@ -2106,17 +2106,34 @@ bool Simulation::part_change_type(int i, int x, int y, int t)
 	elementCount[t]++;
 
 	parts[i].type = t;
-	if (elements[t].Properties & TYPE_ENERGY)
+
+	// 3D-aware pmap management: use spatialMap when z鈮?
+	int z = int(parts[i].z + 0.5f);
+	bool onBasePlane = (z >= -1 && z <= 1);
+
+	if (onBasePlane)
 	{
-		photons[y][x] = PMAP(i, t);
-		if (pmap[y][x] && ID(pmap[y][x]) == i)
-			pmap[y][x] = 0;
+		if (elements[t].Properties & TYPE_ENERGY)
+		{
+			photons[y][x] = PMAP(i, t);
+			if (pmap[y][x] && ID(pmap[y][x]) == i)
+				pmap[y][x] = 0;
+		}
+		else
+		{
+			pmap[y][x] = PMAP(i, t);
+			if (photons[y][x] && ID(photons[y][x]) == i)
+				photons[y][x] = 0;
+		}
 	}
 	else
 	{
-		pmap[y][x] = PMAP(i, t);
+		// Off-plane: manage spatialMap, clear pmap if we were in it
+		if (pmap[y][x] && ID(pmap[y][x]) == i)
+			pmap[y][x] = 0;
 		if (photons[y][x] && ID(photons[y][x]) == i)
 			photons[y][x] = 0;
+		// Note: spatialMap insertion happens in BuildSpatialMap
 	}
 	return false;
 }
