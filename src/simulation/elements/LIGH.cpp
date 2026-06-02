@@ -311,7 +311,7 @@ static int graphics(GRAPHICS_FUNC_ARGS)
 
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
-	float gx, gy, gsize;
+	float gx, gy, gsize, dummyGravZ;
 	if (v >= 0)
 	{
 		if (v > 55)
@@ -321,7 +321,7 @@ static void create(ELEMENT_CREATE_FUNC_ARGS)
 	else
 		sim->parts[i].life = 30;
 	sim->parts[i].temp = sim->parts[i].life * 150.0f; // temperature of the lightning shows the power of the lightning
-	sim->GetGravityField(x, y, 1.0f, 1.0f, gx, gy);
+	sim->GetGravityField(x, y, 1.0f, 1.0f, gx, gy, dummyGravZ);
 	gsize = gx * gx + gy * gy;
 	if (gsize < 0.0016f)
 	{

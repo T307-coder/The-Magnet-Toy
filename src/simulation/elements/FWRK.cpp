@@ -53,9 +53,9 @@ static int update(UPDATE_FUNC_ARGS)
 	auto &elements = sd.elements;
 	if (parts[i].life == 0 && ((surround_space && parts[i].temp>400 && sim->rng.chance(int(9+parts[i].temp/40), 100000)) || parts[i].ctype == PT_DUST))
 	{
-		float gx, gy, multiplier, gmax;
+		float gx, gy, multiplier, gmax, dummyGravZ;
 		int randTmp;
-		sim->GetGravityField(x, y, elements[PT_FWRK].Gravity, 1.0f, gx, gy);
+		sim->GetGravityField(x, y, elements[PT_FWRK].Gravity, 1.0f, gx, gy, dummyGravZ);
 		if (gx*gx+gy*gy < 0.001f)
 		{
 			float angle = sim->rng.between(0, 6283) * 0.001f;//(in radians, between 0 and 2*pi)

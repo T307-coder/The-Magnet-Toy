@@ -65,8 +65,8 @@ static int update(UPDATE_FUNC_ARGS)
 					auto rt = TYP(r);
 					if (rt==PT_FIRE||rt==PT_PLSM||rt==PT_THDR)
 					{
-						float gx, gy, multiplier;
-						sim->GetGravityField(x, y, elements[PT_FIRW].Gravity, 1.0f, gx, gy);
+						float gx, gy, multiplier, dummyGravZ;
+						sim->GetGravityField(x, y, elements[PT_FIRW].Gravity, 1.0f, gx, gy, dummyGravZ);
 						if (gx*gx+gy*gy < 0.001f)
 						{
 							float angle = sim->rng.between(0, 6283) * 0.001f;//(in radians, between 0 and 2*pi)

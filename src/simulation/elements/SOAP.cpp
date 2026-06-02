@@ -268,9 +268,9 @@ static int update(UPDATE_FUNC_ARGS)
 						continue;
 					if (TYP(r) == PT_OIL)
 					{
-						float ax, ay, gx, gy;
+						float ax, ay, gx, gy, dummyGravZ;
 
-						sim->GetGravityField(x, y, elements[PT_SOAP].Gravity, 1.0f, gx, gy);
+						sim->GetGravityField(x, y, elements[PT_SOAP].Gravity, 1.0f, gx, gy, dummyGravZ);
 
 						ax = ((parts[i].vx-gx)*0.5f + parts[ID(r)].vx)/2;
 						ay = ((parts[i].vy-gy)*0.5f + parts[ID(r)].vy)/2;
