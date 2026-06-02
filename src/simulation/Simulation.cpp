@@ -1246,9 +1246,17 @@ void Simulation::set_emap(int x, int y)
 
 int Simulation::parts_avg(int ci, int ni,int t)
 {
+	int midX = (int)((parts[ci].x + parts[ni].x) / 2 + 0.5f);
+	int midY = (int)((parts[ci].y + parts[ni].y) / 2 + 0.5f);
+	int midZ = (int)((parts[ci].z + parts[ni].z) / 2 + 0.5f);
+
 	if (t==PT_INSL)//to keep electronics working
 	{
-		int pmr = pmap[((int)(parts[ci].y+0.5f) + (int)(parts[ni].y+0.5f))/2][((int)(parts[ci].x+0.5f) + (int)(parts[ni].x+0.5f))/2];
+		int pmr;
+		if (midZ >= -1 && midZ <= 1)
+			pmr = pmap[midY][midX];
+		else
+			pmr = GetPmap3D(midX, midY, midZ);
 		if (pmr)
 			return parts[ID(pmr)].type;
 		else
@@ -1256,7 +1264,11 @@ int Simulation::parts_avg(int ci, int ni,int t)
 	}
 	else
 	{
-		int pmr2 = pmap[(int)((parts[ci].y + parts[ni].y)/2+0.5f)][(int)((parts[ci].x + parts[ni].x)/2+0.5f)];//seems to be more accurate.
+		int pmr2;
+		if (midZ >= -1 && midZ <= 1)
+			pmr2 = pmap[midY][midX];
+		else
+			pmr2 = GetPmap3D(midX, midY, midZ);
 		if (pmr2)
 		{
 			if (parts[ID(pmr2)].type==t)
@@ -2264,10 +2276,18 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	{
 		int oldX = (int)(parts[p].x + 0.5f);
 		int oldY = (int)(parts[p].y + 0.5f);
+		int oldZ = (int)(parts[p].z + 0.5f);
 		if (pmap[oldY][oldX] && ID(pmap[oldY][oldX]) == p)
 			pmap[oldY][oldX] = 0;
 		if (photons[oldY][oldX] && ID(photons[oldY][oldX]) == p)
 			photons[oldY][oldX] = 0;
+		// Clean up spatialMap for off-plane particles
+		if (oldZ < -1 || oldZ > 1)
+		{
+			auto it = spatialMap.find(PackXYZ(oldX, oldY, oldZ));
+			if (it != spatialMap.end() && it->second == p)
+				spatialMap.erase(it);
+		}
 
 		oldType = parts[p].type;
 
