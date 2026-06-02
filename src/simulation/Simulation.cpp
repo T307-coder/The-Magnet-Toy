@@ -3898,14 +3898,26 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				{
 					// if interpolation was done, try moving to last clear position
 					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
-					// XYZ: when stagnant, try one random adjacent cell (cross-layer spread)
+					// XYZ: when stagnant, pick one random axis+dir and try it
 					else if (stagnant)
 					{
 						int rdir = rng.between(0, 1) * 2 - 1; // -1 or +1
-						if      (do_move(i, x, y, z, (float)(x+rdir), (float)y)) {}
-						else if (do_move(i, x, y, z, (float)x, (float)(y+rdir))) {}
-						else if (do_move(i, x, y, z, (float)x, (float)y, float(z+rdir))) {}
-						else parts[i].flags |= FLAG_STAGNANT;
+						int axis = rng.between(0, 2); // 0=X, 1=Y, 2=Z
+						if (axis == 0)
+						{
+							if (!do_move(i, x, y, z, (float)(x+rdir), (float)y))
+								parts[i].flags |= FLAG_STAGNANT;
+						}
+						else if (axis == 1)
+						{
+							if (!do_move(i, x, y, z, (float)x, (float)(y+rdir)))
+								parts[i].flags |= FLAG_STAGNANT;
+						}
+						else
+						{
+							if (!do_move(i, x, y, z, (float)x, (float)y, float(z+rdir)))
+								parts[i].flags |= FLAG_STAGNANT;
+						}
 					}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
