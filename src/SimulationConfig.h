@@ -18,7 +18,7 @@ constexpr int NCELL  = XCELLS * YCELLS;
 constexpr int XRES   = RES.X;
 constexpr int YRES   = RES.Y;
 constexpr int ZRES   = YRES; // XYZ symmetry: Z dimension equals Y (cubic compatible)
-constexpr int NPART  = XRES * YRES;
+constexpr int NPART  = XRES * YRES * 3; // Z-axis headroom (~705K, ~58MB)
 
 // 3D tile constants for parallel simulation
 constexpr int TILE_SIZE = 16; // XYZ equal tile size

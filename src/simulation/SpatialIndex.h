@@ -14,7 +14,7 @@
 class SpatialIndex
 {
 	static constexpr double MAX_LOAD = 0.60;
-	static constexpr size_t MIN_CAP = 262144; // 256K slots, ~157K entries @60% — covers all NPART (147K) off-plane
+	static constexpr size_t MIN_CAP = 524288; // 512K slots, ~314K entries @60%
 
 	uint8_t  *meta_  = nullptr;
 	uint64_t *keys_  = nullptr;
