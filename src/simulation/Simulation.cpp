@@ -2262,11 +2262,11 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].tmp6 = 0;
 
 	//and finally set the pmap/photon maps to the newly created particle
+	// Skip pmap for particles not on the base Z plane (z鈮?)
 	// In XZ/YZ slice views, pmap is 2D and can't represent 3D space.
-	// Skip pmap so particles at different Z can coexist at same (x,y).
-	if (view2D != 0 && p == -2)
+	if ((view2D != 0 && p == -2) || (p == -2 && fabsf(parts[i].z) > 0.5f))
 	{
-		// Non-XY brush: no pmap entry (3D position stored in parts[i].x/y/z)
+		// Non-XY brush or non-zero Z: no pmap entry (3D position stored in parts[i].x/y/z)
 	}
 	else if (elements[t].Properties & TYPE_ENERGY)
 		photons[y][x] = PMAP(i, t);
