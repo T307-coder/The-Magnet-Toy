@@ -3790,9 +3790,6 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 						}
 					else if (s==-1) {} // particle is out of bounds
 					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
-					// XYZ: try adjacent Z layers when XY is blocked (slope-like 3D spread)
-					else if (do_move(i, x, y, z, (float)x, (float)y, float(z+1))) {}
-					else if (do_move(i, x, y, z, (float)x, (float)y, float(z-1))) {}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
@@ -3901,6 +3898,9 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				{
 					// if interpolation was done, try moving to last clear position
 					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
+					// XYZ: try adjacent Z layers when XY is blocked (slope-like 3D spread)
+					else if (do_move(i, x, y, z, (float)x, (float)y, float(z+1))) {}
+					else if (do_move(i, x, y, z, (float)x, (float)y, float(z-1))) {}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
