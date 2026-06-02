@@ -1353,12 +1353,13 @@ void GameModel::FrameStep(int frames)
 
 void GameModel::ClearSimulation()
 {
-	//Load defaults — 3D mode: disable 2D subsystems pending 3D rewrite
-	sim->gravityMode = GRAV_OFF;
+	//Load defaults — 3D mode: keep basic downward gravity, disable expensive subsystems
+	sim->gravityMode = GRAV_VERTICAL;  // normal downward gravity stays on
 	sim->customGravityX = 0.0f;
 	sim->customGravityY = 0.0f;
-	sim->air->airMode = AIR_OFF;
-	sim->magnetismEnabled = false;
+	sim->grav.reset();                  // disable Newtonian gravity (particle-to-particle)
+	sim->air->airMode = AIR_OFF;        // disable air simulation
+	sim->magnetismEnabled = false;      // disable electromagnetism
 	sim->inductionEnabled = false;
 	sim->currentBFieldEnabled = false;
 	sim->sprkCurrentEnabled = false;
