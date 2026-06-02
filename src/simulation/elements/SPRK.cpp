@@ -429,6 +429,40 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 		}
 	}
+
+	// 3D cross-Z spark propagation (XYZ symmetric)
+	// Spark jumps to conducting materials on adjacent Z layers
+	if (parts[i].life < 4)
+	{
+		int z = int(parts[i].z + 0.5f);
+		for (auto rz = -1; rz <= 1; rz += 2) // only z-1 and z+1
+		{
+			for (auto ry = -1; ry <= 1; ry++)
+			{
+				for (auto rx = -1; rx <= 1; rx++)
+				{
+					if (!rx && !ry)
+						continue;
+					auto r = sim->GetPmap3D(x+rx, y+ry, z+rz, i);
+					if (!r)
+						continue;
+					auto rt = TYP(r);
+					// Only conduct to conductors (simple rule for cross-Z)
+					if (!(elements[rt].Properties&PROP_CONDUCTS) && rt != PT_INST && rt != PT_QRTZ)
+						continue;
+					if (parts[ID(r)].life == 0)
+					{
+						parts[ID(r)].life = 4;
+						parts[ID(r)].ctype = rt;
+						sim->part_change_type(ID(r), x+rx, y+ry, PT_SPRK);
+						if (parts[i].tmp3 == 1)
+							parts[ID(r)].tmp3 = 1;
+					}
+				}
+			}
+		}
+	}
+
 	return 0;
 }
 

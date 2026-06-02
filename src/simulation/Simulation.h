@@ -215,7 +215,7 @@ public:
 	// Other Z: reads spatialMap (hash, O(1) average).
 	// Returns PMAP-format particle reference, or 0 if empty.
 	// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
-	int  GetPmap3D(int x, int y, int z) const;
+	int  GetPmap3D(int x, int y, int z, int skipSelf = -1) const;
 	bool IsOccupied3D(int x, int y, int z) const;
 
 	void Load(const GameSave *save, bool includePressure, Vec2<int> blockP); // block coordinates
@@ -230,10 +230,10 @@ public:
 	int is_boundary(int pt, int x, int y) const;
 	int find_next_boundary(int pt, int *x, int *y, int dm, int *em, bool reverse) const;
 	void photoelectric_effect(int nx, int ny);
-	int do_move(int i, int x, int y, float nxf, float nyf);
-	bool move(int i, int x, int y, float nxf, float nyf);
-	int try_move(int i, int x, int y, int nx, int ny);
-	int eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ = -1) const;
+	int do_move(int i, int x, int y, int z, float nxf, float nyf, float nzf = -1);
+	bool move(int i, int x, int y, int z, float nxf, float nyf, float nzf = -1);
+	int try_move(int i, int x, int y, int z, int nx, int ny, int nz = -1);
+	int eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ = -1, int skipSelf = -1) const;
 
 	struct PlanMoveResult
 	{

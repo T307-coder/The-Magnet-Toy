@@ -33,9 +33,16 @@ namespace
 	{
 		struct Neighbourhood
 		{
+			// 2D neighbours (same Z, 8 directions) — backward compatible
 			std::array<int, 8> surround;
 			int surround_space = 0;
-			int nt = 0; //if nt is greater than 1 after this, then there is a particle around the current particle, that is NOT the current particle's type, for water movement.
+			int nt = 0; // if nt is greater than 1 after this, then there is a particle around the current particle, that is NOT the current particle's type, for water movement.
+
+			// 3D neighbours (26 directions, including different Z) — XYZ symmetric
+			std::array<int, 26> surround_3d;
+			int surround_space_3d = 0;
+			int nt_3d = 0;
+
 			float pGravX = 0;
 			float pGravY = 0;
 		};
@@ -993,7 +1000,7 @@ bool Simulation::flood_water(int x, int y, int i)
 					else if (!eval_move(parts[i].type, x, y - 1, nullptr))
 						continue;
 
-					move(i, originalX, originalY, float(x), float(y - 1));
+					move(i, originalX, originalY, int(parts[i].z+0.5f), float(x), float(y - 1));
 					return true;
 				}
 
@@ -1367,7 +1374,7 @@ bool Simulation::IsWallBlocking(int x, int y, int type) const
 0 = No move/Bounce
 2 = Both particles occupy the same space.
  */
-int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ) const
+int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ, int skipSelf) const
 {
 	unsigned r;
 	int result;
@@ -1376,7 +1383,7 @@ int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ) const
 		return 0;
 
 	if (moveZ >= 0)
-		r = GetPmap3D(nx, ny, moveZ);
+		r = GetPmap3D(nx, ny, moveZ, skipSelf);
 	else
 		r = pmap[ny][nx];
 	if (r)
@@ -1460,7 +1467,7 @@ int Simulation::eval_move(int pt, int nx, int ny, unsigned *rr, int moveZ) const
 	return result;
 }
 
-int Simulation::try_move(int i, int x, int y, int nx, int ny, int nz)
+int Simulation::try_move(int i, int x, int y, int z, int nx, int ny, int nz)
 {
 	unsigned r = 0, e;
 
@@ -1469,7 +1476,7 @@ int Simulation::try_move(int i, int x, int y, int nx, int ny, int nz)
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 1;
 
-	e = eval_move(parts[i].type, nx, ny, &r, nz);
+	e = eval_move(parts[i].type, nx, ny, &r, nz, i);
 
 	/* half-silvered mirror */
 	if (!e && parts[i].type==PT_PHOT && ((TYP(r)==PT_BMTL && rng.chance(1, 2)) || TYP(pmap[y][x])==PT_BMTL))
@@ -1778,6 +1785,7 @@ int Simulation::try_move(int i, int x, int y, int nx, int ny, int nz)
 			pmap[ny][nx] = 0;
 		parts[ri].x = parts[i].x;
 		parts[ri].y = parts[i].y;
+		if (nz >= 0) parts[ri].z = parts[i].z;
 		int rx = int(parts[ri].x + 0.5f);
 		int ry = int(parts[ri].y + 0.5f);
 		pmap[ry][rx] = PMAP(ri, parts[ri].type);
@@ -1785,10 +1793,10 @@ int Simulation::try_move(int i, int x, int y, int nx, int ny, int nz)
 	return 1;
 }
 
-// try to move particle, and if successful update pmap and parts[i].x,y
-int Simulation::do_move(int i, int x, int y, float nxf, float nyf)
+// try to move particle, and if successful update pmap and parts[i].x,y,z
+int Simulation::do_move(int i, int x, int y, int z, float nxf, float nyf, float nzf)
 {
-	int nx = (int)(nxf+0.5f), ny = (int)(nyf+0.5f), result;
+	int nx = (int)(nxf+0.5f), ny = (int)(nyf+0.5f), nz = (nzf >= 0) ? (int)(nzf+0.5f) : -1, result;
 	if (edgeMode == EDGE_LOOP)
 	{
 		bool x_ok = (nx >= CELL && nx < XRES-CELL);
@@ -1799,27 +1807,19 @@ int Simulation::do_move(int i, int x, int y, float nxf, float nyf)
 			nyf = remainder_p(nyf-CELL+.5f, YRES-CELL*2.0f)+CELL-.5f;
 		nx = (int)(nxf+0.5f);
 		ny = (int)(nyf+0.5f);
-
-		/*if (!x_ok || !y_ok)
-		{
-			//make sure there isn't something blocking it on the other side
-			//only needed if this if statement is moved after the try_move (like my mod)
-			//if (!eval_move(t, nx, ny, NULL) || (t == PT_PHOT && pmap[ny][nx]))
-			//	return -1;
-		}*/
 	}
 	if (parts[i].type == PT_NONE)
 		return 0;
-	result = try_move(i, x, y, nx, ny);
+	result = try_move(i, x, y, z, nx, ny, nz);
 	if (result)
 	{
-		if (!move(i, x, y, nxf, nyf))
+		if (!move(i, x, y, z, nxf, nyf, nzf))
 			return -1;
 	}
 	return result;
 }
 
-bool Simulation::move(int i, int x, int y, float nxf, float nyf)
+bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nzf)
 {
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
@@ -1827,6 +1827,7 @@ bool Simulation::move(int i, int x, int y, float nxf, float nyf)
 	int t = parts[i].type;
 	parts[i].x = nxf;
 	parts[i].y = nyf;
+	if (nzf >= 0) parts[i].z = nzf;
 	if (ny != y || nx != x)
 	{
 		if (pmap[y][x] && ID(pmap[y][x]) == i)
@@ -2601,9 +2602,12 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 	auto t = parts[i].type;
 	auto x = int(parts[i].x + 0.5f);
 	auto y = int(parts[i].y + 0.5f);
+	auto z = int(parts[i].z + 0.5f);
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
 	Neighbourhood n;
+
+	// 2D neighbours (same Z, 8 directions) — backward compatible
 	auto j = 0;
 	for (auto nx=-1; nx<2; nx++)
 	{
@@ -2614,11 +2618,32 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 				auto r = pmap[y+ny][x+nx];
 				n.surround[j] = r;
 				j++;
-				n.surround_space += (!TYP(r)); // count empty space
-				n.nt += (TYP(r)!=t); // count empty space and particles of different type
+				n.surround_space += (!TYP(r));
+				n.nt += (TYP(r)!=t);
 			}
 		}
 	}
+
+	// 3D neighbours (26 directions, XYZ symmetric)
+	auto j3 = 0;
+	for (auto nz=-1; nz<2; nz++)
+	{
+		for (auto ny=-1; ny<2; ny++)
+		{
+			for (auto nx=-1; nx<2; nx++)
+			{
+				if (nx||ny||nz)
+				{
+					auto r = GetPmap3D(x+nx, y+ny, z+nz, i);
+					n.surround_3d[j3] = r;
+					j3++;
+					n.surround_space_3d += (!TYP(r));
+					n.nt_3d += (TYP(r)!=t);
+				}
+			}
+		}
+	}
+
 	if (!(elements[t].Properties & TYPE_SOLID) && (elements[t].Gravity || elements[t].NewtonianGravity))
 	{
 		GetGravityField(x, y, elements[t].Gravity, elements[t].NewtonianGravity, n.pGravX, n.pGravY);
@@ -2804,7 +2829,7 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 			GetGravityField(x, y, -2.0f, -2.0f, convGravX, convGravY);
 			auto offsetX = std::clamp(int(std::round(convGravX + x)), x-1, x+1);
 			auto offsetY = std::clamp(int(std::round(convGravY + y)), y-1, y+1);
-			// Some heat convection for liquids
+			// Some heat convection for liquids (3D: also check Z offset)
 			if (offsetX != x || offsetY != y)
 			{
 				auto r = pmap[offsetY][offsetX];
@@ -2815,6 +2840,21 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 						auto swappage = parts[i].temp;
 						parts[i].temp = parts[ID(r)].temp;
 						parts[ID(r)].temp = swappage;
+					}
+				}
+			}
+			// 3D convection: also check adjacent Z layers
+			int z = int(parts[i].z + 0.5f);
+			for (auto nz = -1; nz <= 1; nz += 2)
+			{
+				auto r3 = GetPmap3D(offsetX, offsetY, z+nz, i);
+				if (r3 && parts[i].type == TYP(r3))
+				{
+					if (parts[i].temp > parts[ID(r3)].temp)
+					{
+						auto swappage = parts[i].temp;
+						parts[i].temp = parts[ID(r3)].temp;
+						parts[ID(r3)].temp = swappage;
 					}
 				}
 			}
@@ -2835,15 +2875,15 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 				hv[y/CELL][x/CELL] = restrict_flt(hv[y/CELL][x/CELL] - alpha*dtemp, MIN_TEMP, MAX_TEMP);
 			}
 
-			// Heat transfer with other elements
-			auto hc_total = 0.0f; // Total heat capacity of elements involved
-			auto c_heat = 0.0f; // Total heat distributed between elements
-			int surround_hconduct[8]; // IDs of elements which exchange heat
+// Heat transfer with other elements (3D: 26 neighbours, XYZ symmetric)
+		auto hc_total = 0.0f; // Total heat capacity of elements involved
+		auto c_heat = 0.0f; // Total heat distributed between elements
+		int surround_hconduct[26]; // IDs of elements which exchange heat
 
-			for (auto j=0; j<8; j++)
-			{
-				surround_hconduct[j] = i;
-				auto r = neighbourhood.surround[j];
+		for (auto j=0; j<26; j++)
+		{
+			surround_hconduct[j] = i;
+			auto r = neighbourhood.surround_3d[j];
 
 				if (!r)
 					continue;
@@ -2875,7 +2915,7 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 			float pt = restrict_flt(c_heat / hc_total, MIN_TEMP, MAX_TEMP);
 
 			parts[i].temp = pt;
-			for (auto j=0; j<8; j++)
+			for (auto j=0; j<26; j++)
 			{
 				parts[surround_hconduct[j]].temp = pt;
 			}
@@ -3398,12 +3438,12 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 		if (stagnant)//FLAG_STAGNANT set, was reflected on previous frame
 		{
 			// cast coords as int then back to float for compatibility with existing saves
-			if (!do_move(i, x, y, (float)fin_x, (float)fin_y) && parts[i].type) {
+			if (!do_move(i, x, y, z, z, (float)fin_x, (float)fin_y) && parts[i].type) {
 				kill_part(i);
 				return;
 			}
 		}
-		else if (!do_move(i, x, y, fin_xf, fin_yf))
+		else if (!do_move(i, x, y, z, z, fin_xf, fin_yf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
@@ -3485,7 +3525,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 	else if (elements[t].Falldown==0)
 	{
 		// gasses and solids (but not powders)
-		if (!do_move(i, x, y, fin_xf, fin_yf))
+		if (!do_move(i, x, y, z, z, fin_xf, fin_yf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
@@ -3494,11 +3534,11 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 			if (fin_x<x-ISTP) fin_x=x-ISTP;
 			if (fin_y>y+ISTP) fin_y=y+ISTP;
 			if (fin_y<y-ISTP) fin_y=y-ISTP;
-			if (do_move(i, x, y, float(2*x-fin_x), float(fin_y)))
+			if (do_move(i, x, y, z, z, float(2*x-fin_x), float(fin_y)))
 			{
 				parts[i].vx *= elements[t].Collision;
 			}
-			else if (do_move(i, x, y, float(fin_x), float(2*y-fin_y)))
+			else if (do_move(i, x, y, z, z, float(fin_x), float(2*y-fin_y)))
 			{
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
@@ -3520,26 +3560,25 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				return;
 		}
 		// liquids and powders
-		if (!do_move(i, x, y, fin_xf, fin_yf))
+		if (!do_move(i, x, y, z, z, fin_xf, fin_yf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
-			if (fin_x!=x && do_move(i, x, y, fin_xf, clear_yf))
+			if (fin_x!=x && do_move(i, x, y, z, z, fin_xf, clear_yf))
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
 			}
-			else if (fin_y!=y && do_move(i, x, y, clear_xf, fin_yf))
+			else if (fin_y!=y && do_move(i, x, y, z, z, clear_xf, fin_yf))
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
 			}
 			// XYZ equal-rights: Z-only fallback, same priority as X-only/Y-only
-			else if (fin_z != z && eval_move(t, x, y, nullptr, fin_z))
+			else if (fin_z != z && do_move(i, x, y, z, clear_xf, clear_yf, fin_zf))
 			{
-				parts[i].z = fin_zf;
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
@@ -3562,7 +3601,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					dx /= mv2;
 					dy /= mv2;
 					dz /= mv2;
-					if (do_move(i, x, y, clear_xf+dx, clear_yf+dy))
+					if (do_move(i, x, y, z, z, clear_xf+dx, clear_yf+dy))
 					{
 						parts[i].vx *= elements[t].Collision;
 						parts[i].vy *= elements[t].Collision;
@@ -3575,7 +3614,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 						dy = -swappage*r;
 						// dz stays same
 					}
-					if (do_move(i, x, y, clear_xf+dx, clear_yf+dy))
+					if (do_move(i, x, y, z, z, clear_xf+dx, clear_yf+dy))
 					{
 						parts[i].vx *= elements[t].Collision;
 						parts[i].vy *= elements[t].Collision;
@@ -3589,7 +3628,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 						{
 							float tdx = sign * (dx != 0 ? dx : 1.0f);
 							float tdy = sign * (dy != 0 ? dy : 1.0f);
-							if (do_move(i, x, y, clear_xf+tdx, clear_yf+tdy))
+							if (do_move(i, x, y, z, z, clear_xf+tdx, clear_yf+tdy))
 							{
 								parts[i].z += dz;
 								parts[i].vx *= elements[t].Collision;
@@ -3617,14 +3656,14 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					for (auto j=clear_x+r; j>=0 && j>=clear_x-rt && j<clear_x+rt && j<XRES; j+=r)
 					{
 						if ((TYP(pmap[fin_y][j])!=t || bmap[fin_y/CELL][j/CELL])
-							&& (s=do_move(i, x, y, (float)j, fin_yf)))
+							&& (s=do_move(i, x, y, z, z, (float)j, fin_yf)))
 						{
 							nx = (int)(parts[i].x+0.5f);
 							ny = (int)(parts[i].y+0.5f);
 							break;
 						}
 						if (fin_y!=clear_y && (TYP(pmap[clear_y][j])!=t || bmap[clear_y/CELL][j/CELL])
-							&& (s=do_move(i, x, y, (float)j, clear_yf)))
+							&& (s=do_move(i, x, y, z, z, (float)j, clear_yf)))
 						{
 							nx = (int)(parts[i].x+0.5f);
 							ny = (int)(parts[i].y+0.5f);
@@ -3639,13 +3678,13 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					if (s==1)
 						for (auto j=ny+r; j>=0 && j<YRES && j>=ny-rt && j<ny+rt; j+=r)
 						{
-							if ((TYP(pmap[j][nx])!=t || bmap[j/CELL][nx/CELL]) && do_move(i, nx, ny, (float)nx, (float)j))
+							if ((TYP(pmap[j][nx])!=t || bmap[j/CELL][nx/CELL]) && do_move(i, nx, ny, z, (float)nx, (float)j))
 								break;
 							if (TYP(pmap[j][nx])!=t || (bmap[j/CELL][nx/CELL] && bmap[j/CELL][nx/CELL]!=WL_STREAM))
 								break;
 						}
 					else if (s==-1) {} // particle is out of bounds
-					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, clear_xf, clear_yf)) {}
+					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, z, clear_xf, clear_yf)) {}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
@@ -3699,7 +3738,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 							break;
 						if (TYP(pmap[ny][nx])!=t || bmap[ny/CELL][nx/CELL])
 						{
-							s = do_move(i, x, y, nxf, nyf);
+							s = do_move(i, x, y, z, z, nxf, nyf);
 							if (s)
 							{
 								// Movement was successful
@@ -3737,14 +3776,14 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 							// If the space is anything except the same element (a wall, empty space, or occupied by a particle of a different element), try to move into it
 							if (TYP(pmap[ny][nx])!=t || bmap[ny/CELL][nx/CELL])
 							{
-								s = do_move(i, clear_x, clear_y, nxf, nyf);
+								s = do_move(i, clear_x, clear_y, z, nxf, nyf);
 								if (s || TYP(pmap[ny][nx])!=t || bmap[ny/CELL][nx/CELL]!=WL_STREAM)
 									break; // found the edge of the liquid and movement into it succeeded, so stop moving down
 							}
 						}
 					}
 					else if (s==-1) {} // particle is out of bounds
-					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, clear_xf, clear_yf)) {} // try moving to the last clear position
+					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, z, clear_xf, clear_yf)) {} // try moving to the last clear position
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
@@ -3753,7 +3792,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				else
 				{
 					// if interpolation was done, try moving to last clear position
-					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, clear_xf, clear_yf)) {}
+					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, z, clear_xf, clear_yf)) {}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
@@ -4180,18 +4219,25 @@ int Simulation::FindParticle3D(int x, int y, int z) const
 // spatialMap (all Z), so callers don't need to know which layer a
 // particle lives on.
 
-int Simulation::GetPmap3D(int x, int y, int z) const
+int Simulation::GetPmap3D(int x, int y, int z, int skipSelf) const
 {
 	if (x < 0 || y < 0 || x >= XRES || y >= YRES || z < 0 || z >= 384)
 		return 0;
 
-	// Always use spatialMap for consistent per-Z-level occupancy.
-	// (Previously fell through to pmap for z鈮?, but pmap conflates
-	//  all z鈭圼-1,1] into one cell, breaking Z-sliding detection.)
+	// Z≈0: fast path via 2D pmap (backward compatible, O(1))
+	if (z >= -1 && z <= 1)
+	{
+		unsigned r = pmap[y][x];
+		if (r && ID(r) == skipSelf) return 0; // skip self
+		return r;
+	}
+
+	// Other Z layers: spatial hash (O(1) average)
 	auto it = spatialMap.find(PackXYZ(x, y, z));
 	if (it != spatialMap.end())
 	{
 		int i = it->second;
+		if (i == skipSelf) return 0; // skip self
 		if (i >= 0 && i < NPART && parts[i].type)
 			return PMAP(i, parts[i].type);
 	}

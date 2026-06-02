@@ -341,7 +341,7 @@ void LuaSetParticleProperty(lua_State *L, int particleID, StructProperty propert
 		float y = sim->parts[particleID].y;
 		float nx = property.Name == "x" ? val : x;
 		float ny = property.Name == "y" ? val : y;
-		sim->move(particleID, (int)(x + 0.5f), (int)(y + 0.5f), nx, ny);
+		sim->move(particleID, (int)(x + 0.5f), (int)(y + 0.5f), int(sim->parts[particleID].z+0.5f), nx, ny);
 	}
 	else
 	{

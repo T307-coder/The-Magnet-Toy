@@ -400,7 +400,7 @@ static int partPosition(lua_State *L)
 		lsi->AssertMonopartAccessEvent(-1);
 		float x = sim->parts[particleID].x;
 		float y = sim->parts[particleID].y;
-		sim->move(particleID, (int)(x + 0.5f), (int)(y + 0.5f), lua_tonumber(L, 2), lua_tonumber(L, 3));
+		sim->move(particleID, (int)(x + 0.5f), (int)(y + 0.5f), int(sim->parts[particleID].z+0.5f), lua_tonumber(L, 2), lua_tonumber(L, 3));
 
 		return 0;
 	}
