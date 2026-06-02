@@ -2699,24 +2699,36 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 		}
 	}
 
-	// 3D neighbours (26 directions, XYZ symmetric)
+	// 3D neighbours (26 directions) — only for off-plane particles
+	// z≈0 particles use 2D surround (pmap), no cross-Z neighbours exist
 	auto j3 = 0;
-	for (auto nz=-1; nz<2; nz++)
+	if (z < -1 || z > 1)
 	{
-		for (auto ny=-1; ny<2; ny++)
+		for (auto nz=-1; nz<2; nz++)
 		{
-			for (auto nx=-1; nx<2; nx++)
+			for (auto ny=-1; ny<2; ny++)
 			{
-				if (nx||ny||nz)
+				for (auto nx=-1; nx<2; nx++)
 				{
-					auto r = GetPmap3D(x+nx, y+ny, z+nz, i);
-					n.surround_3d[j3] = r;
-					j3++;
-					n.surround_space_3d += (!TYP(r));
-					n.nt_3d += (TYP(r)!=t);
+					if (nx||ny||nz)
+					{
+						auto r = GetPmap3D(x+nx, y+ny, z+nz, i);
+						n.surround_3d[j3] = r;
+						j3++;
+						n.surround_space_3d += (!TYP(r));
+						n.nt_3d += (TYP(r)!=t);
+					}
 				}
 			}
 		}
+	}
+	else
+	{
+		// z≈0: copy 2D neighbours into Z=0 slice of surround_3d (indices 9..16)
+		for (int k = 0; k < 8; k++)
+			n.surround_3d[9 + k] = n.surround[k];
+		n.surround_space_3d = n.surround_space;
+		n.nt_3d = n.nt;
 	}
 
 	if (!(elements[t].Properties & TYPE_SOLID) && (elements[t].Gravity || elements[t].NewtonianGravity))
