@@ -9,6 +9,8 @@
 #include "AccessProperty.h"
 #include "CoordStack.h"
 #include "common/tpt-rand.h"
+#include "common/ThreadPool.h"
+#include "common/ThreadIndex.h"
 #include "gravity/Gravity.h"
 #include "graphics/RendererFrame.h"
 #include "Element.h"
@@ -41,7 +43,7 @@ class Parts
 	int pfree;
 
 public:
-	std::array<Particle, NPART> data;
+	alignas(64) std::array<Particle, NPART> data;
 	// initialized in clear_sim
 	int active;
 
@@ -207,6 +209,27 @@ public:
 	}
 	void BuildSpatialMap();
 	int  FindParticle3D(int x, int y, int z) const;
+
+	// ---- Multithreading support ----
+	int threadCount = 1;
+	ThreadPool threadPool;
+	bool allowThreadedSimulation = false;
+
+	struct ThreadContext
+	{
+		RNG rng;
+		std::array<int, PT_NUM> elementCount{};
+		int NUM_PARTS = 0;
+	};
+	std::vector<ThreadContext> threadContexts;
+	bool useThreadContext = false;
+
+	RNG &GetRng()
+	{
+		if (useThreadContext)
+			return threadContexts[ThreadIndex()].rng;
+		return rng;
+	}
 
 	// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
 	// 3D Unified Occupancy Query API (Phase 1 鈥?XYZ 骞虫潈鍖?
