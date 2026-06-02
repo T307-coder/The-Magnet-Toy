@@ -12,6 +12,7 @@
 #include "common/ThreadPool.h"
 #include "common/ThreadIndex.h"
 #include "gravity/Gravity.h"
+#include "SpatialIndex.h"
 #include "graphics/RendererFrame.h"
 #include "Element.h"
 #include "SimulationConfig.h"
@@ -20,7 +21,6 @@
 #include <cstddef>
 #include <vector>
 #include <array>
-#include <unordered_map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -203,7 +203,7 @@ public:
 	int sandcolour_interface;
 
 	// 3D spatial index: maps packed (x,y,z) 鈫?particle index
-	std::unordered_map<uint64_t, int> spatialMap;
+	SpatialIndex spatialMap;
 	static uint64_t PackXYZ(int x, int y, int z) {
 		return ((uint64_t)(uint16_t)x << 32) | ((uint64_t)(uint16_t)y << 16) | (uint16_t)z;
 	}

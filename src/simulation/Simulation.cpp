@@ -1,4 +1,5 @@
 ﻿#include "Simulation.h"
+#include <unordered_map>
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
@@ -2095,7 +2096,7 @@ void Simulation::kill_part(int i)//kills particle number i
 		if (z < -1 || z > 1)
 		{
 			auto it = spatialMap.find(PackXYZ(x, y, z));
-			if (it != spatialMap.end() && it->second == i)
+			if (it != spatialMap.end() && it.second() == i)
 				spatialMap.erase(it);
 		}
 	}
@@ -2386,7 +2387,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 		if (oldZ < -1 || oldZ > 1)
 		{
 			auto it = spatialMap.find(PackXYZ(oldX, oldY, oldZ));
-			if (it != spatialMap.end() && it->second == p)
+			if (it != spatialMap.end() && it.second() == p)
 				spatialMap.erase(it);
 		}
 
@@ -4596,7 +4597,7 @@ void Simulation::BuildSpatialMap()
 int Simulation::FindParticle3D(int x, int y, int z) const
 {
 	auto it = spatialMap.find(PackXYZ(x, y, z));
-	return (it != spatialMap.end()) ? it->second : -1;
+	return (it != spatialMap.end()) ? it.second() : -1;
 }
 
 // 鈹€鈹€ 3D Unified Occupancy Query API 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
@@ -4621,7 +4622,7 @@ int Simulation::GetPmap3D(int x, int y, int z, int skipSelf) const
 	auto it = spatialMap.find(PackXYZ(x, y, z));
 	if (it != spatialMap.end())
 	{
-		int i = it->second;
+		int i = it.second();
 		if (i == skipSelf) return 0; // skip self
 		if (i >= 0 && i < NPART && parts[i].type)
 			return PMAP(i, parts[i].type);
