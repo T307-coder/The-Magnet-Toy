@@ -2761,9 +2761,11 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 	auto x = int(parts[i].x+0.5f);
 	auto y = int(parts[i].y+0.5f);
 
+	// ---- Critical section: operations that modify global state ----
 	// Kill a particle off screen
 	if (x<CELL || y<CELL || x>=XRES-CELL || y>=YRES-CELL)
 	{
+		std::lock_guard<std::mutex> lock(simMutex);
 		kill_part(i);
 		return;
 	}
@@ -2780,6 +2782,7 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 	    (bmap[y/CELL][x/CELL]==WL_ALLOWENERGY && !(elements[t].Properties&TYPE_ENERGY)) ||
 	    (bmap[y/CELL][x/CELL]==WL_EWALL && !emap[y/CELL][x/CELL])) && (t!=PT_STKM) && (t!=PT_STKM2) && (t!=PT_FIGH))
 	{
+		std::lock_guard<std::mutex> lock(simMutex);
 		kill_part(i);
 		return;
 	}
@@ -2789,7 +2792,10 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 		return;
 
 	if (bmap[y/CELL][x/CELL]==WL_DETECT && emap[y/CELL][x/CELL]<8)
+	{
+		std::lock_guard<std::mutex> lock(simMutex);
 		set_emap(x/CELL, y/CELL);
+	}
 
 	//adding to velocity from the particle's velocity
 	vx[y/CELL][x/CELL] = vx[y/CELL][x/CELL]*elements[t].AirLoss + elements[t].AirDrag*parts[i].vx;
@@ -2852,6 +2858,7 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 
 	if (elements[t].Update)
 	{
+		std::lock_guard<std::mutex> lock(simMutex);
 		if ((*(elements[t].Update))(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap))
 			return;
 		x = int(parts[i].x+0.5f);
@@ -2859,13 +2866,19 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 	}
 
 	if (legacy_enable)
+	{
+		std::lock_guard<std::mutex> lock(simMutex);
 		Element::legacyUpdate(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap);
+	}
 
 	if (parts[i].type == PT_NONE) return;
 	if (transitionOccurred) return;
 	if (!parts[i].vx && !parts[i].vy && !parts[i].vz) return;
 
-	MovementPhase(i, neighbourhood);
+	{
+		std::lock_guard<std::mutex> lock(simMutex);
+		MovementPhase(i, neighbourhood);
+	}
 
 	if (parts[i].vz != 0.0f)
 	{
@@ -2897,8 +2910,9 @@ void SimulationImpl::UpdateParticlesSerial(int start, int end)
 
 void SimulationImpl::UpdateParticles(int start, int end)
 {
-	// Serial path: used when threading is disabled or for sub-range updates
-	if (!allowThreadedSimulation || threadCount <= 1 || start != 0 || end != NPART)
+	// Serial path: used when threading is disabled, for sub-range updates, or when too many particles
+	if (!allowThreadedSimulation || threadCount <= 1 || start != 0 || end != NPART
+		|| parts.active > NPART / 4) // safety: fall back to serial when >25% full
 	{
 		UpdateParticlesSerial(start, end);
 		return;

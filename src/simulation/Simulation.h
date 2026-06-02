@@ -22,6 +22,7 @@
 #include <array>
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 #include <optional>
 
 constexpr int CHANNELS = int(MAX_TEMP - 73) / 100 + 2;
@@ -223,6 +224,7 @@ public:
 	};
 	std::vector<ThreadContext> threadContexts;
 	bool useThreadContext = false;
+	std::mutex simMutex; // protects kill_part, move, spatialMap, pmap writes during parallel update
 
 	RNG &GetRng()
 	{
