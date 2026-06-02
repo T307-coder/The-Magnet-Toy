@@ -19,6 +19,12 @@ constexpr int XRES   = RES.X;
 constexpr int YRES   = RES.Y;
 constexpr int NPART  = XRES * YRES;
 
+// Aligned dimensions for cache-line isolation (64-byte boundaries)
+// XCELLS_ALIGNED: pad each row to a multiple of 16 floats (64 bytes)
+constexpr int XCELLS_ALIGNED = ((XCELLS + 15) / 16) * 16;
+// XRES_ALIGNED: pad each row to a multiple of 16 ints (64 bytes)
+constexpr int XRES_ALIGNED = ((XRES + 15) / 16) * 16;
+
 constexpr int XCNTR = XRES / 2;
 constexpr int YCNTR = YRES / 2;
 
