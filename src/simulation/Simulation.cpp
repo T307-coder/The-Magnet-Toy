@@ -3898,11 +3898,15 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				{
 					// if interpolation was done, try moving to last clear position
 					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
-					// XYZ: try adjacent layers/columns when XY is blocked
-					else if (do_move(i, x, y, z, (float)(x+1), (float)y)) {}
-					else if (do_move(i, x, y, z, (float)(x-1), (float)y)) {}
-					else if (do_move(i, x, y, z, (float)x, (float)y, float(z+1))) {}
-					else if (do_move(i, x, y, z, (float)x, (float)y, float(z-1))) {}
+					// XYZ: when stagnant, try one random adjacent cell (cross-layer spread)
+					else if (stagnant)
+					{
+						int rdir = rng.between(0, 1) * 2 - 1; // -1 or +1
+						if      (do_move(i, x, y, z, (float)(x+rdir), (float)y)) {}
+						else if (do_move(i, x, y, z, (float)x, (float)(y+rdir))) {}
+						else if (do_move(i, x, y, z, (float)x, (float)y, float(z+rdir))) {}
+						else parts[i].flags |= FLAG_STAGNANT;
+					}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
