@@ -1,4 +1,4 @@
-#include "Simulation.h"
+﻿#include "Simulation.h"
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
@@ -4208,7 +4208,11 @@ void Simulation::BeforeSim(bool willUpdate)
 					if (type == PT_ELEC) q = freeChargeFieldsEnabled ? -1.0f : 0.0f;
 					else if (type == PT_PROT) q = freeChargeFieldsEnabled ? 1.0f : 0.0f;
 					else if (electricityEnabled && (elements[type].Properties & PROP_CONDUCTS))
+					{
+						// Skip induced SPRK (tmp3==1): created by dB/dt, shouldn't feed back
+						if (type == PT_SPRK && parts[i].tmp3 == 1) continue;
 						q = parts[i].tmp4 * 0.01f;
+					}
 					if (q == 0.0f) continue;
 					bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
 					float vx = isSolid ? (float)parts[i].tmp5 : parts[i].vx;

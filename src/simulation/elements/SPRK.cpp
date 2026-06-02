@@ -118,6 +118,7 @@ static int update(UPDATE_FUNC_ARGS)
 				sim->part_change_type(nearp,(int)(parts[nearp].x+0.5f),(int)(parts[nearp].y+0.5f),PT_SPRK);
 				parts[nearp].life = 9;
 				parts[nearp].ctype = PT_ETRD;
+				if (parts[i].tmp3 == 1) parts[nearp].tmp3 = 1;
 			}
 		}
 		break;
@@ -425,6 +426,7 @@ static int update(UPDATE_FUNC_ARGS)
 					parts[ID(r)].life = 4;
 					parts[ID(r)].ctype = receiver;
 					sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
+					if (parts[i].tmp3 == 1) parts[ID(r)].tmp3 = 1;
 				}
 			}
 		}
