@@ -52,6 +52,8 @@ namespace
 		bool TransitionPhase(int i, const Neighbourhood &neighbourhood);
 
 		void UpdateParticles(int start, int end) final override;
+		void UpdateParticlesSerial(int start, int end);
+		void UpdateOneParticle(RNG &rng, int i);
 	};
 }
 
@@ -2746,161 +2748,228 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 	return n;
 }
 
-void SimulationImpl::UpdateParticles(int start, int end)
+void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 {
-	//the main particle loop function, goes over all particles.
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
+
+	auto t = parts[i].type;
+	if (!t) return;
+
+	debug_mostRecentlyUpdated = i;
+
+	auto x = int(parts[i].x+0.5f);
+	auto y = int(parts[i].y+0.5f);
+
+	// Kill a particle off screen
+	if (x<CELL || y<CELL || x>=XRES-CELL || y>=YRES-CELL)
+	{
+		kill_part(i);
+		return;
+	}
+
+	// Kill a particle in a wall where it isn't supposed to go
+	if (bmap[y/CELL][x/CELL] &&
+	   (bmap[y/CELL][x/CELL]==WL_WALL ||
+	    bmap[y/CELL][x/CELL]==WL_WALLELEC ||
+	    bmap[y/CELL][x/CELL]==WL_ALLOWAIR ||
+	    (bmap[y/CELL][x/CELL]==WL_DESTROYALL) ||
+	    (bmap[y/CELL][x/CELL]==WL_ALLOWLIQUID && !(elements[t].Properties&TYPE_LIQUID)) ||
+	    (bmap[y/CELL][x/CELL]==WL_ALLOWPOWDER && !(elements[t].Properties&TYPE_PART)) ||
+	    (bmap[y/CELL][x/CELL]==WL_ALLOWGAS && !(elements[t].Properties&TYPE_GAS)) ||
+	    (bmap[y/CELL][x/CELL]==WL_ALLOWENERGY && !(elements[t].Properties&TYPE_ENERGY)) ||
+	    (bmap[y/CELL][x/CELL]==WL_EWALL && !emap[y/CELL][x/CELL])) && (t!=PT_STKM) && (t!=PT_STKM2) && (t!=PT_FIGH))
+	{
+		kill_part(i);
+		return;
+	}
+
+	// Make sure that STASIS'd particles don't tick.
+	if (bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL]<8)
+		return;
+
+	if (bmap[y/CELL][x/CELL]==WL_DETECT && emap[y/CELL][x/CELL]<8)
+		set_emap(x/CELL, y/CELL);
+
+	//adding to velocity from the particle's velocity
+	vx[y/CELL][x/CELL] = vx[y/CELL][x/CELL]*elements[t].AirLoss + elements[t].AirDrag*parts[i].vx;
+	vy[y/CELL][x/CELL] = vy[y/CELL][x/CELL]*elements[t].AirLoss + elements[t].AirDrag*parts[i].vy;
+
+	if (elements[t].HotAir)
+	{
+		if (t==PT_GAS||t==PT_NBLE)
+		{
+			if (pv[y/CELL][x/CELL]<3.5f)
+				pv[y/CELL][x/CELL] += elements[t].HotAir*(3.5f-pv[y/CELL][x/CELL]);
+			if (y+CELL<YRES && pv[y/CELL+1][x/CELL]<3.5f)
+				pv[y/CELL+1][x/CELL] += elements[t].HotAir*(3.5f-pv[y/CELL+1][x/CELL]);
+			if (x+CELL<XRES)
+			{
+				if (pv[y/CELL][x/CELL+1]<3.5f)
+					pv[y/CELL][x/CELL+1] += elements[t].HotAir*(3.5f-pv[y/CELL][x/CELL+1]);
+				if (y+CELL<YRES && pv[y/CELL+1][x/CELL+1]<3.5f)
+					pv[y/CELL+1][x/CELL+1] += elements[t].HotAir*(3.5f-pv[y/CELL+1][x/CELL+1]);
+			}
+		}
+		else
+		{
+			pv[y/CELL][x/CELL] += elements[t].HotAir;
+			if (y+CELL<YRES)
+				pv[y/CELL+1][x/CELL] += elements[t].HotAir;
+			if (x+CELL<XRES)
+			{
+				pv[y/CELL][x/CELL+1] += elements[t].HotAir;
+				if (y+CELL<YRES)
+					pv[y/CELL+1][x/CELL+1] += elements[t].HotAir;
+			}
+		}
+	}
+
+	auto neighbourhood = GetNeighbourhood(i);
+
+	//velocity updates for the particle
+	if (t != PT_SPNG || !(parts[i].flags&FLAG_MOVABLE))
+	{
+		parts[i].vx *= elements[t].Loss;
+		parts[i].vy *= elements[t].Loss;
+		parts[i].vz *= elements[t].Loss;
+	}
+	parts[i].vx += elements[t].Advection*vx[y/CELL][x/CELL] + neighbourhood.pGravX;
+	parts[i].vy += elements[t].Advection*vy[y/CELL][x/CELL] + neighbourhood.pGravY;
+	parts[i].vz += neighbourhood.pGravZ;
+
+	if (elements[t].Diffusion)
+	{
+		parts[i].vx += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
+		parts[i].vy += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
+		parts[i].vz += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
+	}
+
+	auto transitionOccurred = TransitionPhase(i, neighbourhood);
+	if (!parts[i].type) return;
+	if (transitionOccurred)
+		t = parts[i].type;
+
+	if (elements[t].Update)
+	{
+		if ((*(elements[t].Update))(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap))
+			return;
+		x = int(parts[i].x+0.5f);
+		y = int(parts[i].y+0.5f);
+	}
+
+	if (legacy_enable)
+		Element::legacyUpdate(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap);
+
+	if (parts[i].type == PT_NONE) return;
+	if (transitionOccurred) return;
+	if (!parts[i].vx && !parts[i].vy && !parts[i].vz) return;
+
+	MovementPhase(i, neighbourhood);
+
+	if (parts[i].vz != 0.0f)
+	{
+		float newZ = parts[i].z + parts[i].vz;
+		if (newZ < 0) { parts[i].z = 0; parts[i].vz = 0; }
+		else if (newZ >= ZRES) { parts[i].z = float(ZRES - 1); parts[i].vz = 0; }
+		else
+		{
+			int tx = (int)(parts[i].x + 0.5f);
+			int ty = (int)(parts[i].y + 0.5f);
+			int oz = (int)(parts[i].z + 0.5f);
+			int nzi = (int)(newZ + 0.5f);
+			if (nzi == oz) { parts[i].z = roundf(newZ); }
+			else if (eval_move(parts[i].type, tx, ty, nullptr, nzi))
+				{ parts[i].z = roundf(newZ); }
+			else
+				{ parts[i].vz = 0; }
+		}
+	}
+}
+
+void SimulationImpl::UpdateParticlesSerial(int start, int end)
+{
 	for (auto i = start; i < end && i < parts.active; i++)
 	{
-		auto t = parts[i].type;
-		if (!t)
-		{
-			continue;
-		}
-		debug_mostRecentlyUpdated = i;
+		UpdateOneParticle(rng, i);
+	}
+}
 
-		auto x = int(parts[i].x+0.5f);
-		auto y = int(parts[i].y+0.5f);
+void SimulationImpl::UpdateParticles(int start, int end)
+{
+	// Serial path: used when threading is disabled or for sub-range updates
+	if (!allowThreadedSimulation || threadCount <= 1 || start != 0 || end != NPART)
+	{
+		UpdateParticlesSerial(start, end);
+		return;
+	}
 
-		// Kill a particle off screen
-		if (x<CELL || y<CELL || x>=XRES-CELL || y>=YRES-CELL)
-		{
-			kill_part(i);
-			continue;
-		}
+	// ---- Parallel path: 3D tile-based ----
+	FrameTime::Span span(frameTime, "Simulation::UpdateParticles");
 
-		// Kill a particle in a wall where it isn't supposed to go
-		if (bmap[y/CELL][x/CELL] &&
-		   (bmap[y/CELL][x/CELL]==WL_WALL ||
-		    bmap[y/CELL][x/CELL]==WL_WALLELEC ||
-		    bmap[y/CELL][x/CELL]==WL_ALLOWAIR ||
-		    (bmap[y/CELL][x/CELL]==WL_DESTROYALL) ||
-		    (bmap[y/CELL][x/CELL]==WL_ALLOWLIQUID && !(elements[t].Properties&TYPE_LIQUID)) ||
-		    (bmap[y/CELL][x/CELL]==WL_ALLOWPOWDER && !(elements[t].Properties&TYPE_PART)) ||
-		    (bmap[y/CELL][x/CELL]==WL_ALLOWGAS && !(elements[t].Properties&TYPE_GAS)) || //&& elements[t].Falldown!=0 && parts[i].type!=PT_FIRE && parts[i].type!=PT_SMKE && parts[i].type!=PT_CFLM) ||
-		            (bmap[y/CELL][x/CELL]==WL_ALLOWENERGY && !(elements[t].Properties&TYPE_ENERGY)) ||
-		    (bmap[y/CELL][x/CELL]==WL_EWALL && !emap[y/CELL][x/CELL])) && (t!=PT_STKM) && (t!=PT_STKM2) && (t!=PT_FIGH))
-		{
-			kill_part(i);
-			continue;
-		}
+	// 1. Setup per-thread contexts
+	threadContexts.resize(threadCount);
+	for (auto &ctx : threadContexts)
+	{
+		ctx.rng.seed(rng());
+		ctx.NUM_PARTS = 0;
+		for (auto &c : ctx.elementCount) c = 0;
+	}
 
-		// Make sure that STASIS'd particles don't tick.
-		if (bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL]<8) {
-			continue;
-		}
+	// 2. Randomized tile offsets — prevent systematic boundary bias
+	tileOffsetX = rng.between(0, TILE_SIZE - 1);
+	tileOffsetY = rng.between(0, TILE_SIZE - 1);
+	tileOffsetZ = rng.between(0, TILE_SIZE - 1);
 
-		if (bmap[y/CELL][x/CELL]==WL_DETECT && emap[y/CELL][x/CELL]<8)
-			set_emap(x/CELL, y/CELL);
-
-		//adding to velocity from the particle's velocity
-		vx[y/CELL][x/CELL] = vx[y/CELL][x/CELL]*elements[t].AirLoss + elements[t].AirDrag*parts[i].vx;
-		vy[y/CELL][x/CELL] = vy[y/CELL][x/CELL]*elements[t].AirLoss + elements[t].AirDrag*parts[i].vy;
-
-		if (elements[t].HotAir)
-		{
-			if (t==PT_GAS||t==PT_NBLE)
+	// 3. Clear and populate 3D tiles
+	tiles.clear();
+	tiles.resize(TILES_TOTAL);
+	for (int tz = 0; tz < TILES_Z; ++tz)
+		for (int ty = 0; ty < TILES_Y; ++ty)
+			for (int tx = 0; tx < TILES_X; ++tx)
 			{
-				if (pv[y/CELL][x/CELL]<3.5f)
-					pv[y/CELL][x/CELL] += elements[t].HotAir*(3.5f-pv[y/CELL][x/CELL]);
-				if (y+CELL<YRES && pv[y/CELL+1][x/CELL]<3.5f)
-					pv[y/CELL+1][x/CELL] += elements[t].HotAir*(3.5f-pv[y/CELL+1][x/CELL]);
-				if (x+CELL<XRES)
-				{
-					if (pv[y/CELL][x/CELL+1]<3.5f)
-						pv[y/CELL][x/CELL+1] += elements[t].HotAir*(3.5f-pv[y/CELL][x/CELL+1]);
-					if (y+CELL<YRES && pv[y/CELL+1][x/CELL+1]<3.5f)
-						pv[y/CELL+1][x/CELL+1] += elements[t].HotAir*(3.5f-pv[y/CELL+1][x/CELL+1]);
-				}
+				auto idx = (tz * TILES_Y + ty) * TILES_X + tx;
+				tiles[idx].tx = tx;
+				tiles[idx].ty = ty;
+				tiles[idx].tz = tz;
+				tiles[idx].particleIds.clear();
+				tiles[idx].deferredIds.clear();
 			}
-			else//add the hotair variable to the pressure map, like black hole, or white hole.
+
+	for (auto i = 0; i < parts.active; ++i)
+	{
+		if (!parts[i].type) continue;
+		auto tx = (int(parts[i].x + 0.5f) + tileOffsetX) / TILE_SIZE;
+		auto ty = (int(parts[i].y + 0.5f) + tileOffsetY) / TILE_SIZE;
+		auto tz = (int(parts[i].z + 0.5f) + tileOffsetZ) / TILE_SIZE;
+		if (tx < 0) tx = 0; if (tx >= TILES_X) tx = TILES_X - 1;
+		if (ty < 0) ty = 0; if (ty >= TILES_Y) ty = TILES_Y - 1;
+		if (tz < 0) tz = 0; if (tz >= TILES_Z) tz = TILES_Z - 1;
+		tiles[(tz * TILES_Y + ty) * TILES_X + tx].particleIds.push_back(i);
+	}
+
+	// 4. Dispatch tiles to thread pool
+	useThreadContext = true;
+	for (auto &tile : tiles)
+	{
+		if (tile.particleIds.empty()) continue;
+		threadPool.PushWorkItem([this, &tile]() {
+			auto &ctxRng = threadContexts[ThreadIndex()].rng;
+			for (auto i : tile.particleIds)
 			{
-				pv[y/CELL][x/CELL] += elements[t].HotAir;
-				if (y+CELL<YRES)
-					pv[y/CELL+1][x/CELL] += elements[t].HotAir;
-				if (x+CELL<XRES)
-				{
-					pv[y/CELL][x/CELL+1] += elements[t].HotAir;
-					if (y+CELL<YRES)
-						pv[y/CELL+1][x/CELL+1] += elements[t].HotAir;
-				}
+				UpdateOneParticle(ctxRng, i);
 			}
-		}
+		});
+	}
+	threadPool.Flush();
+	useThreadContext = false;
 
-		auto neighbourhood = GetNeighbourhood(i);
-
-		//velocity updates for the particle
-		if (t != PT_SPNG || !(parts[i].flags&FLAG_MOVABLE))
-		{
-			parts[i].vx *= elements[t].Loss;
-			parts[i].vy *= elements[t].Loss;
-			parts[i].vz *= elements[t].Loss;
-		}
-		//particle gets velocity from the vx and vy maps
-		parts[i].vx += elements[t].Advection*vx[y/CELL][x/CELL] + neighbourhood.pGravX;
-		parts[i].vy += elements[t].Advection*vy[y/CELL][x/CELL] + neighbourhood.pGravY;
-		parts[i].vz += neighbourhood.pGravZ;
-
-		if (elements[t].Diffusion)//the random diffusion that gasses have
-		{
-			parts[i].vx += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
-			parts[i].vy += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
-			parts[i].vz += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
-		}
-
-		auto transitionOccurred = TransitionPhase(i, neighbourhood);
-		if (!parts[i].type)
-		{
-			continue;
-		}
-		if (transitionOccurred)
-		{
-			t = parts[i].type;
-		}
-
-		//call the particle update function, if there is one
-		if (elements[t].Update)
-		{
-			if ((*(elements[t].Update))(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap))
-				continue;
-			x = int(parts[i].x+0.5f);
-			y = int(parts[i].y+0.5f);
-		}
-
-		if(legacy_enable)//if heat sim is off
-			Element::legacyUpdate(this, i,x,y,neighbourhood.surround_space,neighbourhood.nt, parts, pmap);
-
-		if (parts[i].type == PT_NONE)//if its dead, skip to next particle
-			continue;
-
-		if (transitionOccurred)
-			continue;
-
-		if (!parts[i].vx&&!parts[i].vy&&!parts[i].vz)//if its not moving, skip to next particle
-			continue;
-
-		MovementPhase(i, neighbourhood);
-
-		// Z movement for non-powder particles (powders handle Z in MovementPhase)
-		if (parts[i].vz != 0.0f)
-		{
-			float newZ = parts[i].z + parts[i].vz;
-			if (newZ < 0) { parts[i].z = 0; parts[i].vz = 0; }
-			else if (newZ >= 384) { parts[i].z = 383; parts[i].vz = 0; }
-			else
-			{
-				int tx = (int)(parts[i].x + 0.5f);
-				int ty = (int)(parts[i].y + 0.5f);
-				int oz = (int)(parts[i].z + 0.5f);
-				int nzi = (int)(newZ + 0.5f);
-				if (nzi == oz) { parts[i].z = roundf(newZ); }
-				else if (eval_move(parts[i].type, tx, ty, nullptr, nzi))
-					{ parts[i].z = roundf(newZ); }
-				else
-					{ parts[i].vz = 0; }
-			}
-		}
+	// 5. Merge per-thread element counts
+	for (auto &ctx : threadContexts)
+	{
+		for (int t = 0; t < PT_NUM; ++t)
+			elementCount[t] += ctx.elementCount[t];
+		NUM_PARTS += ctx.NUM_PARTS;
 	}
 }
 

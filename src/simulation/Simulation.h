@@ -231,6 +231,22 @@ public:
 		return rng;
 	}
 
+	// 3D tile system — XYZ symmetric spatial partitioning
+	// Each tile is TILE_SIZE³ cells; tiles are dispatched in parallel
+	struct Tile3D
+	{
+		int tx, ty, tz;                       // tile index in tiles grid
+		std::vector<int> particleIds;         // particles in this tile
+		std::vector<int> deferredIds;         // cross-tile interactions deferred to serial phase
+	};
+	std::vector<Tile3D> tiles;                // flat, size TILES_TOTAL
+	int tileOffsetX = 0, tileOffsetY = 0, tileOffsetZ = 0; // randomized each frame
+
+	// Parallel update dispatch
+	void AssignParticlesToTiles();
+	void UpdateTilesParallel();
+	void ProcessDeferred();
+
 	// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
 	// 3D Unified Occupancy Query API (Phase 1 鈥?XYZ 骞虫潈鍖?
 	// Bridges 2D pmap (Z鈮?) and 3D spatialMap (all Z).

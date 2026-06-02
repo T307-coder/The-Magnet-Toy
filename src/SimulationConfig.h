@@ -17,7 +17,15 @@ constexpr int YCELLS = CELLS.Y;
 constexpr int NCELL  = XCELLS * YCELLS;
 constexpr int XRES   = RES.X;
 constexpr int YRES   = RES.Y;
+constexpr int ZRES   = XRES; // XYZ symmetry: Z dimension equals XY
 constexpr int NPART  = XRES * YRES;
+
+// 3D tile constants for parallel simulation
+constexpr int TILE_SIZE = 16; // XYZ equal tile size
+constexpr int TILES_X = (XRES + TILE_SIZE - 1) / TILE_SIZE;
+constexpr int TILES_Y = (YRES + TILE_SIZE - 1) / TILE_SIZE;
+constexpr int TILES_Z = (ZRES + TILE_SIZE - 1) / TILE_SIZE;
+constexpr int TILES_TOTAL = TILES_X * TILES_Y * TILES_Z;
 
 // Aligned dimensions for cache-line isolation (64-byte boundaries)
 // XCELLS_ALIGNED: pad each row to a multiple of 16 floats (64 bytes)
