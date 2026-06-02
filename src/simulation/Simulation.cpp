@@ -3726,19 +3726,18 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				parts[i].vz *= elements[t].Collision;
 						return;
 					}
-					// XYZ: try Z-major diagonals (dx,dy,dz variations)
-					if (dz != 0.0f)
+					// XYZ: try Z-major diagonals (like XY diagonals, symmetric)
 					{
+						if (dz == 0.0f) dz = rng.between(0, 1) * 2.0f - 1.0f; // random Z dir when no vz
 						for (int sign = -1; sign <= 1; sign += 2)
 						{
 							float tdx = sign * (dx != 0 ? dx : 1.0f);
 							float tdy = sign * (dy != 0 ? dy : 1.0f);
-							if (do_move(i, x, y, z, clear_xf+tdx, clear_yf+tdy))
+							if (do_move(i, x, y, z, clear_xf+tdx, clear_yf+tdy, parts[i].z + dz))
 							{
-								parts[i].z += dz;
 								parts[i].vx *= elements[t].Collision;
 								parts[i].vy *= elements[t].Collision;
-				parts[i].vz *= elements[t].Collision;
+								parts[i].vz *= elements[t].Collision;
 								return;
 							}
 						}
