@@ -3726,9 +3726,9 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				parts[i].vz *= elements[t].Collision;
 						return;
 					}
-					// XYZ: try Z-major diagonals (like XY diagonals, symmetric)
+					// XYZ: try Z-major diagonals (only when particle has Z velocity)
+					if (dz != 0.0f)
 					{
-						if (dz == 0.0f) dz = rng.between(0, 1) * 2.0f - 1.0f; // random Z dir when no vz
 						for (int sign = -1; sign <= 1; sign += 2)
 						{
 							float tdx = sign * (dx != 0 ? dx : 1.0f);
