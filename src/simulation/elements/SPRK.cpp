@@ -59,6 +59,7 @@ static int update(UPDATE_FUNC_ARGS)
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
 	int ct = parts[i].ctype;
+	int z = int(parts[i].z + 0.5f); // 3D: Z coordinate for conduction
 	Element_FIRE_update(UPDATE_FUNC_SUBCALL_ARGS);
 
 	if (parts[i].life<=0)
@@ -137,13 +138,14 @@ static int update(UPDATE_FUNC_ARGS)
 	case PT_TESC:
 		if (parts[i].tmp>300)
 			parts[i].tmp=300;
+		for (auto rz = -1; rz <= 1; rz++)
 		for (auto rx = -1; rx <= 1; rx++)
 		{
 			for (auto ry = -1; ry <= 1; ry++)
 			{
-				if (rx || ry)
+				if (rx || ry || rz)
 				{
-					auto r = TPT_PM(x+rx, y+ry);
+					auto r = TPT_PM3D(x+rx, y+ry, z+rz);
 					if (r)
 						continue;
 					if (parts[i].tmp>4 && sim->rng.chance(1, parts[i].tmp*parts[i].tmp/20+6))
@@ -174,13 +176,14 @@ static int update(UPDATE_FUNC_ARGS)
 		}
 		break;
 	case PT_IRON:
+		for (auto rz = -1; rz <= 1; rz++)
 		for (auto rx = -1; rx <= 1; rx++)
 		{
 			for (auto ry = -1; ry <= 1; ry++)
 			{
-				if (rx || ry)
+				if (rx || ry || rz)
 				{
-					auto r = TPT_PM(x+rx, y+ry);
+					auto r = TPT_PM3D(x+rx, y+ry, z+rz);
 					if (!r)
 						continue;
 					if (TYP(r)==PT_DSTW || TYP(r)==PT_SLTW || TYP(r)==PT_WATR)
@@ -203,13 +206,14 @@ static int update(UPDATE_FUNC_ARGS)
 	default:
 		break;
 	}
+	for (auto rz = -1; rz <= 1; rz++)
 	for (auto rx = -2; rx <= 2; rx++)
 	{
 		for (auto ry = -2; ry <= 2; ry++)
 		{
-			if (rx || ry)
+			if (rx || ry || rz)
 			{
-				auto r = TPT_PM(x+rx, y+ry);
+				auto r = TPT_PM3D(x+rx, y+ry, z+rz);
 				if (!r)
 					continue;
 				auto receiver = TYP(r);
