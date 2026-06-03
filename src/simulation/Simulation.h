@@ -98,6 +98,7 @@ struct RenderableSimulation
 	bool sprkCurrentEnabled = true;
 	bool realisticPstnEnabled = false;
 	bool freeChargeFieldsEnabled = true; // ELEC/PROT contribute to Biot-Savart & eSrc
+	bool polarizationEnabled = true; // dielectric polarization along E-field gradient
 	bool electricityEnabled = true;
 	float uniformBField = 0.0f; // global uniform magnetic field added to bField
 

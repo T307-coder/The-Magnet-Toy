@@ -275,6 +275,7 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new CurrentBFieldOption(this));
 	quickOptions.push_back(new SprkCurrentOption(this));
 	quickOptions.push_back(new FreeChargeFieldsOption(this));
+	quickOptions.push_back(new PolarizationOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
 
 	notifyQuickOptionsChanged();
@@ -1297,6 +1298,21 @@ void GameModel::SetFreeChargeFieldsEnabled(bool enable)
 bool GameModel::GetFreeChargeFieldsEnabled()
 {
 	return sim->freeChargeFieldsEnabled;
+}
+
+void GameModel::SetPolarizationEnabled(bool enable)
+{
+	sim->polarizationEnabled = enable;
+	if (enable)
+		SetInfoTip("Polarization: On");
+	else
+		SetInfoTip("Polarization: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetPolarizationEnabled()
+{
+	return sim->polarizationEnabled;
 }
 
 void GameModel::SetSprkCurrentEnabled(bool enable)

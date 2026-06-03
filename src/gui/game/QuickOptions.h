@@ -122,3 +122,11 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+
+class PolarizationOption: public QuickOption
+{
+public:
+	PolarizationOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

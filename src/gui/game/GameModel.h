@@ -281,6 +281,8 @@ public:
 	bool GetRealisticPstnEnabled();
 	void SetFreeChargeFieldsEnabled(bool enable);
 	bool GetFreeChargeFieldsEnabled();
+	void SetPolarizationEnabled(bool enable);
+	bool GetPolarizationEnabled();
 	void SetSprkCurrentEnabled(bool enable);
 	bool GetSprkCurrentEnabled();
 	void SetElectricityEnabled(bool enable);

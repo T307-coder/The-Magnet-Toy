@@ -232,3 +232,17 @@ void FreeChargeFieldsOption::perform()
 {
 	m->SetFreeChargeFieldsEnabled(!m->GetFreeChargeFieldsEnabled());
 }
+
+PolarizationOption::PolarizationOption(GameModel * m):
+QuickOption("U", "Dielectric polarization \bg(E-field)", m, Toggle)
+{
+
+}
+bool PolarizationOption::GetToggle()
+{
+	return m->GetPolarizationEnabled();
+}
+void PolarizationOption::perform()
+{
+	m->SetPolarizationEnabled(!m->GetPolarizationEnabled());
+}

@@ -135,19 +135,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (parts[i].tmp4>100) parts[i].tmp4=100; if (parts[i].tmp4<-100) parts[i].tmp4=-100;
 		if (parts[i].tmp4!=0) sim->eSrc[cy][cx] += parts[i].tmp4*0.05f;
 	}
-	// Charge diffusion: equalize between conductors (DEUT-style)
-	for (auto trade = 0; trade < 4; trade++)
-	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
-		if (!rx && !ry) continue;
-		auto r = pmap[y+ry][x+rx];
-		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))
-		{
-			int diff = parts[i].tmp4 - parts[ID(r)].tmp4;
-			if (diff > 1) { int t = diff/2; parts[ID(r)].tmp4 += t; parts[i].tmp4 -= t; }
-			else if (diff == 1) { parts[ID(r)].tmp4++; parts[i].tmp4--; }
-		}
-	}
+	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
 	return 0;
 }
 

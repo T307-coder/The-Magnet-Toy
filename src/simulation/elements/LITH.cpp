@@ -1,4 +1,5 @@
 #include "simulation/ElementCommon.h"
+#include "simulation/ElectricityCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 static int graphics(GRAPHICS_FUNC_ARGS);
@@ -302,19 +303,7 @@ static int update(UPDATE_FUNC_ARGS)
 		if (parts[i].tmp3>100) parts[i].tmp3=100; if (parts[i].tmp3<-100) parts[i].tmp3=-100;
 		if (parts[i].tmp3!=0) sim->eSrc[cy][cx] += parts[i].tmp3*0.05f;
 	}
-	// Charge diffusion: equalize between conductors (DEUT-style, uses tmp3)
-	for (auto trade = 0; trade < 4; trade++)
-	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
-		if (!rx && !ry) continue;
-		auto r = pmap[y+ry][x+rx];
-		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))
-		{
-			int diff = parts[i].tmp3 - parts[ID(r)].tmp3;
-			if (diff > 1) { int t = diff/2; parts[ID(r)].tmp3 += t; parts[i].tmp3 -= t; }
-			else if (diff == 1) { parts[ID(r)].tmp3++; parts[i].tmp3--; }
-		}
-	}
+	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp3);
 	// Electromagnetic Lorentz force: F = q(v x B), rotates velocity, preserves |v|
 	if (sim->electricityEnabled && sim->magnetismEnabled && parts[i].tmp3 != 0)
 	{
