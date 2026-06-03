@@ -2926,11 +2926,10 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 	auto x = int(parts[i].x+0.5f);
 	auto y = int(parts[i].y+0.5f);
 
-	// ---- Critical section: operations that modify global state ----
+	// ---- Operations that modify global state ----
 	// Kill a particle off screen
 	if (x<CELL || y<CELL || x>=XRES-CELL || y>=YRES-CELL)
 	{
-		std::lock_guard<std::mutex> lock(simMutex);
 		kill_part(i);
 		return;
 	}
@@ -2947,7 +2946,6 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 	    (bmap[y/CELL][x/CELL]==WL_ALLOWENERGY && !(elements[t].Properties&TYPE_ENERGY)) ||
 	    (bmap[y/CELL][x/CELL]==WL_EWALL && !emap[y/CELL][x/CELL])) && (t!=PT_STKM) && (t!=PT_STKM2) && (t!=PT_FIGH))
 	{
-		std::lock_guard<std::mutex> lock(simMutex);
 		kill_part(i);
 		return;
 	}
@@ -2958,7 +2956,6 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 
 	if (bmap[y/CELL][x/CELL]==WL_DETECT && emap[y/CELL][x/CELL]<8)
 	{
-		std::lock_guard<std::mutex> lock(simMutex);
 		set_emap(x/CELL, y/CELL);
 	}
 
@@ -3023,7 +3020,6 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 
 	if (elements[t].Update)
 	{
-		std::lock_guard<std::mutex> lock(simMutex);
 		if ((*(elements[t].Update))(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap))
 			return;
 		x = int(parts[i].x+0.5f);
@@ -3032,7 +3028,6 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 
 	if (legacy_enable)
 	{
-		std::lock_guard<std::mutex> lock(simMutex);
 		Element::legacyUpdate(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap);
 	}
 
@@ -3048,18 +3043,12 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 		int nz = (int)(newZf + 0.5f);
 		if (nz == oz)
 		{
-			// Same integer layer: sub-layer drift (XY equivalent: PlanMove sub-pixel accumulation)
 			parts[i].z = newZf;
 		}
 		else
 		{
-			// Crossing integer layer: use do_move for full collision pipeline (XYZ平等).
-			// No pre-check — let do_move → eval_move → can_move decide, same as XY.
-			// (The old "must be empty" pre-check blocked ALL Z displacement, even
-			//  when can_move would allow it, causing light particles to freeze.)
 			int x = (int)(parts[i].x + 0.5f);
 			int y = (int)(parts[i].y + 0.5f);
-			std::lock_guard<std::mutex> lock(simMutex);
 			if (do_move(i, x, y, oz, (float)x, (float)y, newZf))
 			{ }
 			else if (do_move(i, x, y, oz, (float)x, (float)y, newZf + 1.0f))
@@ -3074,7 +3063,6 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 	}
 
 	{
-		std::lock_guard<std::mutex> lock(simMutex);
 		MovementPhase(i, neighbourhood);
 	}
 }
@@ -3098,11 +3086,12 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		return;
 	}
 
-	// ---- Parallel path: 3D tile-based (pmap rebuild merged with tile population) ----
+	// ---- Parallel path: LBPHacker-style safe-zone tiling ----
+	// Particles whose full 26-neighbourhood is within their tile are "safe"
+	// and processed in parallel without any locks. Particles near tile edges
+	// ("deferred") are processed serially after the parallel phase, ensuring
+	// correctness without mutex overhead.
 	FrameTime::Span span(frameTime, "Simulation::UpdateParticles");
-
-	// Compact spatialMap if tombstones accumulate (gas/dying particles create many)
-	spatialMap.compact();
 
 	// 1. Setup per-thread contexts
 	threadContexts.resize(threadCount);
@@ -3115,12 +3104,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		for (auto &c : ctx.elementCount) c = 0;
 	}
 
-	// 2. Randomized tile offsets — prevent systematic boundary bias
-	tileOffsetX = rng.between(0, TILE_SIZE - 1);
-	tileOffsetY = rng.between(0, TILE_SIZE - 1);
-	tileOffsetZ = rng.between(0, TILE_SIZE - 1);
-
-	// 3. Clear 3D tiles
+	// 2. Clear tiles
 	tiles.clear();
 	tiles.resize(TILES_TOTAL);
 	for (int tz = 0; tz < TILES_Z; ++tz)
@@ -3135,7 +3119,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 				tiles[idx].deferredIds.clear();
 			}
 
-	// 4a. Phase A: life dec + Flatten (must run BEFORE tile population — Flatten changes indices)
+	// 3a. Phase A: life dec + Flatten (serial, cheap)
 	if (simWillUpdate)
 	{
 		auto &sd = SimulationData::CRef();
@@ -3171,21 +3155,17 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		parts.Flatten();
 	}
 
-	// 4b. Phase B: pmap rebuild + spatialMap rebuild + tile population (single pass, after Flatten so indices are stable)
+	// 3b. Phase B: pmap + spatialMap rebuild + tile classification (serial, single pass)
 	memset(pmap, 0, sizeof(pmap));
 	memset(pmap_count, 0, sizeof(pmap_count));
 	memset(photons, 0, sizeof(photons));
 	NUM_PARTS = 0;
-
-	// Rebuild spatialMap from scratch every frame (same policy as pmap).
-	// This prevents permanent "ghost" particles when two particles end up
-	// at the same XYZ cell (via can_move=1 swap). Without per-frame rebuild,
-	// spatialMap's incremental update + overwrite protection would leave the
-	// displaced particle permanently invisible, causing cascading穿模.
 	spatialMap.clear();
 
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
+
+	std::vector<int> deferredParticles; // particles near tile boundaries (serial catch-up)
 
 	for (auto i = 0; i < parts.active; ++i)
 	{
@@ -3195,7 +3175,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		auto y = int(parts[i].y + 0.5f);
 		auto z = int(parts[i].z + 0.5f);
 
-		// --- pmap/photons rebuild (z≈0 only) ---
+		// pmap rebuild (z≈0 only)
 		bool onDefaultZ = (z >= -1 && z <= 1);
 		if (x >= 0 && y >= 0 && x < XRES && y < YRES)
 		{
@@ -3213,31 +3193,43 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		}
 		NUM_PARTS++;
 
-		// --- spatialMap rebuild (all Z, XYZ对称) ---
-		// Same "last writer wins" policy as pmap: if two particles share
-		// the same cell, the one processed later in this loop wins the slot.
-		// This matches original TPT behaviour where pmap is rebuilt per-frame.
+		// spatialMap rebuild (all Z)
 		if (x >= 0 && y >= 0 && z >= 0 && x < XRES && y < YRES && z < ZRES)
-		{
 			spatialMap[PackXYZ(x, y, z)] = i;
-		}
 
 		if (elementRecount && t >= 0 && t < PT_NUM && elements[t].Enabled)
 			elementCount[t]++;
 
-		// --- tile index ---
-		auto tx = (x + tileOffsetX) / TILE_SIZE;
-		auto ty = (y + tileOffsetY) / TILE_SIZE;
-		auto tz = (z + tileOffsetZ) / TILE_SIZE;
-		if (tx < 0) tx = 0; if (tx >= TILES_X) tx = TILES_X - 1;
-		if (ty < 0) ty = 0; if (ty >= TILES_Y) ty = TILES_Y - 1;
-		if (tz < 0) tz = 0; if (tz >= TILES_Z) tz = TILES_Z - 1;
-		tiles[(tz * TILES_Y + ty) * TILES_X + tx].particleIds.push_back(i);
+		// LBPHacker safe-zone classification:
+		// Particle is "safe" if local position within tile is NOT on any edge
+		// (i.e., all 26 neighbours fall within the same tile).
+		// Edge particles are deferred to serial catch-up.
+		int lx = x % TILE_SIZE;
+		int ly = y % TILE_SIZE;
+		int lz = z % TILE_SIZE;
+		bool onEdge = (lx == 0 || lx == TILE_SIZE - 1 ||
+		               ly == 0 || ly == TILE_SIZE - 1 ||
+		               lz == 0 || lz == TILE_SIZE - 1);
+
+		if (onEdge)
+		{
+			deferredParticles.push_back(i);
+		}
+		else
+		{
+			auto tx = x / TILE_SIZE;
+			auto ty = y / TILE_SIZE;
+			auto tz = z / TILE_SIZE;
+			if (tx < 0) tx = 0; if (tx >= TILES_X) tx = TILES_X - 1;
+			if (ty < 0) ty = 0; if (ty >= TILES_Y) ty = TILES_Y - 1;
+			if (tz < 0) tz = 0; if (tz >= TILES_Z) tz = TILES_Z - 1;
+			tiles[(tz * TILES_Y + ty) * TILES_X + tx].particleIds.push_back(i);
+		}
 	}
 	if (elementRecount)
 		elementRecount = false;
 
-	// 5. Dispatch tiles to thread pool
+	// 4. Parallel phase: safe particles (truly independent — no locks needed)
 	useThreadContext = true;
 	for (auto &tile : tiles)
 	{
@@ -3245,21 +3237,24 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		threadPool.PushWorkItem([this, &tile]() {
 			auto &ctxRng = threadContexts[ThreadIndex()].rng;
 			for (auto i : tile.particleIds)
-			{
 				UpdateOneParticle(ctxRng, i);
-			}
 		});
 	}
 	threadPool.Flush();
+
+	// 5. Serial catch-up: deferred particles (near tile edges)
+	for (auto i : deferredParticles)
+	{
+		UpdateOneParticle(rng, i);
+	}
 	useThreadContext = false;
 
-	// 6. Merge per-thread element counts and free lists back to global
+	// 6. Merge per-thread data
 	for (auto &ctx : threadContexts)
 	{
 		for (int t = 0; t < PT_NUM; ++t)
 			elementCount[t] += ctx.elementCount[t];
 		NUM_PARTS += ctx.NUM_PARTS;
-		// Merge per-thread free list to global
 		if (ctx.pfree != -1)
 		{
 			int tail = ctx.pfree;

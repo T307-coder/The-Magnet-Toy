@@ -1,4 +1,4 @@
-﻿#include "Config.h"
+#include "Config.h"
 #include "GameModel.h"
 #include "BitmapBrush.h"
 #include "EllipseBrush.h"
@@ -71,7 +71,7 @@ GameModel::GameModel(GameView *newView):
 	sim = Simulation::Factory();
 	sim->useLuaCallbacks = true;
 
-	// 3D physics: single-thread only (multi-thread has spatialMap race with brush)
+	// 3D physics: single-thread (parallelism not viable — see LBPHacker #1031)
 	sim->threadCount = 1;
 	sim->threadPool.SetThreadCount(0);
 	sim->allowThreadedSimulation = false;
@@ -272,7 +272,7 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new NGravityOption(this));
 	quickOptions.push_back(new AHeatOption(this));
 	quickOptions.push_back(new ConsoleShowOption(this, controller));
-	// New magnet mod options 鈥?second row
+	// New magnet mod options �?second row
 	quickOptions.push_back(new DrawMagneticOption(this));
 	quickOptions.push_back(new MagnetismEnableOption(this));
 	quickOptions.push_back(new InductionEnableOption(this));
@@ -1350,7 +1350,7 @@ void GameModel::FrameStep(int frames)
 
 void GameModel::ClearSimulation()
 {
-	//Load defaults — 3D mode: keep basic downward gravity, disable expensive subsystems
+	//Load defaults �� 3D mode: keep basic downward gravity, disable expensive subsystems
 	sim->gravityMode = GRAV_VERTICAL;  // normal downward gravity stays on
 	sim->customGravityX = 0.0f;
 	sim->customGravityY = 0.0f;

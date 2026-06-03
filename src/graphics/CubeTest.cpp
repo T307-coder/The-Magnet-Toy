@@ -533,8 +533,8 @@ void CubeTest_Render()
 	}
 	if (g_fontBase && g_currentFps > 0)
 	{
-		char fpsBuf[32];
-		snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.0f", g_currentFps);
+		char fpsBuf[64];
+		snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.0f  NP: %d", g_currentFps, sim ? sim->parts.active : 0);
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 		glLoadIdentity();
