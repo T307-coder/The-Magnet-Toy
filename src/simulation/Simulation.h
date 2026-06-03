@@ -347,7 +347,7 @@ public:
 	void CreateBox(int p, int x1, int y1, int x2, int y2, int c, int flags);
 	int FloodParts(int x, int y, int c, int cm, int flags);
 
-	void GetGravityField(int x, int y, float particleGrav, float newtonGrav, float & pGravX, float & pGravY, float & pGravZ) const;
+	void GetGravityField(int x, int y, int z, float particleGrav, float newtonGrav, float & pGravX, float & pGravY, float & pGravZ) const;
 
 	int get_wavelength_bin(int *wm);
 	struct GetNormalResult

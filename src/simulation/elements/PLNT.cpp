@@ -409,7 +409,7 @@ int Element_PLNT_detectDown(Simulation *sim, int x, int y)
 	float pGravY = 0;
 	float dummyGravZ = 0;
 
-	sim->GetGravityField(x, y, 1.0f, 1.0f, pGravX, pGravY, dummyGravZ);
+	sim->GetGravityField(x, y, 0, 1.0f, 1.0f, pGravX, pGravY, dummyGravZ);
 
 	float gravLen = hypot(pGravX, pGravY);
 

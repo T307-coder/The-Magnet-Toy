@@ -1489,7 +1489,7 @@ int Simulation::try_move(int i, int x, int y, int z, int nx, int ny, int nz)
 {
 	unsigned r = 0, e;
 
-	if (x==nx && y==ny)
+	if (x==nx && y==ny && z==nz) // 3D: must also check Z — same XY ≠ same cell
 		return 1;
 	if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
 		return 1;
@@ -1753,7 +1753,7 @@ int Simulation::try_move(int i, int x, int y, int z, int nx, int ny, int nz)
 	case PT_CNCT:
 		{
 			float cnctGravX, cnctGravY, cnctGravZ; // Calculate offset from gravity
-			GetGravityField(x, y, elements[PT_CNCT].Gravity, elements[PT_CNCT].Gravity, cnctGravX, cnctGravY, cnctGravZ);
+			GetGravityField(x, y, z, elements[PT_CNCT].Gravity, elements[PT_CNCT].Gravity, cnctGravX, cnctGravY, cnctGravZ);
 			int offsetX = 0, offsetY = 0;
 			if (cnctGravX > 0.0f) offsetX++;
 			else if (cnctGravX < 0.0f) offsetX--;
@@ -1851,35 +1851,31 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 	parts[i].x = (float)nx;
 	parts[i].y = (float)ny;
 	if (nzf >= 0) parts[i].z = roundf(nzf); // snap Z to integer (Z is a layer index)
-	bool onBasePlane = (z >= -1 && z <= 1);
+	bool oldOnPlane = (z >= -1 && z <= 1);
 	int newZ = (nzf >= 0) ? (int)roundf(nzf) : z;
-	bool newOffPlane = (newZ < -1 || newZ > 1);
+	bool newOnPlane = (newZ >= -1 && newZ <= 1);
+	bool newOffPlane = !newOnPlane;
 	if (ny != y || nx != x || newZ != z)
 	{
 		// Real-time spatialMap maintenance (XYZ symmetric, unlike pmap which is z≈0 only)
-		if (!onBasePlane || newOffPlane)
+		if (!oldOnPlane || newOffPlane)
 		{
 			std::lock_guard<std::shared_mutex> lock(spatialMutex);
-			if (!onBasePlane)
+			if (!oldOnPlane)
 			{
-				// Only erase if WE own the entry (match pmap's ID-check policy).
-				// Without this, a displaced particle would erase the displacer's entry.
 				auto oldEntry = spatialMap.find(PackXYZ(x, y, z));
 				if (oldEntry != spatialMap.end() && oldEntry.second() == i)
 					spatialMap.erase(oldEntry);
 			}
 			if (t && newOffPlane)
 			{
-				// Unconditional overwrite (same policy as pmap): last mover wins.
-				// The displaced particle becomes a temporary ghost — exactly like
-				// pmap on z=0. It will try to move when its own MovementPhase runs,
-				// and per-frame spatialMap rebuild ensures no permanent ghosting.
 				spatialMap[PackXYZ(nx, ny, newZ)] = i;
 			}
 		}
 
 		// pmap for base-plane particles (fast 2D cache)
-		if (onBasePlane)
+		// Erase OLD pmap entry if leaving the base plane
+		if (oldOnPlane)
 		{
 			if (pmap[y][x] && ID(pmap[y][x]) == i)
 				pmap[y][x] = 0;
@@ -1893,7 +1889,8 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 			kill_part(i);
 			return false;
 		}
-		if (onBasePlane)
+		// Write NEW pmap entry if arriving on the base plane
+		if (newOnPlane)
 		{
 			if (elements[t].Properties & TYPE_ENERGY)
 				photons[ny][nx] = PMAP(i, t);
@@ -2607,7 +2604,7 @@ void Simulation::create_cherenkov_photon(int pp)//photons from NEUT going throug
 	parts[i].vy *= r;
 }
 
-void Simulation::GetGravityField(int x, int y, float particleGrav, float newtonGrav, float & pGravX, float & pGravY, float & pGravZ) const
+void Simulation::GetGravityField(int x, int y, int z, float particleGrav, float newtonGrav, float & pGravX, float & pGravY, float & pGravZ) const
 {
 	switch (gravityMode)
 	{
@@ -2622,19 +2619,24 @@ void Simulation::GetGravityField(int x, int y, float particleGrav, float newtonG
 		pGravY = 0;
 		pGravZ = 0;
 		break;
-	case GRAV_RADIAL: //radial gravity (3D-aware)
+	case GRAV_RADIAL: //true 3D radial gravity → (XCNTR, YCNTR, ZCNTR)
 		{
-			pGravX = 0;
-			pGravY = 0;
-			pGravZ = 0;
-			auto dx = float(x - XCNTR);
-			auto dy = float(y - YCNTR);
-			if (dx || dy)
+			auto dx = float(XCNTR - x); // toward center
+			auto dy = float(YCNTR - y);
+			auto dz = float(ZCNTR - z);
+			auto dist = sqrtf(dx*dx + dy*dy + dz*dz);
+			if (dist > 0.5f)
 			{
-				auto pGravD = 0.01f - hypotf(dx, dy);
-				pGravX = particleGrav * (dx / pGravD);
-				pGravY = particleGrav * (dy / pGravD);
-				// Z radial: no Z component (2D radial in XY plane)
+				auto invDist = 1.0f / dist;
+				pGravX = particleGrav * dx * invDist;
+				pGravY = particleGrav * dy * invDist;
+				pGravZ = particleGrav * dz * invDist;
+			}
+			else
+			{
+				pGravX = 0;
+				pGravY = 0;
+				pGravZ = 0;
 			}
 		}
 		break;
@@ -2896,7 +2898,7 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 
 	if (!(elements[t].Properties & TYPE_SOLID) && (elements[t].Gravity || elements[t].NewtonianGravity))
 	{
-		GetGravityField(x, y, elements[t].Gravity, elements[t].NewtonianGravity, n.pGravX, n.pGravY, n.pGravZ);
+		GetGravityField(x, y, z, elements[t].Gravity, elements[t].NewtonianGravity, n.pGravX, n.pGravY, n.pGravZ);
 	}
 	return n;
 }
@@ -3041,20 +3043,18 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 		}
 		else
 		{
-			// Crossing integer layer: use do_move for full collision pipeline (XYZ平等)
+			// Crossing integer layer: use do_move for full collision pipeline (XYZ平等).
+			// No pre-check — let do_move → eval_move → can_move decide, same as XY.
+			// (The old "must be empty" pre-check blocked ALL Z displacement, even
+			//  when can_move would allow it, causing light particles to freeze.)
 			int x = (int)(parts[i].x + 0.5f);
 			int y = (int)(parts[i].y + 0.5f);
-			// Pre-check: only try to move into empty cells (spatialMap single-entry limit)
-			auto canMoveZ = [&](int targetZ) -> bool {
-				if (targetZ < 0 || targetZ >= ZRES) return false;
-				return GetPmap3D(x, y, targetZ, i) == 0;
-			};
 			std::lock_guard<std::mutex> lock(simMutex);
-			if (canMoveZ(nz) && do_move(i, x, y, oz, (float)x, (float)y, newZf))
+			if (do_move(i, x, y, oz, (float)x, (float)y, newZf))
 			{ }
-			else if (canMoveZ(nz + 1) && do_move(i, x, y, oz, (float)x, (float)y, newZf + 1.0f))
+			else if (do_move(i, x, y, oz, (float)x, (float)y, newZf + 1.0f))
 			{ }
-			else if (canMoveZ(nz - 1) && do_move(i, x, y, oz, (float)x, (float)y, newZf - 1.0f))
+			else if (do_move(i, x, y, oz, (float)x, (float)y, newZf - 1.0f))
 			{ }
 			else
 			{
@@ -3280,7 +3280,8 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 		if ((elements[t].Properties&TYPE_LIQUID) && (t!=PT_GEL || gel_scale > (1 + rng.between(0, 254))))
 		{
 			float convGravX, convGravY, convGravZ;
-			GetGravityField(x, y, -2.0f, -2.0f, convGravX, convGravY, convGravZ);
+			int convZ = int(parts[i].z + 0.5f);
+			GetGravityField(x, y, convZ, -2.0f, -2.0f, convGravX, convGravY, convGravZ);
 			auto offsetX = std::clamp(int(std::round(convGravX + x)), x-1, x+1);
 			auto offsetY = std::clamp(int(std::round(convGravY + y)), y-1, y+1);
 			// Some heat convection for liquids (3D: also check Z offset)
@@ -3758,16 +3759,6 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 	auto stagnant = parts[i].flags & FLAG_STAGNANT;
 	parts[i].flags &= ~FLAG_STAGNANT;
 
-	// DUST sliding diagnostic
-	if (t == PT_DUST && (fin_x != x || fin_y != y)) {
-		FILE *df = fopen("dust_slide.log", "a");
-		if (df) {
-			fprintf(df, "i=%d vx=%.3f vy=%.3f x=%d->%d y=%d->%d clrX=%d clrY=%d\n",
-				i, parts[i].vx, parts[i].vy, x, fin_x, y, fin_y, clear_x, clear_y);
-			fclose(df);
-		}
-	}
-
 	if (t==PT_STKM || t==PT_STKM2 || t==PT_FIGH)
 	{
 		//head movement, let head pass through anything
@@ -4196,100 +4187,110 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 					parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
 				}
-				else if (elements[t].Falldown>1 && fabsf(pGravX*parts[i].vx+pGravY*parts[i].vy)>fabsf(pGravY*parts[i].vx-pGravX*parts[i].vy))
+				else if (elements[t].Falldown>1 && fabsf(pGravX*parts[i].vx+pGravY*parts[i].vy+pGravZ*parts[i].vz)>
+					fabsf(pGravY*parts[i].vx-pGravX*parts[i].vy + pGravZ*parts[i].vx-pGravX*parts[i].vz)*0.5f) // 3D: dot(gravity,velocity) dominant
 				{
-					float nxf, nyf, prev_pGravX, prev_pGravY, ptGrav = elements[t].Gravity;
+					float nxf, nyf, nzf, prev_pGravX = 0, prev_pGravY = 0, prev_pGravZ = 0, ptGrav = elements[t].Gravity;
 					auto s = 0;
-					// stagnant is true if FLAG_STAGNANT was set for this particle in previous frame
-					// nt is if there is something else besides the current particle type around the particle
-					// 30 gives slightly less water lag, although it changes how it moves a lot
 					auto rt = (!stagnant || neighbourhood.nt) ? 30 : 10;
 
-					// clear_xf, clear_yf is the last known position that the particle should almost certainly be able to move to
 					nxf = clear_xf;
 					nyf = clear_yf;
+					nzf = clear_zf;
 					auto nx = clear_x;
 					auto ny = clear_y;
-					// Look for spaces to move horizontally (perpendicular to gravity direction), keep going until a space is found or the number of positions examined = rt
+					auto nz = clear_z;
+
+					// Perpendicular direction sign (random left/right in 3D tangent plane)
+					auto r = rng.between(0, 1) * 2 - 1;
+
+					// Walk perpendicular to gravity to find a gap
 					for (auto j=0;j<rt;j++)
 					{
-						// Calculate overall gravity direction
-						GetGravityField(nx, ny, ptGrav, 1.0f, pGravX, pGravY, pGravZ);
-						// Scale gravity vector so that the largest component is 1 pixel
-						auto mv = std::max(fabsf(pGravX), fabsf(pGravY));
+						GetGravityField(nx, ny, nz, ptGrav, 1.0f, pGravX, pGravY, pGravZ);
+						auto mv = fmaxf(fmaxf(fabsf(pGravX), fabsf(pGravY)), fabsf(pGravZ));
 						if (mv<0.0001f) break;
 						pGravX /= mv;
 						pGravY /= mv;
-						// Move 1 pixel perpendicularly to gravity
-						// r is +1/-1, to try moving left or right at random
+						pGravZ /= mv;
+
+						// 3D perpendicular: cross gravity with a reference axis
+						float perpX, perpY, perpZ;
+						if (fabsf(pGravX) < 0.9f)
+							{ perpX = 0; perpY = -pGravZ; perpZ = pGravY; } // cross with (1,0,0)
+						else
+							{ perpX = pGravZ; perpY = 0; perpZ = -pGravX; } // cross with (0,1,0)
+						float perpLen = sqrtf(perpX*perpX + perpY*perpY + perpZ*perpZ);
+						if (perpLen > 0.0001f) { perpX /= perpLen; perpY /= perpLen; perpZ /= perpLen; }
+
 						if (j)
 						{
-							// Not quite the gravity direction
-							// Gravity direction + last change in gravity direction
-							// This makes liquid movement a bit less frothy, particularly for balls of liquid in radial gravity. With radial gravity, instead of just moving along a tangent, the attempted movement will follow the curvature a bit better.
-							nxf += r*(pGravY*2.0f-prev_pGravY);
-							nyf += -r*(pGravX*2.0f-prev_pGravX);
+							nxf += r*(perpX*2.0f-prev_pGravX);
+							nyf += r*(perpY*2.0f-prev_pGravY);
+							nzf += r*(perpZ*2.0f-prev_pGravZ);
 						}
 						else
 						{
-							nxf += r*pGravY;
-							nyf += -r*pGravX;
+							nxf += r*perpX;
+							nyf += r*perpY;
+							nzf += r*perpZ;
 						}
-						prev_pGravX = pGravX;
-						prev_pGravY = pGravY;
-						// Check whether movement is allowed
+						prev_pGravX = perpX;
+						prev_pGravY = perpY;
+						prev_pGravZ = perpZ;
+
 						nx = (int)(nxf+0.5f);
 						ny = (int)(nyf+0.5f);
-						if (nx<0 || ny<0 || nx>=XRES || ny >=YRES)
+						nz = (int)(nzf+0.5f);
+						if (nx<0 || ny<0 || nz<0 || nx>=XRES || ny>=YRES || nz>=ZRES)
 							break;
-						if (TYP(pmap[ny][nx])!=t || bmap[ny/CELL][nx/CELL])
+						auto r3d = GetPmap3D(nx, ny, nz);
+						if ((!r3d && !bmap[ny/CELL][nx/CELL]) || TYP(r3d)!=t || bmap[ny/CELL][nx/CELL])
 						{
-							s = do_move(i, x, y, z, nxf, nyf);
+							s = do_move(i, x, y, z, nxf, nyf, nzf);
 							if (s)
 							{
-								// Movement was successful
 								nx = (int)(parts[i].x+0.5f);
 								ny = (int)(parts[i].y+0.5f);
+								nz = (int)(parts[i].z+0.5f);
 								break;
 							}
-							// A particle of a different type, or a wall, was found. Stop trying to move any further horizontally unless the wall should be completely invisible to particles.
-							if (TYP(pmap[ny][nx])!=t || bmap[ny/CELL][nx/CELL]!=WL_STREAM)
+							if (TYP(r3d)!=t || (bmap[ny/CELL][nx/CELL] && bmap[ny/CELL][nx/CELL]!=WL_STREAM))
 								break;
 						}
 					}
 					if (s==1)
 					{
-						// The particle managed to move horizontally, now try to move vertically (parallel to gravity direction)
-						// Keep going until the particle is blocked (by something that isn't the same element) or the number of positions examined = rt
 						clear_x = nx;
 						clear_y = ny;
+						clear_z = nz;
 						for (auto j=0;j<rt;j++)
 						{
-							// Calculate overall gravity direction
-							GetGravityField(nx, ny, ptGrav, 1.0f, pGravX, pGravY, pGravZ);
-							// Scale gravity vector so that the largest component is 1 pixel
-							auto mv = std::max(fabsf(pGravX), fabsf(pGravY));
+							GetGravityField(nx, ny, nz, ptGrav, 1.0f, pGravX, pGravY, pGravZ);
+							auto mv = fmaxf(fmaxf(fabsf(pGravX), fabsf(pGravY)), fabsf(pGravZ));
 							if (mv<0.0001f) break;
 							pGravX /= mv;
 							pGravY /= mv;
-							// Move 1 pixel in the direction of gravity
+							pGravZ /= mv;
 							nxf += pGravX;
 							nyf += pGravY;
+							nzf += pGravZ;
 							nx = (int)(nxf+0.5f);
 							ny = (int)(nyf+0.5f);
-							if (nx<0 || ny<0 || nx>=XRES || ny>=YRES)
+							nz = (int)(nzf+0.5f);
+							if (nx<0 || ny<0 || nz<0 || nx>=XRES || ny>=YRES || nz>=ZRES)
 								break;
-							// If the space is anything except the same element (a wall, empty space, or occupied by a particle of a different element), try to move into it
-							if (TYP(pmap[ny][nx])!=t || bmap[ny/CELL][nx/CELL])
+							auto r3d = GetPmap3D(nx, ny, nz);
+							if ((!r3d && !bmap[ny/CELL][nx/CELL]) || TYP(r3d)!=t || bmap[ny/CELL][nx/CELL])
 							{
-								s = do_move(i, clear_x, clear_y, z, nxf, nyf);
-								if (s || TYP(pmap[ny][nx])!=t || bmap[ny/CELL][nx/CELL]!=WL_STREAM)
-									break; // found the edge of the liquid and movement into it succeeded, so stop moving down
+								s = do_move(i, clear_x, clear_y, clear_z, nxf, nyf, nzf);
+								if (s || TYP(r3d)!=t || (bmap[ny/CELL][nx/CELL] && bmap[ny/CELL][nx/CELL]!=WL_STREAM))
+									break;
 							}
 						}
 					}
 					else if (s==-1) {} // particle is out of bounds
-					else if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {} // try moving to the last clear position
+					else if ((clear_x!=x||clear_y!=y||clear_z!=z) && do_move(i, x, y, z, clear_xf, clear_yf, clear_zf)) {}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;
@@ -4298,7 +4299,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 				else
 				{
 					// if interpolation was done, try moving to last clear position
-					if ((clear_x!=x||clear_y!=y) && do_move(i, x, y, z, clear_xf, clear_yf)) {}
+					if ((clear_x!=x||clear_y!=y||clear_z!=z) && do_move(i, x, y, z, clear_xf, clear_yf, clear_zf)) {}
 					else parts[i].flags |= FLAG_STAGNANT;
 					parts[i].vx *= elements[t].Collision;
 					parts[i].vy *= elements[t].Collision;

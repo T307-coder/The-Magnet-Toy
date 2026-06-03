@@ -35,6 +35,7 @@ constexpr int XRES_ALIGNED = ((XRES + 15) / 16) * 16;
 
 constexpr int XCNTR = XRES / 2;
 constexpr int YCNTR = YRES / 2;
+constexpr int ZCNTR = ZRES / 2;
 
 constexpr Vec2<int> WINDOW = RES + Vec2(BARSIZE, MENUSIZE);
 

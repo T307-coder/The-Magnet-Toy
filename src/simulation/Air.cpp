@@ -176,7 +176,7 @@ void Air::update_airh(void)
 			if (x>=2 && x<XCELLS-2 && y>=2 && y<YCELLS-2)
 			{
 				float convGravX, convGravY, dummyGravZ;
-				sim.GetGravityField(x*CELL, y*CELL, -1.0f, -1.0f, convGravX, convGravY, dummyGravZ);
+				sim.GetGravityField(x*CELL, y*CELL, 0, -1.0f, -1.0f, convGravX, convGravY, dummyGravZ);
 
 				switch (convectionMode)
 				{

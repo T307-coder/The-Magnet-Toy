@@ -55,7 +55,7 @@ static int update(UPDATE_FUNC_ARGS)
 	{
 		float gx, gy, multiplier, gmax, dummyGravZ;
 		int randTmp;
-		sim->GetGravityField(x, y, elements[PT_FWRK].Gravity, 1.0f, gx, gy, dummyGravZ);
+		sim->GetGravityField(x, y, 0, elements[PT_FWRK].Gravity, 1.0f, gx, gy, dummyGravZ);
 		if (gx*gx+gy*gy < 0.001f)
 		{
 			float angle = sim->rng.between(0, 6283) * 0.001f;//(in radians, between 0 and 2*pi)
