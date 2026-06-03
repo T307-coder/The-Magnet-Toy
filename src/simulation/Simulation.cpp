@@ -4128,6 +4128,16 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 		{
 			if (parts[i].type == PT_NONE)
 				return;
+
+			// Batch pre-check: fully surrounded → skip bounce attempts
+			if (neighbourhood.surround_space_3d == 0 && neighbourhood.nt_3d > 0)
+			{
+				parts[i].vx *= elements[t].Collision;
+				parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
+				return;
+			}
+
 			// can't move there, so bounce off
 			if (fin_x>x+ISTP) fin_x=x+ISTP;
 			if (fin_x<x-ISTP) fin_x=x-ISTP;
@@ -4163,6 +4173,17 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 		{
 			if (parts[i].type == PT_NONE)
 				return;
+
+			// Batch pre-check: if all 26 neighbours are occupied, skip fallback
+			// and just damp velocity (no point trying alternate directions).
+			if (neighbourhood.surround_space_3d == 0 && neighbourhood.nt_3d > 0)
+			{
+				parts[i].vx *= elements[t].Collision;
+				parts[i].vy *= elements[t].Collision;
+				parts[i].vz *= elements[t].Collision;
+				return;
+			}
+
 			if (fin_x!=x && do_move(i, x, y, z, fin_xf, clear_yf, fin_zf))
 			{
 				parts[i].vx *= elements[t].Collision;
