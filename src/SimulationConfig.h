@@ -18,7 +18,16 @@ constexpr int NCELL  = XCELLS * YCELLS;
 constexpr int XRES   = RES.X;
 constexpr int YRES   = RES.Y;
 constexpr int ZRES   = YRES; // XYZ symmetry: Z dimension equals Y (cubic compatible)
-constexpr int NPART  = XRES * YRES * 3; // Z-axis headroom (~705K, ~58MB)
+
+// NPART = XRES × YRES × NPART_MULT.
+// Each particle costs ~94 bytes total (72B struct + ~22B spatialMap overhead).
+// Adjust NPART_MULT for your memory budget:
+//   3  →  705K particles,  ~66 MB  (32-bit safe)
+//   15 → 3.52M particles, ~330 MB  (64-bit recommended)
+//   30 → 7.05M particles, ~660 MB  (64-bit, high)
+//   50 → 11.7M particles, ~1.1 GB  (64-bit, extreme)
+constexpr int NPART_MULT = 3; // change this to scale particle capacity
+constexpr int NPART = XRES * YRES * NPART_MULT;
 
 // 3D tile constants for parallel simulation
 constexpr int TILE_SIZE = 16; // XYZ equal tile size
