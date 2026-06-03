@@ -939,19 +939,19 @@ static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 			sim->FloodINST(x, y);
 			return existing;
 		}
-		// Convert to SPRK
-		p.type = PT_SPRK;
-		p.life = 4;
+		// Use part_change_type for proper SPRK creation (preserves life=4, element count, etc.)
 		p.ctype = oldType;
-		// Update pmap type bits
+		sim->part_change_type(existing, x, y, PT_SPRK);
+		sim->parts[existing].life = 4;
+		// Update pmap type bits (part_change_type handles pmap write, but ensure type bits)
 		if (z >= -1 && z <= 1 && sim->pmap[y][x] && ID(sim->pmap[y][x]) == existing)
 			sim->pmap[y][x] = (sim->pmap[y][x] & ~PMAPMASK) | PT_SPRK;
 		// Heating effect for metals
-		if (p.temp + 10.0f < 673.0f && !sim->legacy_enable &&
+		if (sim->parts[existing].temp + 10.0f < 673.0f && !sim->legacy_enable &&
 		    (oldType == PT_METL || oldType == PT_BMTL || oldType == PT_BRMT ||
 		     oldType == PT_PSCN || oldType == PT_NSCN || oldType == PT_ETRD ||
 		     oldType == PT_NBLE || oldType == PT_IRON))
-			p.temp = p.temp + 10.0f;
+			sim->parts[existing].temp = sim->parts[existing].temp + 10.0f;
 		return existing;
 	}
 
