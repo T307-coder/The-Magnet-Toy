@@ -1847,16 +1847,17 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 	auto &elements = sd.elements;
 	int nx = (int)(nxf+0.5f), ny = (int)(nyf+0.5f);
 	int t = parts[i].type;
-	// Always snap to integer cell (strict grid, no sub-pixel drift)
-	parts[i].x = (float)nx;
-	parts[i].y = (float)ny;
-	if (nzf >= 0) parts[i].z = roundf(nzf); // snap Z to integer (Z is a layer index)
 	bool oldOnPlane = (z >= -1 && z <= 1);
-	int newZ = (nzf >= 0) ? (int)roundf(nzf) : z;
+	int newZ = (nzf >= 0) ? (int)roundf(nzf) : (int)roundf(parts[i].z);
 	bool newOnPlane = (newZ >= -1 && newZ <= 1);
 	bool newOffPlane = !newOnPlane;
 	if (ny != y || nx != x || newZ != z)
 	{
+		// Cell changed: snap to integer grid, update indices
+		parts[i].x = (float)nx;
+		parts[i].y = (float)ny;
+		parts[i].z = (float)newZ;
+
 		// Real-time spatialMap maintenance (XYZ symmetric, unlike pmap which is z≈0 only)
 		if (!oldOnPlane || newOffPlane)
 		{
@@ -1897,6 +1898,15 @@ bool Simulation::move(int i, int x, int y, int z, float nxf, float nyf, float nz
 			else if (t)
 				pmap[ny][nx] = PMAP(i, t);
 		}
+	}
+	else
+	{
+		// Same cell: preserve sub-pixel float position so small velocities
+		// (e.g. 3D radial gravity diluted across 3 axes) can accumulate
+		// and eventually cross the 0.5 integer boundary.
+		parts[i].x = nxf;
+		parts[i].y = nyf;
+		if (nzf >= 0) parts[i].z = nzf;
 	}
 
 	return true;
