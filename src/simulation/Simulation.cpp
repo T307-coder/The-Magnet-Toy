@@ -4487,170 +4487,58 @@ void Simulation::RecalcFreeParticles(bool do_life_dec)
 	spatialMap.clear();
 
 	NUM_PARTS = 0;
-	if (elementRecount)
-		std::fill(elementCount, elementCount + PT_NUM, 0);
-
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
-
-	// Parallel rebuild: chunk particles, each thread handles pmap + life dec.
-	// spatialMap entries collected per-thread, merged serially to avoid hash table races.
-	if (allowThreadedSimulationInternal && threadCount > 1)
+	for (int i = 0; i < parts.active; i++)
 	{
-		std::vector<std::vector<int>> deferredKills(threadCount);
-		std::vector<std::vector<std::pair<uint64_t, int>>> spatialEntries(threadCount);
-		std::vector<std::array<int, PT_NUM>> threadElemCount(threadCount);
-		std::vector<int> threadNumParts(threadCount, 0);
-
-		for (auto &tc : threadElemCount)
-			std::fill(tc.begin(), tc.end(), 0);
-
-		const int chunkSize = (parts.active + threadCount - 1) / threadCount;
-		for (int t = 0; t < threadCount; t++)
+		if (!parts[i].type) continue;
+		auto t = parts[i].type;
+		auto x = int(parts[i].x + 0.5f);
+		auto y = int(parts[i].y + 0.5f);
+		auto z = int(parts[i].z + 0.5f);
+		bool inBounds = false;
+		bool onDefaultZ = (z >= -1 && z <= 1);
+		if (x >= 0 && y >= 0 && x < XRES && y < YRES)
 		{
-			int start = t * chunkSize;
-			int end = std::min(start + chunkSize, parts.active);
-			if (start >= end) continue;
-			threadPool.PushWorkItem([this, start, end, t, do_life_dec,
-				&deferredKills, &spatialEntries, &threadElemCount, &threadNumParts]()
+			if (elements[t].Properties & TYPE_ENERGY)
 			{
-				auto &sd = SimulationData::CRef();
-				auto &elements = sd.elements;
-				auto &kills = deferredKills[t];
-				auto &sEntries = spatialEntries[t];
-				auto &elemCnt = threadElemCount[t];
-				int &nParts = threadNumParts[t];
-
-				for (int i = start; i < end; i++)
-				{
-					if (!parts[i].type) continue;
-					auto type = parts[i].type;
-					auto x = int(parts[i].x + 0.5f);
-					auto y = int(parts[i].y + 0.5f);
-					auto z = int(parts[i].z + 0.5f);
-					bool inBounds = false;
-					bool onDefaultZ = (z >= -1 && z <= 1);
-
-					if (x >= 0 && y >= 0 && x < XRES && y < YRES)
-					{
-						if (elements[type].Properties & TYPE_ENERGY)
-						{
-							if (onDefaultZ) photons[y][x] = PMAP(i, type);
-						}
-						else if (onDefaultZ)
-						{
-							if (!pmap[y][x] || (type != PT_INVIS && type != PT_FILT))
-								pmap[y][x] = PMAP(i, type);
-							if (type != PT_THDR && type != PT_EMBR && type != PT_FIGH && type != PT_PLSM)
-								pmap_count[y][x]++;
-						}
-						inBounds = true;
-					}
-
-					if (x >= 0 && y >= 0 && z >= 0 && x < XRES && y < YRES && z < ZRES)
-						sEntries.push_back({ PackXYZ(x, y, z), i });
-
-					nParts++;
-					if (elementRecount && type > 0 && type < PT_NUM && elements[type].Enabled)
-						elemCnt[type]++;
-
-					if (do_life_dec)
-					{
-						if (type < 0 || type >= PT_NUM || !elements[type].Enabled)
-							{ kills.push_back(i); continue; }
-						unsigned int props = elements[type].Properties;
-						if (parts[i].life > 0 && (props & PROP_LIFE_DEC) &&
-						    !(inBounds && bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL] < 8))
-						{
-							parts[i].life--;
-							if (parts[i].life <= 0 && (props & (PROP_LIFE_KILL_DEC | PROP_LIFE_KILL)))
-								{ kills.push_back(i); continue; }
-						}
-						else if (parts[i].life <= 0 && (props & PROP_LIFE_KILL) &&
-						         !(inBounds && bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL] < 8))
-							{ kills.push_back(i); continue; }
-					}
-				}
-			});
-		}
-		threadPool.Flush();
-
-		// Serial: process deferred kills
-		for (auto &kills : deferredKills)
-			for (int i : kills)
-				kill_part(i);
-
-		// Serial: rebuild spatialMap
-		for (auto &entries : spatialEntries)
-			for (auto &[key, idx] : entries)
-				spatialMap[key] = idx;
-
-		// Merge per-thread counts
-		for (int t = 0; t < threadCount; t++)
-		{
-			NUM_PARTS += threadNumParts[t];
-			if (elementRecount)
-				for (int e = 0; e < PT_NUM; e++)
-					elementCount[e] += threadElemCount[t][e];
-		}
-		if (elementRecount) elementRecount = false;
-	}
-	else
-	{
-		// Serial path (unchanged logic)
-		NUM_PARTS = 0;
-		for (int i = 0; i < parts.active; i++)
-		{
-			if (!parts[i].type) continue;
-			auto t = parts[i].type;
-			auto x = int(parts[i].x + 0.5f);
-			auto y = int(parts[i].y + 0.5f);
-			auto z = int(parts[i].z + 0.5f);
-			bool inBounds = false;
-			bool onDefaultZ = (z >= -1 && z <= 1);
-			if (x >= 0 && y >= 0 && x < XRES && y < YRES)
-			{
-				if (elements[t].Properties & TYPE_ENERGY)
-				{
-					if (onDefaultZ) photons[y][x] = PMAP(i, t);
-				}
-				else if (onDefaultZ)
-				{
-					if (!pmap[y][x] || (t != PT_INVIS && t != PT_FILT))
-						pmap[y][x] = PMAP(i, t);
-					if (t != PT_THDR && t != PT_EMBR && t != PT_FIGH && t != PT_PLSM)
-						pmap_count[y][x]++;
-				}
-				inBounds = true;
+				if (onDefaultZ) photons[y][x] = PMAP(i, t);
 			}
-			if (x >= 0 && y >= 0 && z >= 0 && x < XRES && y < YRES && z < ZRES)
-				spatialMap[PackXYZ(x, y, z)] = i;
-
-			NUM_PARTS++;
-			if (elementRecount && t >= 0 && t < PT_NUM && elements[t].Enabled)
-				elementCount[t]++;
-
-			if (do_life_dec)
+			else if (onDefaultZ)
 			{
-				if (t < 0 || t >= PT_NUM || !elements[t].Enabled)
-					{ kill_part(i); continue; }
-				unsigned int ep = elements[t].Properties;
-				if (parts[i].life > 0 && (ep & PROP_LIFE_DEC) &&
-				    !(inBounds && bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL] < 8))
-				{
-					parts[i].life--;
-					if (parts[i].life <= 0 && (ep & (PROP_LIFE_KILL_DEC | PROP_LIFE_KILL)))
-						{ kill_part(i); continue; }
-				}
-				else if (parts[i].life <= 0 && (ep & PROP_LIFE_KILL) &&
-				         !(inBounds && bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL] < 8))
+				if (!pmap[y][x] || (t != PT_INVIS && t != PT_FILT))
+					pmap[y][x] = PMAP(i, t);
+				if (t != PT_THDR && t != PT_EMBR && t != PT_FIGH && t != PT_PLSM)
+					pmap_count[y][x]++;
+			}
+			inBounds = true;
+		}
+		if (x >= 0 && y >= 0 && z >= 0 && x < XRES && y < YRES && z < ZRES)
+			spatialMap[PackXYZ(x, y, z)] = i;
+
+		NUM_PARTS++;
+		if (elementRecount && t >= 0 && t < PT_NUM && elements[t].Enabled)
+			elementCount[t]++;
+
+		if (do_life_dec)
+		{
+			if (t < 0 || t >= PT_NUM || !elements[t].Enabled)
+				{ kill_part(i); continue; }
+			unsigned int ep = elements[t].Properties;
+			if (parts[i].life > 0 && (ep & PROP_LIFE_DEC) &&
+			    !(inBounds && bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL] < 8))
+			{
+				parts[i].life--;
+				if (parts[i].life <= 0 && (ep & (PROP_LIFE_KILL_DEC | PROP_LIFE_KILL)))
 					{ kill_part(i); continue; }
 			}
+			else if (parts[i].life <= 0 && (ep & PROP_LIFE_KILL) &&
+			         !(inBounds && bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL] < 8))
+				{ kill_part(i); continue; }
 		}
-		if (elementRecount) elementRecount = false;
 	}
-
 	parts.Flatten();
+	if (elementRecount) elementRecount = false;
 }
 
 void Parts::Flatten()
