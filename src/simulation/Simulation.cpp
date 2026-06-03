@@ -2269,7 +2269,7 @@ bool Simulation::part_change_type(int i, int x, int y, int t)
 	elementCount[t]++;
 
 	parts[i].type = t;
-	parts[i].flags &= ~FLAG_ASLEEP; // type change → wake up
+	parts[i].flags &= ~0x70; // type change → wake up (clear sleep counter)
 
 	// 3D-aware pmap management: use spatialMap when z鈮?
 	int z = int(parts[i].z + 0.5f);
@@ -3014,17 +3014,26 @@ std::optional<Simulation::DeferredId::When> SimulationImpl::UpdateOne(RNG &rng, 
 
 	debug_mostRecentlyUpdated = i;
 
-	// Sleep optimization: skip update every other frame for stationary particles.
-	// Settled particles (vx=vy=vz=0) only need full update on alternating frames.
-	// Woken by velocity, type change, or external interactions via part_change_type.
-	if (runtimeParallel && (parts[i].flags & FLAG_ASLEEP))
+	// Progressive sleep: 3-bit counter (flags bits 4-6) tracks consecutive
+	// stationary frames. Counter cycles 0→1→...→6→7→0. Particle is updated
+	// only when counter wraps to 0 → 6/7 frames skipped (85% work reduction).
+	// Movement or type change resets counter to 0.
+	if (runtimeParallel)
 	{
-		if (parts[i].vx == 0.0f && parts[i].vy == 0.0f && parts[i].vz == 0.0f)
+		bool stationary = (parts[i].vx == 0.0f && parts[i].vy == 0.0f && parts[i].vz == 0.0f);
+		int sleepCnt = (parts[i].flags >> 4) & 0x7;
+		if (!stationary)
 		{
-			parts[i].flags &= ~FLAG_ASLEEP; // skip this frame
-			return std::nullopt;
+			parts[i].flags &= ~0x70; // reset to 0, process normally
 		}
-		parts[i].flags &= ~FLAG_ASLEEP; // particle moved, wake up
+		else
+		{
+			sleepCnt++;
+			if (sleepCnt > 7) sleepCnt = 0;
+			parts[i].flags = (parts[i].flags & ~0x70) | (sleepCnt << 4);
+			if (sleepCnt != 0)
+				return std::nullopt; // skip this frame
+		}
 	}
 
 	auto x = int(parts[i].x + 0.5f);
@@ -3160,10 +3169,7 @@ std::optional<Simulation::DeferredId::When> SimulationImpl::UpdateOne(RNG &rng, 
 	}
 
 	if (!parts[i].vx && !parts[i].vy && !parts[i].vz)
-	{
-		parts[i].flags |= FLAG_ASLEEP; // stationary, sleep next frame
-		return std::nullopt;
-	}
+		return std::nullopt; // stationary, counter already set at top of function
 
 	// ---- Phase 3: Movement ----
 	if (parts[i].vz != 0.0f)
@@ -3191,13 +3197,6 @@ std::optional<Simulation::DeferredId::When> SimulationImpl::UpdateOne(RNG &rng, 
 	}
 
 	MovementPhase(i, neighbourhood);
-
-	// Set sleep flag for next frame if particle settled
-	if (parts[i].type && parts[i].vx == 0.0f && parts[i].vy == 0.0f && parts[i].vz == 0.0f)
-		parts[i].flags |= FLAG_ASLEEP;
-	else if (parts[i].type)
-		parts[i].flags &= ~FLAG_ASLEEP;
-
 	return std::nullopt;
 }
 
