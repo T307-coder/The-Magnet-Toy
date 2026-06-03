@@ -251,77 +251,10 @@ static int update(UPDATE_FUNC_ARGS)
 	}
 	// Electric charging: contact POSC, F = q*E (uses tmp3 for charge)
 	int cx = x/CELL, cy = y/CELL;
-	if (sim->electricityEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
-	{
-		for (auto rx = -1; rx <= 1; rx++)
-			for (auto ry = -1; ry <= 1; ry++)
-			{
-				if (!rx && !ry) continue;
-				auto r = pmap[y+ry][x+rx];
-				if (r)
-				{
-					int rt = TYP(r);
-					if (rt == PT_POSC && parts[ID(r)].life==10)
-					{
-						int q = (int)((parts[ID(r)].temp-273.15f)/5.0f);
-						if (q>100) q=100; if (q<-100) q=-100;
-						if (parts[i].tmp3<q) parts[i].tmp3++; else if (parts[i].tmp3>q) parts[i].tmp3--;
-					}
-					else if (rt == PT_FIXC)
-					{
-						int q = parts[ID(r)].tmp;
-						if (q>100) q=100; if (q<-100) q=-100;
-						if (parts[i].tmp3<q) parts[i].tmp3++; else if (parts[i].tmp3>q) parts[i].tmp3--;
-					}
-				}
-				auto pr = sim->photons[y+ry][x+rx];
-				if (pr)
-				{
-					int prt = TYP(pr);
-					if (prt == PT_ELEC) { if (parts[i].tmp3 > -100) parts[i].tmp3--; }
-					else if (prt == PT_PROT) { if (parts[i].tmp3 < 100) parts[i].tmp3++; }
-				}
-			}
-		if (cx>0 && cy>0 && cx<XCELLS-1 && cy<YCELLS-1)
-		{
-			float dEx=sim->eField[cy][cx+1]-sim->eField[cy][cx-1];
-			float dEy=sim->eField[cy+1][cx]-sim->eField[cy-1][cx];
-			float massFactor = 1.0f / (SimulationData::CRef().elements[parts[i].type].Gravity + 0.05f);
-			if (parts[i].tmp3 != 0)
-			{
-				parts[i].vx -= dEx*parts[i].tmp3*0.5f * massFactor;
-				parts[i].vy -= dEy*parts[i].tmp3*0.5f * massFactor;
-			}
-			else
-			{
-				float dAbsEx=fabsf(sim->eField[cy][cx+1])-fabsf(sim->eField[cy][cx-1]);
-				float dAbsEy=fabsf(sim->eField[cy+1][cx])-fabsf(sim->eField[cy-1][cx]);
-				parts[i].vx += dAbsEx*0.5f * massFactor;
-				parts[i].vy += dAbsEy*0.5f * massFactor;
-			}
-		}
-		if (parts[i].tmp3>100) parts[i].tmp3=100; if (parts[i].tmp3<-100) parts[i].tmp3=-100;
-		if (parts[i].tmp3!=0) sim->eSrc[cy][cx] += parts[i].tmp3*0.05f;
-	}
+electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp3);
+	electricity_applyForce(sim, parts[i], x, y, parts[i].tmp3, 0.5f);
 	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp3);
-	// Electromagnetic Lorentz force: F = q(v x B), rotates velocity, preserves |v|
-	if (sim->electricityEnabled && sim->magnetismEnabled && parts[i].tmp3 != 0)
-	{
-		int cx = x/CELL, cy = y/CELL;
-		if (cx>=0 && cy>=0 && cx<XCELLS && cy<YCELLS)
-		{
-			float Bz = sim->bField[cy][cx];
-			if (Bz != 0.0f)
-			{
-				float massFactor = 1.0f / (SimulationData::CRef().elements[parts[i].type].Gravity + 0.05f);
-				float dtheta = Bz * parts[i].tmp3 * 0.05f * massFactor;
-				float c = cosf(dtheta), s = sinf(dtheta);
-				float vx = parts[i].vx * c - parts[i].vy * s;
-				float vy = parts[i].vx * s + parts[i].vy * c;
-				parts[i].vx = vx; parts[i].vy = vy;
-			}
-		}
-	}
+	electricity_applyLorentz(sim, parts[i], x, y, parts[i].tmp3);
 	return 0;
 }
 
