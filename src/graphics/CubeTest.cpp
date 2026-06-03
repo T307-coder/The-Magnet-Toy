@@ -3,6 +3,7 @@
 #include "SimulationConfig.h"
 #include "simulation/Simulation.h"
 #include "simulation/SimulationData.h"
+#include "simulation/ElementClasses.h"
 #include "gui/game/GameController.h"
 #ifdef _WIN32
 #include <windows.h>
@@ -899,7 +900,7 @@ static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 	auto &sd = SimulationData::CRef();
 	if (!sd.elements[t].Enabled) return -1;
 
-	// Check if a particle ALREADY exists at the exact 3D position
+	// Find existing particle at exact 3D position
 	int existing = -1;
 	{
 		auto key = Simulation::PackXYZ(x, y, z);
@@ -908,12 +909,50 @@ static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 		if (it != sim->spatialMap.end())
 			existing = it.second();
 	}
-	// Also check pmap for z≈0
 	if (existing < 0 && z >= -1 && z <= 1 && sim->pmap[y][x])
 	{
 		int pmapIdx = ID(sim->pmap[y][x]);
 		if ((int)(sim->parts[pmapIdx].z + 0.5f) == z && sim->parts[pmapIdx].type)
 			existing = pmapIdx;
+	}
+
+	// ---- SPRK: light up conductive materials instead of placing ----
+	if (t == PT_SPRK)
+	{
+		if (existing < 0 || existing >= NPART || !sim->parts[existing].type)
+			return -1; // nothing to spark
+		auto &p = sim->parts[existing];
+		int oldType = p.type;
+
+		// WIRE → set ctype to DUST (same as 2D brush)
+		if (oldType == PT_WIRE)
+		{
+			p.ctype = PT_DUST;
+			return existing;
+		}
+		// Only spark conductors that aren't already live
+		if (!((oldType == PT_INST) || (sd.elements[oldType].Properties & PROP_CONDUCTS)) || p.life != 0)
+			return -1;
+		// INST → flood fill
+		if (oldType == PT_INST)
+		{
+			sim->FloodINST(x, y);
+			return existing;
+		}
+		// Convert to SPRK
+		p.type = PT_SPRK;
+		p.life = 4;
+		p.ctype = oldType;
+		// Update pmap type bits
+		if (z >= -1 && z <= 1 && sim->pmap[y][x] && ID(sim->pmap[y][x]) == existing)
+			sim->pmap[y][x] = (sim->pmap[y][x] & ~PMAPMASK) | PT_SPRK;
+		// Heating effect for metals
+		if (p.temp + 10.0f < 673.0f && !sim->legacy_enable &&
+		    (oldType == PT_METL || oldType == PT_BMTL || oldType == PT_BRMT ||
+		     oldType == PT_PSCN || oldType == PT_NSCN || oldType == PT_ETRD ||
+		     oldType == PT_NBLE || oldType == PT_IRON))
+			p.temp = p.temp + 10.0f;
+		return existing;
 	}
 
 	if (existing >= 0 && existing < NPART && sim->parts[existing].type)
