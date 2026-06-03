@@ -2392,7 +2392,11 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 			if (parts[existing3D].type == t)
 				return existing3D;
 
-			// Different type: replace old with new.
+			// Different type: only replace if REPLACE_MODE is active (; key).
+			// Otherwise skip — original TPT behaviour: brush skips occupied cells.
+			if (!(replaceModeFlags & REPLACE_MODE))
+				return -1;
+
 			auto drawOn = parts[existing3D].type;
 			if (elements[drawOn].CtypeDraw)
 			{
