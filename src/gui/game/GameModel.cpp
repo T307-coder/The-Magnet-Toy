@@ -71,10 +71,10 @@ GameModel::GameModel(GameView *newView):
 	sim = Simulation::Factory();
 	sim->useLuaCallbacks = true;
 
-	// 3D physics: single-thread (parallelism not viable — see LBPHacker #1031)
-	sim->threadCount = 1;
-	sim->threadPool.SetThreadCount(0);
-	sim->allowThreadedSimulation = false;
+	auto hw = std::max(1u, std::thread::hardware_concurrency());
+	sim->threadCount = (int)std::min(hw, 8u);
+	sim->threadPool.SetThreadCount(sim->threadCount);
+	sim->allowThreadedSimulation = true;
 
 	ren = new Renderer();
 

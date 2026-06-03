@@ -20,6 +20,10 @@
 #include <cstring>
 #include <cstddef>
 #include <vector>
+#include <optional>
+#include <mutex>
+#include <condition_variable>
+#include <shared_mutex>
 #include <array>
 #include <memory>
 #include <shared_mutex>
@@ -243,14 +247,76 @@ public:
 
 	// 3D tile system — XYZ symmetric spatial partitioning
 	// Each tile is TILE_SIZE³ cells; tiles are dispatched in parallel
+	// with neighbour-avoidance scheduling (LBPHacker-style).
 	struct Tile3D
 	{
-		int tx, ty, tz;                       // tile index in tiles grid
-		std::vector<int> particleIds;         // particles in this tile
-		std::vector<int> deferredIds;         // cross-tile interactions deferred to serial phase
+		int tx, ty, tz;
+		std::vector<int> particleIds;
 	};
-	std::vector<Tile3D> tiles;                // flat, size TILES_TOTAL
-	int tileOffsetX = 0, tileOffsetY = 0, tileOffsetZ = 0; // randomized each frame
+
+	// LBPHacker TileSchedule: ensures no two adjacent tiles run simultaneously,
+	// eliminating pmap write conflicts without locks.
+	struct TileSchedule3D
+	{
+		enum class State { waiting, working, done };
+		std::vector<State> states;
+		int doneCount = 0;
+		std::mutex mx;
+		std::condition_variable cv;
+		std::vector<int> tileOrder; // indices into tiles[]
+
+		void Reset(int totalTiles)
+		{
+			states.assign(totalTiles, State::waiting);
+			doneCount = 0;
+		}
+		void Permute(RNG &rng)
+		{
+			tileOrder.resize(states.size());
+			for (int i = 0; i < (int)tileOrder.size(); ++i)
+				tileOrder[i] = i;
+			for (int i = 0; i < (int)tileOrder.size(); ++i)
+				std::swap(tileOrder[i], tileOrder[rng.between(i, (int)tileOrder.size() - 1)]);
+		}
+		// Returns next tile index to process, or -1 when all done.
+		// Blocks if no eligible tile is available (all are working or have working neighbours).
+		int Next(std::optional<int> markDone)
+		{
+			std::unique_lock lk(mx);
+			if (markDone) { states[*markDone] = State::done; doneCount++; }
+			cv.notify_all();
+			int total = (int)states.size();
+			int lastDone = doneCount;
+			while (doneCount < total)
+			{
+				for (auto idx : tileOrder)
+				{
+					if (states[idx] != State::waiting) continue;
+					int tz = idx / (TILES_Y * TILES_X);
+					int ty = (idx / TILES_X) % TILES_Y;
+					int tx = idx % TILES_X;
+					bool blocked = false;
+					for (int dz = -1; dz <= 1 && !blocked; ++dz)
+					for (int dy = -1; dy <= 1 && !blocked; ++dy)
+					for (int dx = -1; dx <= 1 && !blocked; ++dx)
+					{
+						int nx = tx + dx, ny = ty + dy, nz = tz + dz;
+						if (nx < 0 || nx >= TILES_X || ny < 0 || ny >= TILES_Y || nz < 0 || nz >= TILES_Z) continue;
+						if (states[(nz * TILES_Y + ny) * TILES_X + nx] == State::working) blocked = true;
+					}
+					if (blocked) continue;
+					states[idx] = State::working;
+					return idx;
+				}
+				cv.wait(lk, [&] { return doneCount > lastDone; });
+				lastDone = doneCount;
+			}
+			return -1;
+		}
+	};
+
+	std::vector<Tile3D> tiles;
+	TileSchedule3D tileSchedule;
 
 	// Parallel update dispatch
 	void AssignParticlesToTiles();

@@ -30,7 +30,7 @@ constexpr int NPART_MULT = 3; // change this to scale particle capacity
 constexpr int NPART = XRES * YRES * NPART_MULT;
 
 // 3D tile constants for parallel simulation
-constexpr int TILE_SIZE = 16; // XYZ equal tile size
+constexpr int TILE_SIZE = 32; // XYZ equal tile size (LBPHacker-style: larger = fewer boundary particles)
 constexpr int TILES_X = (XRES + TILE_SIZE - 1) / TILE_SIZE;
 constexpr int TILES_Y = (YRES + TILE_SIZE - 1) / TILE_SIZE;
 constexpr int TILES_Z = (ZRES + TILE_SIZE - 1) / TILE_SIZE;

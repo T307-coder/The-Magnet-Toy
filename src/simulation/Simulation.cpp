@@ -3077,7 +3077,6 @@ void SimulationImpl::UpdateParticlesSerial(int start, int end)
 
 void SimulationImpl::UpdateParticles(int start, int end)
 {
-	// Serial path: used when threading is disabled or for sub-range updates
 	if (!allowThreadedSimulation || threadCount <= 1 || start != 0 || end != NPART)
 	{
 		if (start == 0)
@@ -3086,11 +3085,8 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		return;
 	}
 
-	// ---- Parallel path: LBPHacker-style safe-zone tiling ----
-	// Particles whose full 26-neighbourhood is within their tile are "safe"
-	// and processed in parallel without any locks. Particles near tile edges
-	// ("deferred") are processed serially after the parallel phase, ensuring
-	// correctness without mutex overhead.
+	// ---- LBPHacker-style parallel path ----
+	// Phase A (life dec) + Phase B (pmap rebuild) run HERE, not in BeforeSim.
 	FrameTime::Span span(frameTime, "Simulation::UpdateParticles");
 
 	// 1. Setup per-thread contexts
@@ -3104,106 +3100,33 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		for (auto &c : ctx.elementCount) c = 0;
 	}
 
-	// 2. Clear tiles
+	// 2. Clear tiles + classify from already-rebuilt pmap/spatialMap
 	tiles.clear();
 	tiles.resize(TILES_TOTAL);
 	for (int tz = 0; tz < TILES_Z; ++tz)
 		for (int ty = 0; ty < TILES_Y; ++ty)
 			for (int tx = 0; tx < TILES_X; ++tx)
 			{
-				auto idx = (tz * TILES_Y + ty) * TILES_X + tx;
-				tiles[idx].tx = tx;
-				tiles[idx].ty = ty;
-				tiles[idx].tz = tz;
-				tiles[idx].particleIds.clear();
-				tiles[idx].deferredIds.clear();
+				auto &tile = tiles[(tz * TILES_Y + ty) * TILES_X + tx];
+				tile.tx = tx; tile.ty = ty; tile.tz = tz;
+				tile.particleIds.clear();
 			}
 
-	// 3a. Phase A: life dec + Flatten (serial, cheap)
-	if (simWillUpdate)
-	{
-		auto &sd = SimulationData::CRef();
-		auto &elements = sd.elements;
-		for (auto i = 0; i < parts.active; ++i)
-		{
-			if (!parts[i].type) continue;
-			auto t = parts[i].type;
-			auto x = int(parts[i].x + 0.5f);
-			auto y = int(parts[i].y + 0.5f);
-			if (t < 0 || t >= PT_NUM || !elements[t].Enabled)
-			{
-				kill_part(i);
-				continue;
-			}
-			unsigned int ep = elements[t].Properties;
-			bool inBounds = (x >= 0 && y >= 0 && x < XRES && y < YRES);
-			if (parts[i].life > 0 && (ep & PROP_LIFE_DEC) && !(inBounds && bmap[y / CELL][x / CELL] == WL_STASIS && emap[y / CELL][x / CELL] < 8))
-			{
-				parts[i].life--;
-				if (parts[i].life <= 0 && (ep & (PROP_LIFE_KILL_DEC | PROP_LIFE_KILL)))
-				{
-					kill_part(i);
-					continue;
-				}
-			}
-			else if (parts[i].life <= 0 && (ep & PROP_LIFE_KILL) && !(inBounds && bmap[y / CELL][x / CELL] == WL_STASIS && emap[y / CELL][x / CELL] < 8))
-			{
-				kill_part(i);
-				continue;
-			}
-		}
-		parts.Flatten();
-	}
-
-	// 3b. Phase B: pmap + spatialMap rebuild + tile classification (serial, single pass)
-	memset(pmap, 0, sizeof(pmap));
-	memset(pmap_count, 0, sizeof(pmap_count));
-	memset(photons, 0, sizeof(photons));
-	NUM_PARTS = 0;
-	spatialMap.clear();
-
-	auto &sd = SimulationData::CRef();
-	auto &elements = sd.elements;
-
-	std::vector<int> deferredParticles; // particles near tile boundaries (serial catch-up)
+	std::vector<int> deferredParticles;
 
 	for (auto i = 0; i < parts.active; ++i)
 	{
 		if (!parts[i].type) continue;
-		auto t = parts[i].type;
 		auto x = int(parts[i].x + 0.5f);
 		auto y = int(parts[i].y + 0.5f);
 		auto z = int(parts[i].z + 0.5f);
 
-		// pmap rebuild (z≈0 only)
-		bool onDefaultZ = (z >= -1 && z <= 1);
-		if (x >= 0 && y >= 0 && x < XRES && y < YRES)
-		{
-			if (elements[t].Properties & TYPE_ENERGY)
-			{
-				if (onDefaultZ) photons[y][x] = PMAP(i, t);
-			}
-			else if (onDefaultZ)
-			{
-				if (!pmap[y][x] || (t != PT_INVIS && t != PT_FILT))
-					pmap[y][x] = PMAP(i, t);
-				if (t != PT_THDR && t != PT_EMBR && t != PT_FIGH && t != PT_PLSM)
-					pmap_count[y][x]++;
-			}
-		}
-		NUM_PARTS++;
+		// High-velocity deferral: particles that could cross tile boundaries
+		// in a single frame must be processed serially (LBPHacker rule).
+		float mv = fmaxf(fmaxf(fabsf(parts[i].vx), fabsf(parts[i].vy)), fabsf(parts[i].vz));
+		bool fastParticle = (mv > TILE_SIZE / 2);
 
-		// spatialMap rebuild (all Z)
-		if (x >= 0 && y >= 0 && z >= 0 && x < XRES && y < YRES && z < ZRES)
-			spatialMap[PackXYZ(x, y, z)] = i;
-
-		if (elementRecount && t >= 0 && t < PT_NUM && elements[t].Enabled)
-			elementCount[t]++;
-
-		// LBPHacker safe-zone classification:
-		// Particle is "safe" if local position within tile is NOT on any edge
-		// (i.e., all 26 neighbours fall within the same tile).
-		// Edge particles are deferred to serial catch-up.
+		// Safe-zone check: particle safe if local pos NOT on tile edge
 		int lx = x % TILE_SIZE;
 		int ly = y % TILE_SIZE;
 		int lz = z % TILE_SIZE;
@@ -3211,7 +3134,7 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		               ly == 0 || ly == TILE_SIZE - 1 ||
 		               lz == 0 || lz == TILE_SIZE - 1);
 
-		if (onEdge)
+		if (onEdge || fastParticle)
 		{
 			deferredParticles.push_back(i);
 		}
@@ -3226,30 +3149,62 @@ void SimulationImpl::UpdateParticles(int start, int end)
 			tiles[(tz * TILES_Y + ty) * TILES_X + tx].particleIds.push_back(i);
 		}
 	}
-	if (elementRecount)
-		elementRecount = false;
 
-	// 4. Parallel phase: safe particles (truly independent — no locks needed)
+	// 3. Parallel phase: 8-color checkerboard (3D). Tiles of the same color
+	// share no edges/vertices, so they can be processed concurrently without
+	// any pmap/spatialMap conflicts — no locks needed.
 	useThreadContext = true;
-	for (auto &tile : tiles)
+	for (int color = 0; color < 8; ++color)
 	{
-		if (tile.particleIds.empty()) continue;
-		threadPool.PushWorkItem([this, &tile]() {
-			auto &ctxRng = threadContexts[ThreadIndex()].rng;
-			for (auto i : tile.particleIds)
-				UpdateOneParticle(ctxRng, i);
-		});
+		int cx = (color & 1) ? 1 : 0;
+		int cy = (color & 2) ? 1 : 0;
+		int cz = (color & 4) ? 1 : 0;
+		for (auto &tile : tiles)
+		{
+			if (tile.particleIds.empty()) continue;
+			if ((tile.tx & 1) != cx) continue;
+			if ((tile.ty & 1) != cy) continue;
+			if ((tile.tz & 1) != cz) continue;
+			threadPool.PushWorkItem([this, &tile]() {
+				auto &ctxRng = threadContexts[ThreadIndex()].rng;
+				for (auto i : tile.particleIds)
+					UpdateOneParticle(ctxRng, i);
+			});
+		}
+		threadPool.Flush();
 	}
-	threadPool.Flush();
 
-	// 5. Serial catch-up: deferred particles (near tile edges)
+	// 5. Serial catch-up: deferred particles (edge + high-velocity)
 	for (auto i : deferredParticles)
-	{
 		UpdateOneParticle(rng, i);
-	}
 	useThreadContext = false;
 
-	// 6. Merge per-thread data
+	// 6. Runtime reclassification (LBPHacker): safe-zone particles that crossed
+	// tile boundaries during parallel update must be re-processed serially.
+	{
+		std::vector<int> recrossed;
+		for (auto &tile : tiles)
+		{
+			for (auto i : tile.particleIds)
+			{
+				if (!parts[i].type) continue;
+				int x = int(parts[i].x + 0.5f);
+				int y = int(parts[i].y + 0.5f);
+				int z = int(parts[i].z + 0.5f);
+				int lx = x % TILE_SIZE, ly = y % TILE_SIZE, lz = z % TILE_SIZE;
+				if (lx == 0 || lx == TILE_SIZE - 1 ||
+				    ly == 0 || ly == TILE_SIZE - 1 ||
+				    lz == 0 || lz == TILE_SIZE - 1)
+				{
+					recrossed.push_back(i);
+				}
+			}
+		}
+		for (auto i : recrossed)
+			UpdateOneParticle(rng, i);
+	}
+
+	// 7. Merge per-thread data
 	for (auto &ctx : threadContexts)
 	{
 		for (int t = 0; t < PT_NUM; ++t)
