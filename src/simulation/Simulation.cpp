@@ -3461,7 +3461,8 @@ bool SimulationImpl::TransitionPhase(int i, const Neighbourhood &neighbourhood)
 		}
 
 		// Heat transfer code
-		if (t && !sd.IsHeatInsulator(parts[i]) && rng.chance(int(elements[t].HeatConduct*gel_scale), 250))
+		int hcVal = int(elements[t].HeatConduct * gel_scale);
+		if (t && !sd.IsHeatInsulator(parts[i]) && hcVal > 0 && rng.chance(hcVal, 250))
 		{
 			// Heat transfer with air
 			if (aheat_enable && !(elements[t].Properties&PROP_NOAMBHEAT))
