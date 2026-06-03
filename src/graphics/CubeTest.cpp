@@ -534,7 +534,7 @@ void CubeTest_Render()
 	if (g_fontBase && g_currentFps > 0)
 	{
 		char fpsBuf[64];
-		snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.0f  NP: %d", g_currentFps, sim ? sim->parts.active : 0);
+		snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.0f  NP: %d", g_currentFps, sim ? sim->NUM_PARTS : 0);
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 		glLoadIdentity();
@@ -894,13 +894,41 @@ static void FloodDelete3D(int sx, int sy, int sz)
 
 static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 {
-	if (x<0 || y<0 || x>=XRES || y>=YRES) return -1;
+	if (x<0 || y<0 || x>=XRES || y>=YRES || z<0 || z>=ZRES) return -1;
 	if (t<=0 || t>=PT_NUM) return -1;
 	auto &sd = SimulationData::CRef();
 	if (!sd.elements[t].Enabled) return -1;
 
-	if (sim->parts.active >= NPART) return -1;
-	int i = sim->parts.active++;
+	// Check if a particle ALREADY exists at the exact 3D position
+	int existing = -1;
+	{
+		auto key = Simulation::PackXYZ(x, y, z);
+		std::shared_lock lock(sim->spatialMutex);
+		auto it = sim->spatialMap.find(key);
+		if (it != sim->spatialMap.end())
+			existing = it.second();
+	}
+	// Also check pmap for z≈0
+	if (existing < 0 && z >= -1 && z <= 1 && sim->pmap[y][x])
+	{
+		int pmapIdx = ID(sim->pmap[y][x]);
+		if ((int)(sim->parts[pmapIdx].z + 0.5f) == z && sim->parts[pmapIdx].type)
+			existing = pmapIdx;
+	}
+
+	if (existing >= 0 && existing < NPART && sim->parts[existing].type)
+	{
+		// Same type: nothing to do
+		if (sim->parts[existing].type == t)
+			return existing;
+		// Different type: kill old first
+		sim->kill_part(existing);
+	}
+
+	// Allocate new particle
+	int i = sim->parts.Alloc();
+	if (i == -1) return -1;
+
 	auto &p = sim->parts[i];
 	p = sd.elements[t].DefaultProperties;
 	p.type = t;
@@ -910,10 +938,26 @@ static int CreatePart3D(Simulation *sim, int x, int y, int z, int t)
 	p.tmp5 = 0;
 	p.tmp6 = 0;
 
+	// Element creation callback
 	if (sd.elements[t].Create)
 		(*(sd.elements[t].Create))(sim, i, x, y, t, -1);
 
+	// Update pmap (for z≈0) and spatialMap (all Z)
+	bool onBasePlane = (z >= -1 && z <= 1);
+	if (onBasePlane)
+	{
+		if (sd.elements[t].Properties & TYPE_ENERGY)
+			sim->photons[y][x] = PMAP(i, t);
+		else
+			sim->pmap[y][x] = PMAP(i, t);
+	}
+	{
+		std::lock_guard<std::shared_mutex> lock(sim->spatialMutex);
+		sim->spatialMap[Simulation::PackXYZ(x, y, z)] = i;
+	}
+
 	sim->elementCount[t]++;
+	sim->NUM_PARTS++;
 	return i;
 }
 

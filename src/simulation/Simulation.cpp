@@ -54,7 +54,12 @@ namespace
 
 		void UpdateParticles(int start, int end) final override;
 		void UpdateParticlesSerial(int start, int end);
-		void UpdateOneParticle(RNG &rng, int i);
+		// LBPHacker-style: returns DeferredId::When if particle needs deferral
+		std::optional<Simulation::DeferredId::When> UpdateOne(RNG &rng, int i, bool runtimeParallel);
+		// Second phase of UpdateOne: element update + legacy update (no transition)
+		bool UpdatePhase(RNG &rng, int i, const Neighbourhood &neighbourhood);
+		// Process a batch of deferred particles (multi-stage serial catch-up)
+		void HandleDeferred(std::span<Simulation::DeferredId> ids);
 	};
 }
 
@@ -1193,6 +1198,13 @@ int Simulation::get_wavelength_bin(int *wm)
 
 void Simulation::set_emap(int x, int y)
 {
+	// LBPHacker: in parallel context, defer emap activation to avoid races
+	if (useThreadContext)
+	{
+		threadContexts[ThreadIndex()].emapActivation.push_back({ x, y });
+		return;
+	}
+
 	int x1, x2;
 
 	if (!is_wire_off(x, y))
@@ -2257,6 +2269,7 @@ bool Simulation::part_change_type(int i, int x, int y, int t)
 	elementCount[t]++;
 
 	parts[i].type = t;
+	parts[i].flags &= ~FLAG_ASLEEP; // type change → wake up
 
 	// 3D-aware pmap management: use spatialMap when z鈮?
 	int z = int(parts[i].z + 0.5f);
@@ -2348,19 +2361,70 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 
 	if (p == -2)
 	{
+		// 3D-aware brush placement: check if a particle ALREADY exists
+		// at the exact 3D target position.
+		// - spatialMap covers ALL Z layers (populated by RecalcFreeParticles)
+		// - pmap covers z=0 (fast path, updated immediately by create_part)
+		int targetZ = (int)(setZ + 0.5f);
+		int existing3D = -1;
+
+		// Check spatialMap first (all Z layers, most up-to-date for z≠0)
+		{
+			std::shared_lock lock(spatialMutex);
+			auto it = spatialMap.find(PackXYZ(x, y, targetZ));
+			if (it != spatialMap.end())
+				existing3D = it.second();
+		}
+
+		// Fallback: check pmap for z≈0 (spatialMap may be stale for same-frame z=0 creation)
+		if (existing3D < 0 && targetZ >= -1 && targetZ <= 1 && pmap[y][x])
+		{
+			int pmapIdx = ID(pmap[y][x]);
+			int pmapZ = (int)(parts[pmapIdx].z + 0.5f);
+			if (pmapZ == targetZ && parts[pmapIdx].type)
+				existing3D = pmapIdx;
+		}
+
+		if (existing3D >= 0 && existing3D < NPART && parts[existing3D].type)
+		{
+			// Particle already at this 3D position.
+			// Same type → nothing to do (skip kill+create cycle).
+			if (parts[existing3D].type == t)
+				return existing3D;
+
+			// Different type: replace old with new.
+			auto drawOn = parts[existing3D].type;
+			if (elements[drawOn].CtypeDraw)
+			{
+				elements[drawOn].CtypeDraw(this, existing3D, t, v);
+				return existing3D;
+			}
+			// Kill old particle and clean its spatialMap/pmap entry
+			if (targetZ >= -1 && targetZ <= 1)
+			{
+				if (pmap[y][x] && ID(pmap[y][x]) == existing3D)
+					pmap[y][x] = 0;
+			}
+			{
+				std::lock_guard<std::shared_mutex> lock(spatialMutex);
+				auto it = spatialMap.find(PackXYZ(x, y, targetZ));
+				if (it != spatialMap.end() && it.second() == existing3D)
+					spatialMap.erase(it);
+			}
+			kill_part(existing3D);
+			// Fall through: create new particle in a fresh slot
+		}
+
 		// In XZ/YZ slice views, pmap is degenerate (many 3D particles share
 		// the same pmap cell) and walls are a 2D concept. Skip these checks.
-		// In XY view, also check Z 鈥?don't block if existing particle is on a different layer.
 		if (view2D == 0)
 		{
 			if (pmap[y][x])
 			{
 				int existing = ID(pmap[y][x]);
-				// If existing particle is on a different Z slice, allow placement
 				if (fabsf(parts[existing].z - lockVal) > 0.5f)
 				{
-					// Different layer: don't block, but clear old pmap entry
-					// (old particle still exists in parts[], just loses pmap slot)
+					// Different layer: allow placement (old particle loses pmap slot)
 				}
 				else
 				{
@@ -2454,7 +2518,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	parts[i].tmp6 = 0;
 
 	//and finally set the pmap/photon maps to the newly created particle
-	// Skip pmap for particles not on the base Z plane (z鈮?)
+	// Skip pmap for particles not on the base Z plane (z≠0)
 	// In XZ/YZ slice views, pmap is 2D and can't represent 3D space.
 	if ((view2D != 0 && p == -2) || (p == -2 && fabsf(parts[i].z) > 0.5f))
 	{
@@ -2462,15 +2526,25 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 		int iz = (int)(parts[i].z + 0.5f);
 		if (iz >= 0 && iz < ZRES) {
 			std::lock_guard<std::shared_mutex> lock(spatialMutex);
-			// Don't overwrite existing entry
-			if (spatialMap.find(PackXYZ(x, y, iz)) == spatialMap.end())
-				spatialMap[PackXYZ(x, y, iz)] = i;
+			spatialMap[PackXYZ(x, y, iz)] = i; // overwrite (we killed old particle above)
 		}
 	}
 	else if (elements[t].Properties & TYPE_ENERGY)
 		photons[y][x] = PMAP(i, t);
 	else if (t!=PT_STKM && t!=PT_STKM2 && t!=PT_FIGH)
 		pmap[y][x] = PMAP(i, t);
+
+	// Brush-created particles MUST also update spatialMap immediately,
+	// even for z=0, so that subsequent brush calls in the same frame
+	// can detect the particle and avoid stacking.
+	if (p == -2)
+	{
+		int iz = (int)(parts[i].z + 0.5f);
+		if (iz >= 0 && iz < ZRES) {
+			std::lock_guard<std::shared_mutex> lock(spatialMutex);
+			spatialMap[PackXYZ(x, y, iz)] = i;
+		}
+	}
 
 	//Fancy dust effects for powder types
 	if((elements[t].Properties & TYPE_PART) && pretty_powder)
@@ -2878,6 +2952,8 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 		}
 		else
 		{
+			// Acquire shared_lock ONCE for all 26 lookups (was 26 separate locks)
+			std::shared_lock<std::shared_mutex> lock(spatialMutex);
 			for (auto nz=-1; nz<2; nz++)
 			{
 				for (auto ny=-1; ny<2; ny++)
@@ -2886,7 +2962,18 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 					{
 						if (nx||ny||nz)
 						{
-							auto r = GetPmap3D(x+nx, y+ny, z+nz, i);
+							unsigned r = 0;
+							int cx = x+nx, cy = y+ny, cz = z+nz;
+							if ((unsigned)cx < (unsigned)XRES && (unsigned)cy < (unsigned)YRES && (unsigned)cz < (unsigned)ZRES)
+							{
+								auto it = spatialMap.find(PackXYZ(cx, cy, cz));
+								if (it != spatialMap.end())
+								{
+									int pi = it.second();
+									if (pi != i && pi >= 0 && pi < NPART && parts[pi].type)
+										r = PMAP(pi, parts[pi].type);
+								}
+							}
 							n.surround_3d[j3] = r;
 							j3++;
 							n.surround_space_3d += (!TYP(r));
@@ -2913,129 +3000,172 @@ SimulationImpl::Neighbourhood SimulationImpl::GetNeighbourhood(int i) const
 	return n;
 }
 
-void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
+// LBPHacker-style three-phase particle update.
+// When runtimeParallel=true, checks tile boundaries and InfiniteNeighborhood
+// at each phase boundary and returns a DeferredId::When if the particle
+// must be deferred to serial catch-up.
+std::optional<Simulation::DeferredId::When> SimulationImpl::UpdateOne(RNG &rng, int i, bool runtimeParallel)
 {
 	auto &sd = SimulationData::CRef();
 	auto &elements = sd.elements;
 
 	auto t = parts[i].type;
-	if (!t) return;
+	if (!t) return std::nullopt;
 
 	debug_mostRecentlyUpdated = i;
 
-	auto x = int(parts[i].x+0.5f);
-	auto y = int(parts[i].y+0.5f);
+	// Sleep optimization: skip update every other frame for stationary particles.
+	// Settled particles (vx=vy=vz=0) only need full update on alternating frames.
+	// Woken by velocity, type change, or external interactions via part_change_type.
+	if (runtimeParallel && (parts[i].flags & FLAG_ASLEEP))
+	{
+		if (parts[i].vx == 0.0f && parts[i].vy == 0.0f && parts[i].vz == 0.0f)
+		{
+			parts[i].flags &= ~FLAG_ASLEEP; // skip this frame
+			return std::nullopt;
+		}
+		parts[i].flags &= ~FLAG_ASLEEP; // particle moved, wake up
+	}
 
-	// ---- Operations that modify global state ----
-	// Kill a particle off screen
-	if (x<CELL || y<CELL || x>=XRES-CELL || y>=YRES-CELL)
+	auto x = int(parts[i].x + 0.5f);
+	auto y = int(parts[i].y + 0.5f);
+
+	// Compute tile coordinates for runtime parallel boundary checks.
+	// Use TILE_SIZE_FINE (sub-cell) precision + random tileOffset per frame.
+	auto pTileX = (x + tileOffset.X) / TILE_SIZE_FINE;
+	auto pTileY = (y + tileOffset.Y) / TILE_SIZE_FINE;
+
+	// ---- Phase 1: Transition (kill checks, wall, stasis, velocity, transition) ----
+	if (x < CELL || y < CELL || x >= XRES - CELL || y >= YRES - CELL)
 	{
 		kill_part(i);
-		return;
+		return std::nullopt;
 	}
 
-	// Kill a particle in a wall where it isn't supposed to go
-	if (bmap[y/CELL][x/CELL] &&
-	   (bmap[y/CELL][x/CELL]==WL_WALL ||
-	    bmap[y/CELL][x/CELL]==WL_WALLELEC ||
-	    bmap[y/CELL][x/CELL]==WL_ALLOWAIR ||
-	    (bmap[y/CELL][x/CELL]==WL_DESTROYALL) ||
-	    (bmap[y/CELL][x/CELL]==WL_ALLOWLIQUID && !(elements[t].Properties&TYPE_LIQUID)) ||
-	    (bmap[y/CELL][x/CELL]==WL_ALLOWPOWDER && !(elements[t].Properties&TYPE_PART)) ||
-	    (bmap[y/CELL][x/CELL]==WL_ALLOWGAS && !(elements[t].Properties&TYPE_GAS)) ||
-	    (bmap[y/CELL][x/CELL]==WL_ALLOWENERGY && !(elements[t].Properties&TYPE_ENERGY)) ||
-	    (bmap[y/CELL][x/CELL]==WL_EWALL && !emap[y/CELL][x/CELL])) && (t!=PT_STKM) && (t!=PT_STKM2) && (t!=PT_FIGH))
+	if (bmap[y / CELL][x / CELL] &&
+	    (bmap[y / CELL][x / CELL] == WL_WALL ||
+	     bmap[y / CELL][x / CELL] == WL_WALLELEC ||
+	     bmap[y / CELL][x / CELL] == WL_ALLOWAIR ||
+	     (bmap[y / CELL][x / CELL] == WL_DESTROYALL) ||
+	     (bmap[y / CELL][x / CELL] == WL_ALLOWLIQUID && !(elements[t].Properties & TYPE_LIQUID)) ||
+	     (bmap[y / CELL][x / CELL] == WL_ALLOWPOWDER && !(elements[t].Properties & TYPE_PART)) ||
+	     (bmap[y / CELL][x / CELL] == WL_ALLOWGAS && !(elements[t].Properties & TYPE_GAS)) ||
+	     (bmap[y / CELL][x / CELL] == WL_ALLOWENERGY && !(elements[t].Properties & TYPE_ENERGY)) ||
+	     (bmap[y / CELL][x / CELL] == WL_EWALL && !emap[y / CELL][x / CELL])) &&
+	    (t != PT_STKM) && (t != PT_STKM2) && (t != PT_FIGH))
 	{
 		kill_part(i);
-		return;
+		return std::nullopt;
 	}
 
-	// Make sure that STASIS'd particles don't tick.
-	if (bmap[y/CELL][x/CELL] == WL_STASIS && emap[y/CELL][x/CELL]<8)
-		return;
+	if (bmap[y / CELL][x / CELL] == WL_STASIS && emap[y / CELL][x / CELL] < 8)
+		return std::nullopt;
 
-	if (bmap[y/CELL][x/CELL]==WL_DETECT && emap[y/CELL][x/CELL]<8)
-	{
-		set_emap(x/CELL, y/CELL);
-	}
+	if (bmap[y / CELL][x / CELL] == WL_DETECT && emap[y / CELL][x / CELL] < 8)
+		set_emap(x / CELL, y / CELL);
 
-	//adding to velocity from the particle's velocity
-	vx[y/CELL][x/CELL] = vx[y/CELL][x/CELL]*elements[t].AirLoss + elements[t].AirDrag*parts[i].vx;
-	vy[y/CELL][x/CELL] = vy[y/CELL][x/CELL]*elements[t].AirLoss + elements[t].AirDrag*parts[i].vy;
+	vx[y / CELL][x / CELL] = vx[y / CELL][x / CELL] * elements[t].AirLoss + elements[t].AirDrag * parts[i].vx;
+	vy[y / CELL][x / CELL] = vy[y / CELL][x / CELL] * elements[t].AirLoss + elements[t].AirDrag * parts[i].vy;
 
 	if (elements[t].HotAir)
 	{
-		if (t==PT_GAS||t==PT_NBLE)
+		if (t == PT_GAS || t == PT_NBLE)
 		{
-			if (pv[y/CELL][x/CELL]<3.5f)
-				pv[y/CELL][x/CELL] += elements[t].HotAir*(3.5f-pv[y/CELL][x/CELL]);
-			if (y+CELL<YRES && pv[y/CELL+1][x/CELL]<3.5f)
-				pv[y/CELL+1][x/CELL] += elements[t].HotAir*(3.5f-pv[y/CELL+1][x/CELL]);
-			if (x+CELL<XRES)
+			if (pv[y / CELL][x / CELL] < 3.5f)
+				pv[y / CELL][x / CELL] += elements[t].HotAir * (3.5f - pv[y / CELL][x / CELL]);
+			if (y + CELL < YRES && pv[y / CELL + 1][x / CELL] < 3.5f)
+				pv[y / CELL + 1][x / CELL] += elements[t].HotAir * (3.5f - pv[y / CELL + 1][x / CELL]);
+			if (x + CELL < XRES)
 			{
-				if (pv[y/CELL][x/CELL+1]<3.5f)
-					pv[y/CELL][x/CELL+1] += elements[t].HotAir*(3.5f-pv[y/CELL][x/CELL+1]);
-				if (y+CELL<YRES && pv[y/CELL+1][x/CELL+1]<3.5f)
-					pv[y/CELL+1][x/CELL+1] += elements[t].HotAir*(3.5f-pv[y/CELL+1][x/CELL+1]);
+				if (pv[y / CELL][x / CELL + 1] < 3.5f)
+					pv[y / CELL][x / CELL + 1] += elements[t].HotAir * (3.5f - pv[y / CELL][x / CELL + 1]);
+				if (y + CELL < YRES && pv[y / CELL + 1][x / CELL + 1] < 3.5f)
+					pv[y / CELL + 1][x / CELL + 1] += elements[t].HotAir * (3.5f - pv[y / CELL + 1][x / CELL + 1]);
 			}
 		}
 		else
 		{
-			pv[y/CELL][x/CELL] += elements[t].HotAir;
-			if (y+CELL<YRES)
-				pv[y/CELL+1][x/CELL] += elements[t].HotAir;
-			if (x+CELL<XRES)
+			pv[y / CELL][x / CELL] += elements[t].HotAir;
+			if (y + CELL < YRES)
+				pv[y / CELL + 1][x / CELL] += elements[t].HotAir;
+			if (x + CELL < XRES)
 			{
-				pv[y/CELL][x/CELL+1] += elements[t].HotAir;
-				if (y+CELL<YRES)
-					pv[y/CELL+1][x/CELL+1] += elements[t].HotAir;
+				pv[y / CELL][x / CELL + 1] += elements[t].HotAir;
+				if (y + CELL < YRES)
+					pv[y / CELL + 1][x / CELL + 1] += elements[t].HotAir;
 			}
 		}
 	}
 
 	auto neighbourhood = GetNeighbourhood(i);
 
-	//velocity updates for the particle
-	if (t != PT_SPNG || !(parts[i].flags&FLAG_MOVABLE))
+	if (t != PT_SPNG || !(parts[i].flags & FLAG_MOVABLE))
 	{
 		parts[i].vx *= elements[t].Loss;
 		parts[i].vy *= elements[t].Loss;
 		parts[i].vz *= elements[t].Loss;
 	}
-	parts[i].vx += elements[t].Advection*vx[y/CELL][x/CELL] + neighbourhood.pGravX;
-	parts[i].vy += elements[t].Advection*vy[y/CELL][x/CELL] + neighbourhood.pGravY;
+	parts[i].vx += elements[t].Advection * vx[y / CELL][x / CELL] + neighbourhood.pGravX;
+	parts[i].vy += elements[t].Advection * vy[y / CELL][x / CELL] + neighbourhood.pGravY;
 	parts[i].vz += neighbourhood.pGravZ;
 
 	if (elements[t].Diffusion)
 	{
-		parts[i].vx += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
-		parts[i].vy += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
-		parts[i].vz += elements[t].Diffusion*(2.0f*rng.uniform01()-1.0f);
+		parts[i].vx += elements[t].Diffusion * (2.0f * rng.uniform01() - 1.0f);
+		parts[i].vy += elements[t].Diffusion * (2.0f * rng.uniform01() - 1.0f);
+		parts[i].vz += elements[t].Diffusion * (2.0f * rng.uniform01() - 1.0f);
 	}
 
 	auto transitionOccurred = TransitionPhase(i, neighbourhood);
-	if (!parts[i].type) return;
+	if (!parts[i].type) return std::nullopt;
 	if (transitionOccurred)
 		t = parts[i].type;
 
-	if (elements[t].Update)
+	// ---- LBPHacker: check if deferral needed after Transition ----
+	if (runtimeParallel)
 	{
-		if ((*(elements[t].Update))(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap))
-			return;
-		x = int(parts[i].x+0.5f);
-		y = int(parts[i].y+0.5f);
+		// Elements with unbounded neighbourhood (STKM, STKM2, FIGH) must always defer
+		if (t == PT_STKM || t == PT_STKM2 || t == PT_FIGH)
+			return Simulation::DeferredId::When::beforeUpdate;
+		auto x2 = int(parts[i].x + 0.5f);
+		auto y2 = int(parts[i].y + 0.5f);
+		if ((x2 + tileOffset.X) / TILE_SIZE_FINE != pTileX ||
+		    (y2 + tileOffset.Y) / TILE_SIZE_FINE != pTileY)
+			return Simulation::DeferredId::When::beforeUpdate;
 	}
 
-	if (legacy_enable)
+	// ---- Phase 2: Element Update ----
+	if (UpdatePhase(rng, i, neighbourhood))
+		return std::nullopt;
+	x = int(parts[i].x + 0.5f);
+	y = int(parts[i].y + 0.5f);
+
+	if (parts[i].type == PT_NONE) return std::nullopt;
+	if (transitionOccurred) return std::nullopt;
+
+	// ---- LBPHacker: check if deferral needed before Movement ----
+	if (runtimeParallel)
 	{
-		Element::legacyUpdate(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap);
+		auto tNow = parts[i].type;
+		if (tNow == PT_STKM || tNow == PT_STKM2 || tNow == PT_FIGH)
+			return Simulation::DeferredId::When::beforeMovement;
+		auto x2 = int(parts[i].x + 0.5f);
+		auto y2 = int(parts[i].y + 0.5f);
+		if ((x2 + tileOffset.X) / TILE_SIZE_FINE != pTileX ||
+		    (y2 + tileOffset.Y) / TILE_SIZE_FINE != pTileY)
+			return Simulation::DeferredId::When::beforeMovement;
+		auto maxVel = int(std::max(std::max(std::abs(parts[i].vx), std::abs(parts[i].vy)), 1.f));
+		if (maxVel > TILE_SIZE_FINE / 2)
+			return Simulation::DeferredId::When::beforeMovement;
 	}
 
-	if (parts[i].type == PT_NONE) return;
-	if (transitionOccurred) return;
-	if (!parts[i].vx && !parts[i].vy && !parts[i].vz) return;
+	if (!parts[i].vx && !parts[i].vy && !parts[i].vz)
+	{
+		parts[i].flags |= FLAG_ASLEEP; // stationary, sleep next frame
+		return std::nullopt;
+	}
 
-	// Z movement BEFORE MovementPhase (MovementPhase damps vz via Collision)
+	// ---- Phase 3: Movement ----
 	if (parts[i].vz != 0.0f)
 	{
 		float newZf = parts[i].z + parts[i].vz;
@@ -3047,49 +3177,147 @@ void SimulationImpl::UpdateOneParticle(RNG &rng, int i)
 		}
 		else
 		{
-			int x = (int)(parts[i].x + 0.5f);
-			int y = (int)(parts[i].y + 0.5f);
-			if (do_move(i, x, y, oz, (float)x, (float)y, newZf))
+			int mx = (int)(parts[i].x + 0.5f);
+			int my = (int)(parts[i].y + 0.5f);
+			if (do_move(i, mx, my, oz, (float)mx, (float)my, newZf))
 			{ }
-			else if (do_move(i, x, y, oz, (float)x, (float)y, newZf + 1.0f))
+			else if (do_move(i, mx, my, oz, (float)mx, (float)my, newZf + 1.0f))
 			{ }
-			else if (do_move(i, x, y, oz, (float)x, (float)y, newZf - 1.0f))
+			else if (do_move(i, mx, my, oz, (float)mx, (float)my, newZf - 1.0f))
 			{ }
 			else
-			{
-				parts[i].vz *= elements[t].Collision;
-			}
+				parts[i].vz *= elements[parts[i].type].Collision;
 		}
 	}
 
-	{
-		MovementPhase(i, neighbourhood);
-	}
+	MovementPhase(i, neighbourhood);
+
+	// Set sleep flag for next frame if particle settled
+	if (parts[i].type && parts[i].vx == 0.0f && parts[i].vy == 0.0f && parts[i].vz == 0.0f)
+		parts[i].flags |= FLAG_ASLEEP;
+	else if (parts[i].type)
+		parts[i].flags &= ~FLAG_ASLEEP;
+
+	return std::nullopt;
 }
 
 void SimulationImpl::UpdateParticlesSerial(int start, int end)
 {
 	for (auto i = start; i < end && i < parts.active; i++)
 	{
-		UpdateOneParticle(rng, i);
+		UpdateOne(rng, i, false);
+	}
+}
+
+// LBPHacker: second phase of particle update (element Update + legacy update).
+// Called separately from TransitionPhase so that deferred particles can skip
+// the transition and redo only this phase.
+bool SimulationImpl::UpdatePhase(RNG &rng, int i, const Neighbourhood &neighbourhood)
+{
+	auto &sd = SimulationData::CRef();
+	auto &elements = sd.elements;
+	auto t = parts[i].type;
+	if (!t) return false;
+
+	auto x = int(parts[i].x + 0.5f);
+	auto y = int(parts[i].y + 0.5f);
+
+	if (elements[t].Update)
+	{
+		if ((*(elements[t].Update))(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap))
+			return true; // particle was killed
+	}
+
+	if (legacy_enable)
+		Element::legacyUpdate(this, i, x, y, neighbourhood.surround_space, neighbourhood.nt, parts, pmap);
+
+	return false;
+}
+
+// Helper: process a batch of DeferredIds according to their When stage.
+void SimulationImpl::HandleDeferred(std::span<Simulation::DeferredId> ids)
+{
+	auto &sd = SimulationData::CRef();
+	auto &elements = sd.elements;
+	for (auto &item : ids)
+	{
+		switch (item.when)
+		{
+		case Simulation::DeferredId::When::beforeTransition:
+			// Full restart from scratch
+			UpdateOne(rng, item.id, false);
+			break;
+
+		case Simulation::DeferredId::When::beforeUpdate:
+		{
+			// TransitionPhase already done, redo UpdatePhase + MovementPhase
+			auto neighbourhood = GetNeighbourhood(item.id);
+			if (UpdatePhase(rng, item.id, neighbourhood))
+				break; // particle killed
+			if (!parts[item.id].type) break;
+			if (!parts[item.id].vx && !parts[item.id].vy && !parts[item.id].vz) break;
+			// Z movement
+			if (parts[item.id].vz != 0.0f)
+			{
+				float newZf = parts[item.id].z + parts[item.id].vz;
+				int oz = (int)(parts[item.id].z + 0.5f);
+				int nz = (int)(newZf + 0.5f);
+				if (nz == oz) { parts[item.id].z = newZf; }
+				else
+				{
+					int mx = (int)(parts[item.id].x + 0.5f);
+					int my = (int)(parts[item.id].y + 0.5f);
+					if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf))
+						if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf + 1.0f))
+							if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf - 1.0f))
+								parts[item.id].vz *= elements[parts[item.id].type].Collision;
+				}
+			}
+			MovementPhase(item.id, neighbourhood);
+			break;
+		}
+
+		case Simulation::DeferredId::When::beforeMovement:
+		{
+			// Transition+Update already done, redo MovementPhase only
+			if (!parts[item.id].type) break;
+			if (!parts[item.id].vx && !parts[item.id].vy && !parts[item.id].vz) break;
+			if (parts[item.id].vz != 0.0f)
+			{
+				float newZf = parts[item.id].z + parts[item.id].vz;
+				int oz = (int)(parts[item.id].z + 0.5f);
+				int nz = (int)(newZf + 0.5f);
+				if (nz == oz) { parts[item.id].z = newZf; }
+				else
+				{
+					int mx = (int)(parts[item.id].x + 0.5f);
+					int my = (int)(parts[item.id].y + 0.5f);
+					if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf))
+						if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf + 1.0f))
+							if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf - 1.0f))
+								parts[item.id].vz *= elements[parts[item.id].type].Collision;
+				}
+			}
+			MovementPhase(item.id, GetNeighbourhood(item.id));
+			break;
+		}
+		}
 	}
 }
 
 void SimulationImpl::UpdateParticles(int start, int end)
 {
-	if (!allowThreadedSimulation || threadCount <= 1 || start != 0 || end != NPART)
+	if (!allowThreadedSimulationInternal || !(start == 0 && end == NPART))
 	{
-		if (start == 0)
-			RecalcFreeParticles(simWillUpdate);
 		UpdateParticlesSerial(start, end);
 		return;
 	}
 
 	// ---- LBPHacker-style parallel path ----
-	// Phase A (life dec) + Phase B (pmap rebuild) run HERE, not in BeforeSim.
 	FrameTime::Span span(frameTime, "Simulation::UpdateParticles");
 
 	// 1. Setup per-thread contexts
+	pfreeMxLockedTimes = 0;
 	threadContexts.resize(threadCount);
 	for (auto &ctx : threadContexts)
 	{
@@ -3098,9 +3326,12 @@ void SimulationImpl::UpdateParticles(int start, int end)
 		ctx.pfree = -1;
 		ctx.freeListLength = 0;
 		for (auto &c : ctx.elementCount) c = 0;
+		ctx.deferredIds.clear();
+		ctx.emapActivation.clear();
+		ctx.deferredSoapDetaches.clear();
 	}
 
-	// 2. Clear tiles + classify from already-rebuilt pmap/spatialMap
+	// 2. Clear tiles
 	tiles.clear();
 	tiles.resize(TILES_TOTAL);
 	for (int tz = 0; tz < TILES_Z; ++tz)
@@ -3110,114 +3341,126 @@ void SimulationImpl::UpdateParticles(int start, int end)
 				auto &tile = tiles[(tz * TILES_Y + ty) * TILES_X + tx];
 				tile.tx = tx; tile.ty = ty; tile.tz = tz;
 				tile.particleIds.clear();
+				tile.deferredIds.clear();
 			}
 
-	std::vector<int> deferredParticles;
-
-	for (auto i = 0; i < parts.active; ++i)
+	// 3. Serial tile assignment (single-threaded, no data race)
 	{
-		if (!parts[i].type) continue;
-		auto x = int(parts[i].x + 0.5f);
-		auto y = int(parts[i].y + 0.5f);
-		auto z = int(parts[i].z + 0.5f);
-
-		// High-velocity deferral: particles that could cross tile boundaries
-		// in a single frame must be processed serially (LBPHacker rule).
-		float mv = fmaxf(fmaxf(fabsf(parts[i].vx), fabsf(parts[i].vy)), fabsf(parts[i].vz));
-		bool fastParticle = (mv > TILE_SIZE / 2);
-
-		// Safe-zone check: particle safe if local pos NOT on tile edge
-		int lx = x % TILE_SIZE;
-		int ly = y % TILE_SIZE;
-		int lz = z % TILE_SIZE;
-		bool onEdge = (lx == 0 || lx == TILE_SIZE - 1 ||
-		               ly == 0 || ly == TILE_SIZE - 1 ||
-		               lz == 0 || lz == TILE_SIZE - 1);
-
-		if (onEdge || fastParticle)
+		FrameTime::Span span2(frameTime, "assignToTiles");
+		auto &sd = SimulationData::CRef();
+		auto &elements = sd.elements;
+		for (auto j = 0; j < parts.active; j++)
 		{
-			deferredParticles.push_back(i);
-		}
-		else
-		{
+			auto t = parts[j].type;
+			if (!t) continue;
+			// Elements with unbounded neighbourhood (STKM, STKM2, FIGH) always defer
+			if (t == PT_STKM || t == PT_STKM2 || t == PT_FIGH)
+			{
+				threadContexts[0].deferredIds.push_back({ j, DeferredId::When::beforeTransition });
+				continue;
+			}
+			auto x = int(parts[j].x + 0.5f);
+			auto y = int(parts[j].y + 0.5f);
+			auto z = int(parts[j].z + 0.5f);
 			auto tx = x / TILE_SIZE;
 			auto ty = y / TILE_SIZE;
 			auto tz = z / TILE_SIZE;
 			if (tx < 0) tx = 0; if (tx >= TILES_X) tx = TILES_X - 1;
 			if (ty < 0) ty = 0; if (ty >= TILES_Y) ty = TILES_Y - 1;
 			if (tz < 0) tz = 0; if (tz >= TILES_Z) tz = TILES_Z - 1;
-			tiles[(tz * TILES_Y + ty) * TILES_X + tx].particleIds.push_back(i);
+			tiles[(tz * TILES_Y + ty) * TILES_X + tx].particleIds.push_back(j);
 		}
 	}
 
-	// 3. Parallel phase: 8-color checkerboard (3D). Tiles of the same color
-	// share no edges/vertices, so they can be processed concurrently without
-	// any pmap/spatialMap conflicts — no locks needed.
-	useThreadContext = true;
-	for (int color = 0; color < 8; ++color)
+	// 4. Parallel update: 8-color checkerboard (3D).
+	//    Same-color tiles never share edges/vertices → no pmap conflicts.
+	//    Tiles are batched (50 per work item) to reduce scheduling overhead.
 	{
-		int cx = (color & 1) ? 1 : 0;
-		int cy = (color & 2) ? 1 : 0;
-		int cz = (color & 4) ? 1 : 0;
-		for (auto &tile : tiles)
+		FrameTime::Span span2(frameTime, "parallelUpdate");
+		useThreadContext = true;
+		std::vector<int> matchingTiles; // reused across colors
+		matchingTiles.reserve(TILES_TOTAL / 8 + 1);
+		for (int color = 0; color < 8; ++color)
 		{
-			if (tile.particleIds.empty()) continue;
-			if ((tile.tx & 1) != cx) continue;
-			if ((tile.ty & 1) != cy) continue;
-			if ((tile.tz & 1) != cz) continue;
-			threadPool.PushWorkItem([this, &tile]() {
-				auto &ctxRng = threadContexts[ThreadIndex()].rng;
-				for (auto i : tile.particleIds)
-					UpdateOneParticle(ctxRng, i);
-			});
-		}
-		threadPool.Flush();
-	}
-
-	// 5. Serial catch-up: deferred particles (edge + high-velocity)
-	for (auto i : deferredParticles)
-		UpdateOneParticle(rng, i);
-	useThreadContext = false;
-
-	// 6. Runtime reclassification (LBPHacker): safe-zone particles that crossed
-	// tile boundaries during parallel update must be re-processed serially.
-	{
-		std::vector<int> recrossed;
-		for (auto &tile : tiles)
-		{
-			for (auto i : tile.particleIds)
+			int cx = (color & 1) ? 1 : 0;
+			int cy = (color & 2) ? 1 : 0;
+			int cz = (color & 4) ? 1 : 0;
+			matchingTiles.clear();
+			for (int ti = 0; ti < (int)tiles.size(); ++ti)
 			{
-				if (!parts[i].type) continue;
-				int x = int(parts[i].x + 0.5f);
-				int y = int(parts[i].y + 0.5f);
-				int z = int(parts[i].z + 0.5f);
-				int lx = x % TILE_SIZE, ly = y % TILE_SIZE, lz = z % TILE_SIZE;
-				if (lx == 0 || lx == TILE_SIZE - 1 ||
-				    ly == 0 || ly == TILE_SIZE - 1 ||
-				    lz == 0 || lz == TILE_SIZE - 1)
-				{
-					recrossed.push_back(i);
-				}
+				auto &tile = tiles[ti];
+				if (tile.particleIds.empty()) continue;
+				if ((tile.tx & 1) != cx) continue;
+				if ((tile.ty & 1) != cy) continue;
+				if ((tile.tz & 1) != cz) continue;
+				matchingTiles.push_back(ti);
 			}
+			constexpr int BATCH = 50;
+			for (int bi = 0; bi < (int)matchingTiles.size(); bi += BATCH)
+			{
+				int batchStart = bi;
+				int batchEnd = std::min(bi + BATCH, (int)matchingTiles.size());
+				threadPool.PushWorkItem([this, &matchingTiles, batchStart, batchEnd]() {
+					auto &ctxRng = threadContexts[ThreadIndex()].rng;
+					for (int k = batchStart; k < batchEnd; ++k)
+					{
+						auto &tile = tiles[matchingTiles[k]];
+						for (auto i : tile.particleIds)
+						{
+							auto t = parts[i].type;
+							if (!t) continue;
+							auto x = int(parts[i].x + 0.5f);
+							auto y = int(parts[i].y + 0.5f);
+							int txNow = x / TILE_SIZE, tyNow = y / TILE_SIZE;
+							if (txNow != tile.tx || tyNow != tile.ty)
+							{
+								tile.deferredIds.push_back({ i, DeferredId::When::beforeTransition });
+								continue;
+							}
+							if (auto deferred = UpdateOne(ctxRng, i, true))
+								tile.deferredIds.push_back({ i, *deferred });
+						}
+					}
+				});
+			}
+			threadPool.Flush();
 		}
-		for (auto i : recrossed)
-			UpdateOneParticle(rng, i);
+		useThreadContext = false;
 	}
 
-	// 7. Merge per-thread data
-	for (auto &ctx : threadContexts)
+	// 5. Handle deferred from tiles (serial, main thread)
 	{
-		for (int t = 0; t < PT_NUM; ++t)
-			elementCount[t] += ctx.elementCount[t];
-		NUM_PARTS += ctx.NUM_PARTS;
-		if (ctx.pfree != -1)
+		FrameTime::Span span2(frameTime, "handleDeferredFromTiles");
+		for (auto &tile : tiles)
 		{
-			int tail = ctx.pfree;
-			while (parts.data[tail].life != -1)
-				tail = parts.data[tail].life;
-			std::lock_guard lk(pfreeMx);
-			parts.data[tail].life = parts.pfree;
-			parts.pfree = ctx.pfree;
+			tile.particleIds.clear();
+			HandleDeferred(tile.deferredIds);
+			tile.deferredIds.clear();
+		}
+	}
+
+	// 6. Handle deferred from thread contexts + merge per-thread data
+	{
+		FrameTime::Span span2(frameTime, "handleDeferredAndMerge");
+		for (auto &ctx : threadContexts)
+		{
+			HandleDeferred(ctx.deferredIds);
+			ctx.deferredIds.clear();
+			for (int t = 0; t < PT_NUM; ++t)
+				elementCount[t] += ctx.elementCount[t];
+			NUM_PARTS += ctx.NUM_PARTS;
+			for (auto p : ctx.emapActivation)
+				set_emap(p.X, p.Y);
+			ctx.emapActivation.clear();
+			if (ctx.pfree != -1)
+			{
+				int tail = ctx.pfree;
+				while (parts.data[tail].life != -1)
+					tail = parts.data[tail].life;
+				std::lock_guard lk(pfreeMx);
+				parts.data[tail].life = parts.pfree;
+				parts.pfree = ctx.pfree;
+			}
 		}
 	}
 }
@@ -4740,6 +4983,12 @@ void Simulation::BeforeSim(bool willUpdate)
 {
 	if (willUpdate)
 	{
+		// LBPHacker: set up thread pool and tile offset BEFORE RecalcFreeParticles
+		threadPool.SetThreadCount(threadCount);
+		allowThreadedSimulationInternal = allowThreadedSimulation && !water_equal_test;
+		tileOffset.X = rng.between(0, TILE_SIZE - 1) * CELL;
+		tileOffset.Y = rng.between(0, TILE_SIZE - 1) * CELL;
+
 		{
 			FrameTime::Span span(frameTime, "Air::update_air");
 			air->update_air();
@@ -4833,8 +5082,12 @@ void Simulation::BeforeSim(bool willUpdate)
 		gravWallChanged = false;
 	}
 
-	// pmap rebuild & life dec moved into UpdateParticles (merged with tile population)
+	// pmap rebuild & life dec happens HERE (BeforeSim), not in UpdateParticles.
+	// LBPHacker design: clean separation — BeforeSim builds the index,
+	// UpdateParticles only does particle updates.
 	simWillUpdate = willUpdate;
+	if (debug_nextToUpdate == 0)
+		RecalcFreeParticles(willUpdate);
 
 	if (willUpdate)
 	{

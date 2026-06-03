@@ -218,22 +218,51 @@ public:
 	int threadCount = 1;
 	ThreadPool threadPool;
 	bool allowThreadedSimulation = false;
+	bool allowThreadedSimulationInternal = false;
 	bool simWillUpdate = false;   // set by BeforeSim, read by UpdateParticles
 
-	struct ThreadContext
+	// LBPHacker-style deferred particle processing.
+	// Particles that cross tile boundaries or have infinite neighbourhood
+	// are deferred to one of three serial catch-up stages.
+	struct DeferredId
+	{
+		int id;
+		enum class When
+		{
+			beforeTransition,  // full UpdateOne, from scratch
+			beforeUpdate,      // skip TransitionPhase (already done), redo UpdatePhase
+			beforeMovement,    // skip Transition+Update, redo MovementPhase only
+		};
+		When when;
+	};
+
+	struct alignas(64) ThreadContext
 	{
 		RNG rng;
 		std::array<int, PT_NUM> elementCount{};
 		int NUM_PARTS = 0;
 		int pfree = -1;            // per-thread free list head
 		int freeListLength = 0;    // current per-thread free list size
+		std::vector<DeferredId> deferredIds;
+		std::vector<Vec2<int>> emapActivation;
+		struct DeferredSoapDetach { int prev, next; };
+		std::vector<DeferredSoapDetach> deferredSoapDetaches;
 	};
 	std::vector<ThreadContext> threadContexts;
 	bool useThreadContext = false;
 	std::mutex simMutex;   // protects kill_part, move, pmap writes during parallel update
 	std::mutex pfreeMx;    // protects batch transfer between thread-local and global free lists
+	int pfreeMxLockedTimes = 0;
 	mutable std::shared_mutex spatialMutex; // protects spatialMap (shared=read, exclusive=write)
 	static constexpr int freeListTargetLength = 64;
+
+	// Sub-cell tile size for LBPHacker-style fine-grained boundary checking.
+	// TILE_SIZE is in cells; TILE_SIZE_FINE is in sub-cell units (cells * CELL).
+	static constexpr int TILE_SIZE_FINE = TILE_SIZE * CELL;
+
+	// Random offset applied to tile grid each frame to prevent cache-line
+	// false sharing (LBPHacker technique).
+	Vec2<int> tileOffset{ 0, 0 };
 
 	void PartsFreeThreaded(int i);
 	int  PartsAllocThreaded();
@@ -252,10 +281,13 @@ public:
 	{
 		int tx, ty, tz;
 		std::vector<int> particleIds;
+		std::vector<DeferredId> deferredIds;
 	};
 
 	// LBPHacker TileSchedule: ensures no two adjacent tiles run simultaneously,
 	// eliminating pmap write conflicts without locks.
+	// Threads call Exchange(finishedTile) in a loop to get their next tile.
+	// Returns std::nullopt when all tiles are processed.
 	struct TileSchedule3D
 	{
 		enum class State { waiting, working, done };
@@ -278,9 +310,9 @@ public:
 			for (int i = 0; i < (int)tileOrder.size(); ++i)
 				std::swap(tileOrder[i], tileOrder[rng.between(i, (int)tileOrder.size() - 1)]);
 		}
-		// Returns next tile index to process, or -1 when all done.
+		// Exchange: mark a tile as done, get the next eligible tile.
 		// Blocks if no eligible tile is available (all are working or have working neighbours).
-		int Next(std::optional<int> markDone)
+		std::optional<int> Exchange(std::optional<int> markDone)
 		{
 			std::unique_lock lk(mx);
 			if (markDone) { states[*markDone] = State::done; doneCount++; }
@@ -311,17 +343,12 @@ public:
 				cv.wait(lk, [&] { return doneCount > lastDone; });
 				lastDone = doneCount;
 			}
-			return -1;
+			return std::nullopt;
 		}
 	};
 
 	std::vector<Tile3D> tiles;
 	TileSchedule3D tileSchedule;
-
-	// Parallel update dispatch
-	void AssignParticlesToTiles();
-	void UpdateTilesParallel();
-	void ProcessDeferred();
 
 	// 鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
 	// 3D Unified Occupancy Query API (Phase 1 鈥?XYZ 骞虫潈鍖?
