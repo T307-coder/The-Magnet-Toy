@@ -362,9 +362,9 @@ void CubeTest_Render()
 		if (t <= 0 || t >= PT_NUM) continue;
 		auto col = elements[t].Colour;
 		glColor3ub(col.Red, col.Green, col.Blue);
-		float cx = sim->parts[i].x;
-		float cy = sim->parts[i].y;
-		float cz = sim->parts[i].z;
+		float cx = (float)(int)(sim->parts[i].x + 0.5f);
+		float cy = (float)(int)(sim->parts[i].y + 0.5f);
+		float cz = (float)(int)(sim->parts[i].z + 0.5f);
 		glBegin(GL_QUADS);
 		// front (+Z)
 		glNormal3f(0, 0, 1);
@@ -472,7 +472,7 @@ void CubeTest_Render()
 				auto col = el2[t].Colour;
 				glColor3ub(col.Red, col.Green, col.Blue);
 
-				float px = sim->parts[i].x, py = sim->parts[i].y, pz = sim->parts[i].z;
+				float px = (float)(int)(sim->parts[i].x + 0.5f), py = (float)(int)(sim->parts[i].y + 0.5f), pz = (float)(int)(sim->parts[i].z + 0.5f);
 				int sx, sy;
 
 				if (sliceIdx == 0) { // XY slice
