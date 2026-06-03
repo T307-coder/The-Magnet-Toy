@@ -3171,31 +3171,7 @@ std::optional<Simulation::DeferredId::When> SimulationImpl::UpdateOne(RNG &rng, 
 	if (!parts[i].vx && !parts[i].vy && !parts[i].vz)
 		return std::nullopt; // stationary, counter already set at top of function
 
-	// ---- Phase 3: Movement ----
-	if (parts[i].vz != 0.0f)
-	{
-		float newZf = parts[i].z + parts[i].vz;
-		int oz = (int)(parts[i].z + 0.5f);
-		int nz = (int)(newZf + 0.5f);
-		if (nz == oz)
-		{
-			parts[i].z = newZf;
-		}
-		else
-		{
-			int mx = (int)(parts[i].x + 0.5f);
-			int my = (int)(parts[i].y + 0.5f);
-			if (do_move(i, mx, my, oz, (float)mx, (float)my, newZf))
-			{ }
-			else if (do_move(i, mx, my, oz, (float)mx, (float)my, newZf + 1.0f))
-			{ }
-			else if (do_move(i, mx, my, oz, (float)mx, (float)my, newZf - 1.0f))
-			{ }
-			else
-				parts[i].vz *= elements[parts[i].type].Collision;
-		}
-	}
-
+	// ---- Phase 3: Movement (XYZ平等 — Z handled by MovementPhase) ----
 	MovementPhase(i, neighbourhood);
 	return std::nullopt;
 }
@@ -3249,54 +3225,21 @@ void SimulationImpl::HandleDeferred(std::span<Simulation::DeferredId> ids)
 
 		case Simulation::DeferredId::When::beforeUpdate:
 		{
-			// TransitionPhase already done, redo UpdatePhase + MovementPhase
+			// TransitionPhase already done, redo UpdatePhase + MovementPhase (now XYZ)
 			auto neighbourhood = GetNeighbourhood(item.id);
 			if (UpdatePhase(rng, item.id, neighbourhood))
 				break; // particle killed
 			if (!parts[item.id].type) break;
 			if (!parts[item.id].vx && !parts[item.id].vy && !parts[item.id].vz) break;
-			// Z movement
-			if (parts[item.id].vz != 0.0f)
-			{
-				float newZf = parts[item.id].z + parts[item.id].vz;
-				int oz = (int)(parts[item.id].z + 0.5f);
-				int nz = (int)(newZf + 0.5f);
-				if (nz == oz) { parts[item.id].z = newZf; }
-				else
-				{
-					int mx = (int)(parts[item.id].x + 0.5f);
-					int my = (int)(parts[item.id].y + 0.5f);
-					if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf))
-						if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf + 1.0f))
-							if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf - 1.0f))
-								parts[item.id].vz *= elements[parts[item.id].type].Collision;
-				}
-			}
 			MovementPhase(item.id, neighbourhood);
 			break;
 		}
 
 		case Simulation::DeferredId::When::beforeMovement:
 		{
-			// Transition+Update already done, redo MovementPhase only
+			// Transition+Update already done, redo MovementPhase only (now handles XYZ)
 			if (!parts[item.id].type) break;
 			if (!parts[item.id].vx && !parts[item.id].vy && !parts[item.id].vz) break;
-			if (parts[item.id].vz != 0.0f)
-			{
-				float newZf = parts[item.id].z + parts[item.id].vz;
-				int oz = (int)(parts[item.id].z + 0.5f);
-				int nz = (int)(newZf + 0.5f);
-				if (nz == oz) { parts[item.id].z = newZf; }
-				else
-				{
-					int mx = (int)(parts[item.id].x + 0.5f);
-					int my = (int)(parts[item.id].y + 0.5f);
-					if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf))
-						if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf + 1.0f))
-							if (!do_move(item.id, mx, my, oz, (float)mx, (float)my, newZf - 1.0f))
-								parts[item.id].vz *= elements[parts[item.id].type].Collision;
-				}
-			}
 			MovementPhase(item.id, GetNeighbourhood(item.id));
 			break;
 		}
@@ -3966,6 +3909,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 		//head movement, let head pass through anything
 		parts[i].x += parts[i].vx;
 		parts[i].y += parts[i].vy;
+		parts[i].z += parts[i].vz; // XYZ平等
 		int nx = (int)((float)parts[i].x+0.5f);
 		int ny = (int)((float)parts[i].y+0.5f);
 		if (edgeMode == EDGE_LOOP)
@@ -4093,12 +4037,12 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 		if (stagnant)//FLAG_STAGNANT set, was reflected on previous frame
 		{
 			// cast coords as int then back to float for compatibility with existing saves
-			if (!do_move(i, x, y, z, (float)fin_x, (float)fin_y) && parts[i].type) {
+			if (!do_move(i, x, y, z, (float)fin_x, (float)fin_y, fin_zf) && parts[i].type) {
 				kill_part(i);
 				return;
 			}
 		}
-		else if (!do_move(i, x, y, z, fin_xf, fin_yf))
+		else if (!do_move(i, x, y, z, fin_xf, fin_yf, fin_zf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
@@ -4180,7 +4124,7 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 	else if (elements[t].Falldown==0)
 	{
 		// gasses and solids (but not powders)
-		if (!do_move(i, x, y, z, fin_xf, fin_yf))
+		if (!do_move(i, x, y, z, fin_xf, fin_yf, fin_zf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
@@ -4189,11 +4133,11 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 			if (fin_x<x-ISTP) fin_x=x-ISTP;
 			if (fin_y>y+ISTP) fin_y=y+ISTP;
 			if (fin_y<y-ISTP) fin_y=y-ISTP;
-			if (do_move(i, x, y, z, float(2*x-fin_x), float(fin_y)))
+			if (do_move(i, x, y, z, float(2*x-fin_x), float(fin_y), fin_zf))
 			{
 				parts[i].vx *= elements[t].Collision;
 			}
-			else if (do_move(i, x, y, z, float(fin_x), float(2*y-fin_y)))
+			else if (do_move(i, x, y, z, float(fin_x), float(2*y-fin_y), fin_zf))
 			{
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
@@ -4214,24 +4158,24 @@ void SimulationImpl::MovementPhase(int i, Neighbourhood neighbourhood)
 			if (flood_water(x, y, i))
 				return;
 		}
-		// liquids and powders
-		if (!do_move(i, x, y, z, fin_xf, fin_yf))
+		// liquids and powders — full 3D movement
+		if (!do_move(i, x, y, z, fin_xf, fin_yf, fin_zf))
 		{
 			if (parts[i].type == PT_NONE)
 				return;
-			if (fin_x!=x && do_move(i, x, y, z, fin_xf, clear_yf))
+			if (fin_x!=x && do_move(i, x, y, z, fin_xf, clear_yf, fin_zf))
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
 			}
-			else if (fin_y!=y && do_move(i, x, y, z, clear_xf, fin_yf))
+			else if (fin_y!=y && do_move(i, x, y, z, clear_xf, fin_yf, fin_zf))
 			{
 				parts[i].vx *= elements[t].Collision;
 				parts[i].vy *= elements[t].Collision;
 				parts[i].vz *= elements[t].Collision;
 			}
-			// XYZ equal-rights: Z-only fallback, same priority as X-only/Y-only
+			// XYZ平等: Z-only fallback, same priority as X-only/Y-only
 			else if (fin_z != z && do_move(i, x, y, z, clear_xf, clear_yf, fin_zf))
 			{
 				parts[i].vx *= elements[t].Collision;
