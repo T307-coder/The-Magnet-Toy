@@ -1199,7 +1199,7 @@ int Simulation::get_wavelength_bin(int *wm)
 void Simulation::set_emap(int x, int y)
 {
 	// LBPHacker: in parallel context, defer emap activation to avoid races
-	if (useThreadContext)
+	if (useThreadContext && ThreadIndex() >= 0)
 	{
 		threadContexts[ThreadIndex()].emapActivation.push_back({ x, y });
 		return;
@@ -2148,7 +2148,7 @@ void Simulation::kill_part(int i)//kills particle number i
 	if (t == PT_NONE)
 		return;
 
-	if (useThreadContext)
+	if (useThreadContext && ThreadIndex() >= 0)
 	{
 		auto &ctx = threadContexts[ThreadIndex()];
 		if (t > 0 && t < PT_NUM && ctx.elementCount[t] > 0)
@@ -2467,7 +2467,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 		{
 			return -1;
 		}
-		if (useThreadContext)
+		if (useThreadContext && ThreadIndex() >= 0)
 			threadContexts[ThreadIndex()].NUM_PARTS += 1;
 		else
 			NUM_PARTS += 1;
@@ -2496,7 +2496,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 			(*(elements[oldType].ChangeType))(this, p, oldX, oldY, oldType, t);
 		if (oldType)
 		{
-			if (useThreadContext)
+			if (useThreadContext && ThreadIndex() >= 0)
 			{
 				auto &ctx = threadContexts[ThreadIndex()];
 				if (oldType > 0 && oldType < PT_NUM && ctx.elementCount[oldType] > 0)
@@ -2568,7 +2568,7 @@ int Simulation::create_part(int p, int x, int y, int t, int v)
 	if (elements[t].ChangeType)
 		(*(elements[t].ChangeType))(this, i, x, y, oldType, t);
 
-	if (useThreadContext)
+	if (useThreadContext && ThreadIndex() >= 0)
 	{
 		auto &ctx = threadContexts[ThreadIndex()];
 		if (t > 0 && t < PT_NUM)
