@@ -1,11 +1,12 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v1.1.2 — Async fields, field extrapolation, induced SPRK fix.
-Default async B/E field solver (same Exchange pattern as Newtonian gravity).
-T key: temporal field extrapolation (grid-level, factor 0.5).
-O key: source position prediction (particle-level, writes at predicted next-frame positions).
-Induced SPRK (dB/dt) no longer contribute to Biot-Savart current field.
-Induced flag propagates through all SPRK conduction paths.
-Q key: toggle ELEC/PROT field production.
-Full coverage: all conductors, magnetic monopoles (MGPN/ELMG/MAGN), gravity sources (NBHL/GBMB).
+v1.2.1 — Plasma EM, full header refactor, uncapped magnetization.
+Plasma elements (PLSM, hot HYGN/NBLE/OXYG/CO2) now polarize, hold charge, and respond to E/B fields.
+All inline induction/Lorentz/ferromagnetic pull code replaced with shared header functions.
+Magnetization limits removed: ferromagnets and ELMG no longer capped at +-100.
+Dielectric polarization direction fixed (electrons drift toward higher potential).
+Diagonal neighbour support for polarization; rate-limit removed (every-frame).
+Particle gravity field option (L key): all Gravity>0 particles source gravity.
+Save compatibility fix: project version updated to 99.5.394.
+BRMT/BREC/MERC induction unified with magnetism_tryInduction.
