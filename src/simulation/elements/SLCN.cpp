@@ -107,23 +107,8 @@ static int update(UPDATE_FUNC_ARGS)
 	electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);
 	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
 	// Electromagnetic Lorentz force: F = q(v x B), rotates velocity, preserves |v|
-	if (sim->electricityEnabled && sim->magnetismEnabled && parts[i].tmp4 != 0)
-	{
-		int cx = x/CELL, cy = y/CELL;
-		if (cx>=0 && cy>=0 && cx<XCELLS && cy<YCELLS)
-		{
-			float Bz = sim->bField[cy][cx];
-			if (Bz != 0.0f)
-			{
-				float massFactor = 1.0f / (SimulationData::CRef().elements[parts[i].type].Gravity + 0.05f);
-				float dtheta = Bz * parts[i].tmp4 * 0.05f * massFactor;
-				float c = cosf(dtheta), s = sinf(dtheta);
-				float vx = parts[i].vx * c - parts[i].vy * s;
-				float vy = parts[i].vx * s + parts[i].vy * c;
-				parts[i].vx = vx; parts[i].vy = vy;
-			}
-		}
-	}
+	// Electromagnetic Lorentz force
+	electricity_applyLorentz(sim, parts[i], x, y, parts[i].tmp4);
 	return 0;
 }
 
