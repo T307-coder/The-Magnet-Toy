@@ -66,9 +66,6 @@ static inline void electricity_polarizeCharge(Simulation *sim, Particle &p, int 
 	int cx = x / CELL, cy = y / CELL;
 	if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) return;
 
-	// Rate-limit: 1/5 chance per frame, slower than diffusion for natural depolarization.
-	if (!sim->rng.chance(1, 5)) return;
-
 	// Local E-field gradient
 	float dEx = sim->eField[cy][cx + 1] - sim->eField[cy][cx - 1];
 	float dEy = sim->eField[cy + 1][cx] - sim->eField[cy - 1][cx];
@@ -82,23 +79,22 @@ static inline void electricity_polarizeCharge(Simulation *sim, Particle &p, int 
 	if (std::abs(chargeRef) >= chargeLimit) return;
 
 	// Direction: use previous frame's potential gradient to avoid self-field feedback.
-	// Conductor's own charge contributes to eSrc → eField, which can cancel weak external fields.
-	// prevEField is saved before this frame's Poisson solve, providing a cleaner external gradient.
+	// Both axes independently: diagonal neighbours allowed when both gradients are significant.
 	int dx = 0, dy = 0;
 	if (sim->prevEFieldValid)
 	{
 		float pdEx = sim->prevEField[cy][cx + 1] - sim->prevEField[cy][cx - 1];
 		float pdEy = sim->prevEField[cy + 1][cx] - sim->prevEField[cy - 1][cx];
-		if (std::fabs(pdEx) > std::fabs(pdEy))
+		if (std::fabs(pdEx) > std::fabs(pdEy) * 0.3f)
 			dx = (pdEx > 0) ? 1 : -1;
-		else
+		if (std::fabs(pdEy) > std::fabs(pdEx) * 0.3f)
 			dy = (pdEy > 0) ? 1 : -1;
 	}
 	else
 	{
-		if (std::fabs(dEx) > std::fabs(dEy))
+		if (std::fabs(dEx) > std::fabs(dEy) * 0.3f)
 			dx = (dEx > 0) ? 1 : -1;
-		else
+		if (std::fabs(dEy) > std::fabs(dEx) * 0.3f)
 			dy = (dEy > 0) ? 1 : -1;
 	}
 
