@@ -1,5 +1,6 @@
 #include "simulation/ElementCommon.h"
 #include "simulation/ElectricityCommon.h"
+#include "simulation/MagnetismCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 
@@ -141,23 +142,8 @@ static int update(UPDATE_FUNC_ARGS)
 		}
 	}
 	int cx = x/CELL, cy = y/CELL;
-	if (sim->magnetismEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
-	{
-		float Bnow = sim->bField[cy][cx];
-		float Bprev = parts[i].tmp2 / 10000.0f;
-		parts[i].tmp2 = (int)(Bnow * 10000.0f);
-		if (sim->prevBFieldValid)
-		{
-			float dBdt = fabsf(Bnow - Bprev);
-			if (dBdt > 0.5f && sim->rng.chance(1, 8))
-			{
-				sim->part_change_type(i, x, y, PT_SPRK);
-				parts[i].ctype = PT_MERC;
-				parts[i].life = 4;
-				return 1;
-			}
-		}
-	}
+	// Induction: shared function handles cooldown, tmp3 tag, Biot-Savart skip
+	magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_MERC, 0.5f, 8);
 	// Ferromagnetic attraction: pulled toward stronger |B|
 	if (sim->magnetismEnabled && cx > 0 && cy > 0 && cx < XCELLS - 1 && cy < YCELLS - 1)
 	{
