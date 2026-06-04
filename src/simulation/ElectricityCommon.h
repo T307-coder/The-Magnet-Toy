@@ -54,6 +54,70 @@ static inline void electricity_chargeContact(Simulation *sim, Particle &p, int x
 		sim->eSrc[cy][cx] += chargeRef * 0.05f;
 }
 
+// Dielectric polarization: directional charge transfer along E-field gradient.
+// Unlike diffusion (random averaging), this creates opposite charges on opposite
+// sides of a conductor, like real dielectric polarization in an external field.
+// "I give 1, you take 1" — discrete transfer, not averaging.
+// Rate-limit: 1/5 chance per frame, slower than diffusion for natural depolarization.
+static inline void electricity_polarizeCharge(Simulation *sim, Particle &p, int x, int y, int &chargeRef)
+{
+	if (!sim->electricityEnabled || !sim->polarizationEnabled) return;
+
+	int cx = x / CELL, cy = y / CELL;
+	if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) return;
+
+	// Rate-limit: 1/5 chance per frame, slower than diffusion for natural depolarization.
+	if (!sim->rng.chance(1, 5)) return;
+
+	// Local E-field gradient
+	float dEx = sim->eField[cy][cx + 1] - sim->eField[cy][cx - 1];
+	float dEy = sim->eField[cy + 1][cx] - sim->eField[cy - 1][cx];
+	float Emag = std::sqrt(dEx * dEx + dEy * dEy);
+	if (Emag < 3.0f) return;
+
+	// Saturation limit proportional to field strength
+	int chargeLimit = (int)(Emag * 2.0f);
+	if (chargeLimit > 100) chargeLimit = 100;
+	if (chargeLimit < 3) chargeLimit = 3;
+	if (std::abs(chargeRef) >= chargeLimit) return;
+
+	// Direction: use previous frame's potential gradient to avoid self-field feedback.
+	// Conductor's own charge contributes to eSrc → eField, which can cancel weak external fields.
+	// prevEField is saved before this frame's Poisson solve, providing a cleaner external gradient.
+	int dx = 0, dy = 0;
+	if (sim->prevEFieldValid)
+	{
+		float pdEx = sim->prevEField[cy][cx + 1] - sim->prevEField[cy][cx - 1];
+		float pdEy = sim->prevEField[cy + 1][cx] - sim->prevEField[cy - 1][cx];
+		if (std::fabs(pdEx) > std::fabs(pdEy))
+			dx = (pdEx > 0) ? 1 : -1;
+		else
+			dy = (pdEy > 0) ? 1 : -1;
+	}
+	else
+	{
+		if (std::fabs(dEx) > std::fabs(dEy))
+			dx = (dEx > 0) ? 1 : -1;
+		else
+			dy = (dEy > 0) ? 1 : -1;
+	}
+
+	auto r = sim->pmap[y + dy][x + dx];
+	if (!r) return;
+	auto &sd = SimulationData::CRef();
+	if (!(sd.elements[TYP(r)].Properties & PROP_CONDUCTS)) return;
+
+	int &nbrCharge = (TYP(r) == PT_LITH) ? sim->parts[ID(r)].tmp3 : sim->parts[ID(r)].tmp4;
+	int nbrLimit = (int)(Emag * 2.0f);
+	if (nbrLimit > 100) nbrLimit = 100;
+	if (nbrLimit < 3) nbrLimit = 3;
+	if (std::abs(nbrCharge) >= nbrLimit) return;
+
+	// Transfer 1 charge: electrons drift opposite to E-field.
+	// Electron drift side (neighbor) becomes negative, this particle positive.
+	chargeRef++; nbrCharge--;
+}
+
 // Charge diffusion: DEUT-style random trade between PROP_CONDUCTS neighbors.
 // chargeRef = reference to charge variable for THIS particle.
 // For neighbors, automatically uses tmp4 (or tmp3 for LITH).
@@ -79,91 +143,9 @@ static inline void electricity_diffuseCharge(Simulation *sim, Particle &p, int x
 	}
 
 	// Dielectric polarization: directional transfer along E-field gradient.
-	// Rate-limited: slower than diffusion so conductors can depolarize naturally.
-	if (sim->polarizationEnabled && sim->rng.chance(1, 5))
-	{
-		int cx = x / CELL, cy = y / CELL;
-		if (cx > 0 && cy > 0 && cx < XCELLS - 1 && cy < YCELLS - 1)
-		{
-			float dEx = sim->eField[cy][cx + 1] - sim->eField[cy][cx - 1];
-			float dEy = sim->eField[cy + 1][cx] - sim->eField[cy - 1][cx];
-			float Emag = std::sqrt(dEx * dEx + dEy * dEy);
-			if (Emag >= 3.0f)
-			{
-				int chargeLimit = (int)(Emag * 2.0f);
-				if (chargeLimit > 100) chargeLimit = 100;
-				if (chargeLimit < 3) chargeLimit = 3;
-				if (std::abs(chargeRef) < chargeLimit)
-				{
-					int dx = (dEx > 1.0f) ? 1 : (dEx < -1.0f) ? -1 : 0;
-					int dy = (dEy > 1.0f) ? 1 : (dEy < -1.0f) ? -1 : 0;
-					if (dx || dy)
-					{
-						auto r = sim->pmap[y + dy][x + dx];
-						if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))
-						{
-							int &nbr = (TYP(r) == PT_LITH) ? sim->parts[ID(r)].tmp3 : sim->parts[ID(r)].tmp4;
-							if (std::abs(nbr) < chargeLimit)
-							{
-								// Only polarize toward equilibrium, not past it.
-								// Gradient+ side: this particle should become +, neighbor -
-								if ((dx > 0 || dy > 0) && chargeRef <= 0 && nbr >= 0)
-									{ chargeRef++; nbr--; }
-								else if ((dx < 0 || dy < 0) && chargeRef >= 0 && nbr <= 0)
-									{ chargeRef--; nbr++; }
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
-// Dielectric polarization: directional charge transfer along E-field gradient.
-// Unlike diffusion (random averaging), this creates opposite charges on opposite
-// sides of a conductor, like real dielectric polarization in an external field.
-// "I give 1, you take 1" — discrete transfer, not averaging.
-// Saturation: |charge| capped by local |E| * 5 (polarization can't exceed field).
-static inline void electricity_polarizeCharge(Simulation *sim, Particle &p, int x, int y, int &chargeRef)
-{
-	if (!sim->electricityEnabled || !sim->polarizationEnabled) return;
-
-	int cx = x / CELL, cy = y / CELL;
-	if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) return;
-
-	// Local E-field gradient
-	float dEx = sim->eField[cy][cx + 1] - sim->eField[cy][cx - 1];
-	float dEy = sim->eField[cy + 1][cx] - sim->eField[cy - 1][cx];
-	float Emag = std::sqrt(dEx * dEx + dEy * dEy);
-	if (Emag < 1.0f) return;
-
-	// Saturation limit proportional to field strength
-	int chargeLimit = (int)(Emag * 5.0f);
-	if (chargeLimit > 100) chargeLimit = 100;
-	if (chargeLimit < 5) chargeLimit = 5;
-	if (std::abs(chargeRef) >= chargeLimit) return;
-
-	// Direction: find neighbor in field gradient direction
-	int dx = (dEx > 1.0f) ? 1 : (dEx < -1.0f) ? -1 : 0;
-	int dy = (dEy > 1.0f) ? 1 : (dEy < -1.0f) ? -1 : 0;
-	if (!dx && !dy) return;
-
-	auto r = sim->pmap[y + dy][x + dx];
-	if (!r) return;
-	auto &sd = SimulationData::CRef();
-	if (!(sd.elements[TYP(r)].Properties & PROP_CONDUCTS)) return;
-
-	int &nbrCharge = (TYP(r) == PT_LITH) ? sim->parts[ID(r)].tmp3 : sim->parts[ID(r)].tmp4;
-	int nbrLimit = (int)(Emag * 5.0f);
-	if (nbrLimit > 100) nbrLimit = 100;
-	if (nbrLimit < 5) nbrLimit = 5;
-	if (std::abs(nbrCharge) >= nbrLimit) return;
-
-	// Transfer 1 charge unit in direction of field gradient
-	// Positive gradient direction → this particle becomes more positive, neighbor more negative
-	if (dx > 0 || dy > 0) { chargeRef++; nbrCharge--; }
-	else { chargeRef--; nbrCharge++; }
+	// Electrons pulled toward stronger field => gradient+ side becomes negative.
+	if (sim->polarizationEnabled)
+		electricity_polarizeCharge(sim, p, x, y, chargeRef);
 }
 
 // Electric force: Coulomb (charged) or dielectrophoresis (uncharged).

@@ -54,6 +54,5 @@ static int update(UPDATE_FUNC_ARGS)
 		return 1;
 	electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);
 	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
-	electricity_polarizeCharge(sim, parts[i], x, y, parts[i].tmp4);
 	return 0;
 }
