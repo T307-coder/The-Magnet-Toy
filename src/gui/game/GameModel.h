@@ -283,6 +283,8 @@ public:
 	bool GetFreeChargeFieldsEnabled();
 	void SetPolarizationEnabled(bool enable);
 	bool GetPolarizationEnabled();
+	void SetParticleGravityEnabled(bool enable);
+	bool GetParticleGravityEnabled();
 	void SetSprkCurrentEnabled(bool enable);
 	bool GetSprkCurrentEnabled();
 	void SetElectricityEnabled(bool enable);

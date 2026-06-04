@@ -246,3 +246,17 @@ void PolarizationOption::perform()
 {
 	m->SetPolarizationEnabled(!m->GetPolarizationEnabled());
 }
+
+ParticleGravityOption::ParticleGravityOption(GameModel * m):
+QuickOption("L", "Particle gravity field \bg(all particles source gravity)", m, Toggle)
+{
+
+}
+bool ParticleGravityOption::GetToggle()
+{
+	return m->GetParticleGravityEnabled();
+}
+void ParticleGravityOption::perform()
+{
+	m->SetParticleGravityEnabled(!m->GetParticleGravityEnabled());
+}

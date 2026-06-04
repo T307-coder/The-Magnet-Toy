@@ -4187,6 +4187,24 @@ void Simulation::BeforeSim(bool willUpdate)
 			gravIn.mass[p] = 0.f;
 		}
 
+		// Accumulate gravity mass from all particles with non-zero Gravity property
+		if (particleGravityEnabled)
+		{
+			for (auto i = 0; i < NPART; ++i)
+			{
+				if (parts[i].type)
+				{
+					float grav = SimulationData::CRef().elements[parts[i].type].Gravity;
+					if (grav > 0.f)
+					{
+						auto cell = Vec2{ int(parts[i].x / CELL), int(parts[i].y / CELL) };
+						if (cell.X >= 0 && cell.Y >= 0 && cell.X < XCELLS && cell.Y < YCELLS)
+							gravIn.mass[cell] += grav * 0.01f;
+					}
+				}
+			}
+		}
+
 		// Magnetic field: save previous frame, compute new (Biot-Savart sources)
 		if (magnetismEnabled)
 		{

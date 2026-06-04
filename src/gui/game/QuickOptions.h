@@ -130,3 +130,11 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+
+class ParticleGravityOption: public QuickOption
+{
+public:
+	ParticleGravityOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

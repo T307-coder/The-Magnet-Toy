@@ -276,6 +276,7 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new SprkCurrentOption(this));
 	quickOptions.push_back(new FreeChargeFieldsOption(this));
 	quickOptions.push_back(new PolarizationOption(this));
+	quickOptions.push_back(new ParticleGravityOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
 
 	notifyQuickOptionsChanged();
@@ -1313,6 +1314,21 @@ void GameModel::SetPolarizationEnabled(bool enable)
 bool GameModel::GetPolarizationEnabled()
 {
 	return sim->polarizationEnabled;
+}
+
+void GameModel::SetParticleGravityEnabled(bool enable)
+{
+	sim->particleGravityEnabled = enable;
+	if (enable)
+		SetInfoTip("Particle Gravity: On");
+	else
+		SetInfoTip("Particle Gravity: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetParticleGravityEnabled()
+{
+	return sim->particleGravityEnabled;
 }
 
 void GameModel::SetSprkCurrentEnabled(bool enable)

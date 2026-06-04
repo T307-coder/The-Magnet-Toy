@@ -99,6 +99,7 @@ struct RenderableSimulation
 	bool realisticPstnEnabled = false;
 	bool freeChargeFieldsEnabled = true; // ELEC/PROT contribute to Biot-Savart & eSrc
 	bool polarizationEnabled = true; // dielectric polarization along E-field gradient
+	bool particleGravityEnabled = false; // all particles with Gravity>0 source gravity field
 	bool electricityEnabled = true;
 	float uniformBField = 0.0f; // global uniform magnetic field added to bField
 
