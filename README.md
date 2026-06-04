@@ -61,6 +61,17 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 - All particles with `Gravity > 0` contribute mass to the gravitational field proportional to their Gravity property. Heavier elements produce stronger gravity wells.
 - Works alongside Newtonian Gravity (N key) for particle-to-particle attraction.
 
+### Plasma & Ionised Fluid EM
+- **PLSM** (always) and hot gases (**HYGN**>2000°C, **NBLE**>2000°C, **OXYG**>3000°C, **CO2**>4000°C) exhibit full electromagnetic response: polarisation, charge diffusion, Coulomb force, and Lorentz deflection.
+- **LAVA** (>1500°C) acts as an ionic liquid with the same EM behaviour (no SPRK conduction or ferromagnetism).
+- **THRM** (>2000°C) conducts charge and inherits it from upstream reactions.
+- All five plasma elements accept charge from ELEC/PROT contact, enabling ion thruster configurations.
+
+### Charge Heredity & Universal Force
+- Charge (`tmp4`) is preserved across all phase transitions (melt, solidify, shatter) via `part_change_type`.
+- Centralised eSrc, Coulomb force, and Lorentz force pass in `BeforeSim` applies to ALL charged particles — even non-conductors that inherited charge from LAVA solidification (enabling the electret effect).
+- Particles using `tmp4` for other purposes (PLNT, SEED, STOR, VIRS, ARAY) are excluded from the universal pass.
+
 ### Visual Overlays
 - **B-field display** (M key): Red=N, Blue=S, gradient dot trails showing field direction.
 - **E-field display** (E key): Yellow=positive potential, Cyan=negative potential, gradient dot trails.

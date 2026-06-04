@@ -4205,6 +4205,26 @@ void Simulation::BeforeSim(bool willUpdate)
 			}
 		}
 
+		// Accumulate eSrc from ALL charged particles (non-conductors may inherit charge via phase transitions)
+		if (electricityEnabled)
+		{
+			for (auto i = 0; i < NPART; ++i)
+			{
+				if (!parts[i].type) continue;
+				int t = parts[i].type;
+				// Skip elements that use tmp4 for non-charge purposes
+				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY)
+					continue;
+				int charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+				if (charge != 0)
+				{
+					int cx = int(parts[i].x / CELL), cy = int(parts[i].y / CELL);
+					if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+						eSrc[cy][cx] += charge * 0.05f;
+				}
+			}
+		}
+
 		// Magnetic field: save previous frame, compute new (Biot-Savart sources)
 		if (magnetismEnabled)
 		{
@@ -4225,9 +4245,11 @@ void Simulation::BeforeSim(bool willUpdate)
 					float q = 0.0f;
 					if (type == PT_ELEC) q = freeChargeFieldsEnabled ? -1.0f : 0.0f;
 					else if (type == PT_PROT) q = freeChargeFieldsEnabled ? 1.0f : 0.0f;
-					else if (electricityEnabled && (elements[type].Properties & PROP_CONDUCTS))
+					else if (type == PT_LITH) q = parts[i].tmp3 * 0.01f;
+					else if (electricityEnabled && parts[i].tmp4 != 0 &&
+					         type != PT_PLNT && type != PT_SEED && type != PT_STOR &&
+					         type != PT_VIRS && type != PT_ARAY)
 					{
-						// Skip induced SPRK (tmp3==1): created by dB/dt, shouldn't feed back
 						if (type == PT_SPRK && parts[i].tmp3 == 1) continue;
 						q = parts[i].tmp4 * 0.01f;
 					}
@@ -4238,6 +4260,43 @@ void Simulation::BeforeSim(bool willUpdate)
 					if (vx == 0.0f && vy == 0.0f) continue;
 					float scale = (isSolid ? BIOT_SCALE_SOLID : BIOT_SCALE) * q;
 					magnetism_addBiotSavart(this, parts[i].x, parts[i].y, vx, vy, scale, BIOT_RADIUS);
+				}
+			}
+		}
+
+		// Apply Coulomb + Lorentz forces to ALL charged particles
+		// (Non-conductors may inherit charge via phase transitions but lack per-element EM update)
+		if (electricityEnabled)
+		{
+			auto &sd = SimulationData::CRef();
+			for (int i = 0; i < NPART; i++)
+			{
+				if (!parts[i].type) continue;
+				int t = parts[i].type;
+				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY)
+					continue;
+				int charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+				if (charge == 0) continue;
+				int cx = int(parts[i].x / CELL), cy = int(parts[i].y / CELL);
+				if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) continue;
+				float massFactor = 1.0f / (sd.elements[t].Gravity + 0.05f);
+				// Coulomb force
+				float dEx = eField[cy][cx + 1] - eField[cy][cx - 1];
+				float dEy = eField[cy + 1][cx] - eField[cy - 1][cx];
+				parts[i].vx -= dEx * charge * 0.5f * massFactor;
+				parts[i].vy -= dEy * charge * 0.5f * massFactor;
+				// Lorentz force
+				if (magnetismEnabled)
+				{
+					float Bz = bField[cy][cx];
+					if (Bz != 0.0f)
+					{
+						float dtheta = Bz * charge * 0.05f * massFactor;
+						float c = cosf(dtheta), s = sinf(dtheta);
+						float vx = parts[i].vx * c - parts[i].vy * s;
+						float vy = parts[i].vx * s + parts[i].vy * c;
+						parts[i].vx = vx; parts[i].vy = vy;
+					}
 				}
 			}
 		}

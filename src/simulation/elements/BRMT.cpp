@@ -68,13 +68,17 @@ static int update(UPDATE_FUNC_ARGS)
 					{
 						if (sim->rng.chance(1, 2))
 						{
-							//@ BRMT + BREC -> BRMT + THRM
-							sim->create_part(ID(r), x+rx, y+ry, PT_THRM);
+							//@ BRMT + BREC -> BRMT + THRM (inherit charge from BREC)
+							int charge = sim->parts[ID(r)].tmp4;
+							int np = sim->create_part(ID(r), x+rx, y+ry, PT_THRM);
+							if (np >= 0) sim->parts[np].tmp4 = charge;
 						}
 						else
 						{
-							//@ BRMT + BREC -> THRM + BREC
-							sim->create_part(i, x, y, PT_THRM);
+							//@ BRMT + BREC -> THRM + BREC (inherit charge from BRMT)
+							int charge = parts[i].tmp4;
+							int np = sim->create_part(i, x, y, PT_THRM);
+							if (np >= 0) sim->parts[np].tmp4 = charge;
 							return 1;
 						}
 					}
