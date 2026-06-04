@@ -111,8 +111,7 @@ static int update(UPDATE_FUNC_ARGS)
 			if (parts[i].tmp3 > 0) parts[i].tmp3 = std::max(0, parts[i].tmp3 - 5);
 			else if (parts[i].tmp3 < 0) parts[i].tmp3 = std::min(0, parts[i].tmp3 + 5);
 		}
-		if (parts[i].tmp3 > 100) parts[i].tmp3 = 100;
-		if (parts[i].tmp3 < -100) parts[i].tmp3 = -100;
+
 		if (parts[i].tmp3 != 0)
 			sim->magSrc[cy][cx] += parts[i].tmp3 * 0.02f;
 	}

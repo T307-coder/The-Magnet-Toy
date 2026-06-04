@@ -77,8 +77,6 @@ static inline void magnetism_buildSourceList(Simulation *sim)
 		else if (t == PT_ELMG && parts[i].life == 10)
 		{
 			target = (int)((parts[i].temp - 273.15f) / 5.0f);
-			if (target > 100) target = 100;
-			if (target < -100) target = -100;
 		}
 		else if (t == PT_MGPN)
 			target = parts[i].tmp;
@@ -124,7 +122,7 @@ static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, 
 {
 	int reach = 1 + std::abs(tmp3Ref) / 25;
 	if (reach < 2) reach = 2;
-	if (reach > 15) reach = 15;
+
 	int numTrades = reach * reach / 2; // scale probes with area
 	if (numTrades < 4) numTrades = 4;
 	for (int trade = 0; trade < numTrades; trade++)
