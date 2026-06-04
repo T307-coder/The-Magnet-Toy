@@ -6,7 +6,7 @@
 
 ## Overview
 
-This mod adds a complete **classical electromagnetism simulation** to The Powder Toy: magnetic fields, electric fields, magnetizable materials, chargeable conductors, Lorentz force, and dielectrophoresis. Both fields are computed via FFT-based Poisson solvers in real time, with visual overlays and sidebar controls.
+This mod adds a complete **classical electromagnetism simulation** to The Powder Toy: electric fields, magnetic fields, magnetizable materials, chargeable conductors, dielectric polarization, Lorentz force, dielectrophoresis, and particle-sourced gravity. Fields are computed via asynchronous FFT-based Poisson solvers in real time, with visual overlays and sidebar controls.
 
 ---
 
@@ -16,13 +16,13 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 | Element | Menu | Description |
 |---|---|---|
 | **MAGN** | `SC_SPECIAL` | Permanent magnet. `tmp` = polarity/strength (positive=N/red, negative=S/blue). |
-| **ELMG** | `SC_POWERED` | Electromagnet. SPRK to activate (PSCN=on, NSCN=off). Field strength ∝ temperature. |
+| **ELMG** | `SC_POWERED` | Electromagnet. SPRK to activate (PSCN=on, NSCN=off). Field strength proportional to temperature. |
 | **MGPN** | `SC_NUCLEAR` | Magnetic monopole. `tmp` = polarity. Same polarity repels, opposites attract. |
 
 ### Electric (2 new elements)
 | Element | Menu | Description |
 |---|---|---|
-| **POSC** | `SC_POWERED` | Electrode plate. Temp > 0°C = positive (yellow), < 0°C = negative (blue). Single element replaces old POSC/NEGC. |
+| **POSC** | `SC_POWERED` | Electrode plate. Temp > 0C = positive (yellow), < 0C = negative (blue). Single element replaces old POSC/NEGC. |
 | **FIXC** | `SC_SPECIAL` | Fixed charge. Like MAGN for E-field. `tmp` = charge strength and polarity. |
 
 ### Tools (4 new brushes)
@@ -37,31 +37,39 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 
 ## Key Features
 
-### Magnetization & Induction
+### Electric Field & Charge
+- **20 conductors** accept charge by contact with POSC, FIXC, ELEC (electrons), or PROT (protons). Charge stored in `tmp4` (or `tmp3` for LITH).
+- **Charge diffusion**: DEUT-style random trade between any `PROP_CONDUCTS` neighbors. A charged wire charges the whole circuit.
+- **Coulomb force**: Charged particles experience `F = -q grad(V)` with coefficient 0.5, matching native ELEC/PROT behavior.
+- **Dielectrophoresis (DEP)**: Uncharged conductors are pulled toward stronger |E| regions. Polar liquids (WATR, SLTW) respond strongly. Force scales with particle mass via `Gravity` property.
+- **Dielectric polarization** (U key): Conductors develop opposite surface charges along the external potential gradient, like real dielectric polarization. Electrons drift toward higher potential (+grad V). Rate-limited at 20% per frame to allow natural depolarization.
+- **Free charge fields** (Q key): ELEC and PROT particles contribute to the electric field via `eSrc`, making free charges visible in the E-field overlay.
+- **Async E-field solver**: Electric potential computed on a dedicated worker thread via FFT Poisson solver, running in parallel with the B-field solver.
+
+### Magnetic Field & Magnetism
 - **13 conductors** detect changing magnetic flux and spark (dB/dt induction): METL, GOLD, TUNG, PTNM, IRON, BMTL, TTAN, TESC, INWR, INST, MERC, BRMT, BREC.
 - **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields.
-
-### Electrification & Charge
-- **24 conductors** accept charge by contact with POSC, FIXC, ELEC (electrons), or PROT (protons). Charge stored in `tmp4` (or `tmp3` for LITH).
-- **Charge diffusion**: DEUT-style random trade between any `PROP_CONDUCTS` neighbors. A charged wire charges the whole circuit.
-- Charged solids produce their own electric field (eSrc contribution).
+- **Async B-field solver**: Magnetic field computed on a dedicated worker thread via FFT Poisson solver.
 
 ### Electro-Magnetic Coupling
-- **Lorentz force**: Charged moving particles deflect in magnetic fields. `dθ = Bz × q × 0.05 / mass`. Pure rotation preserves kinetic energy.
-- **Biot-Savart effect**: Moving charges (ELEC, PROT, charged conductors) produce their own magnetic field circling around their velocity vector. Solids pushed by PSTN (with Realistic PSTN enabled) also contribute via `tmp5`/`tmp6` effective velocity.
-- **SPRK current effect**: Each SPRK conduction event acts as a current element, producing a magnetic field around the wire. Strength scales with SPRK life (SWCH > WATR > METL). Togglable via `K` button.
-- **Magnetic induction**: Conductors detect changing magnetic flux (dB/dt) and spark. Induced SPRK tags propagate through connected conductors, preventing feedback loops with a 100-frame cooldown.
-- **ELEC/PROT standard**: All Coulomb forces use coefficient 0.5, matching the native ELEC/PROT behavior exactly.
+- **Lorentz force**: Charged moving particles deflect in magnetic fields. `dtheta = Bz * q * 0.05 / mass`. Pure rotation preserves kinetic energy. Applied via shared header to all charged conductors.
+- **Biot-Savart effect (J key)**: Moving charges (ELEC, PROT, charged conductors) produce their own magnetic field circling around their velocity vector. Solids pushed by PSTN (with Realistic PSTN enabled) also contribute via `tmp5`/`tmp6` effective velocity.
+- **SPRK current effect (K key)**: Each SPRK conduction event acts as a current element, producing a magnetic field around the wire. Strength scales with SPRK life. Induced SPRK tags (tmp3=1) are skipped in Biot-Savart to prevent feedback.
+- **Magnetic induction (I key)**: Conductors detect changing magnetic flux (dB/dt) and spark. Induced SPRK tags propagate through all 5 conduction paths, preventing feedback loops.
 
-### Dielectrophoresis
-- Uncharged conductors are pulled toward stronger |E| regions (polarization force).
-- Polar liquids (WATR, SLTW) respond strongly — water bends toward charged objects.
-- Force automatically scales with particle mass via `Gravity` property: light particles move faster.
+### Particle Gravity Field (L key)
+- All particles with `Gravity > 0` contribute mass to the gravitational field proportional to their Gravity property. Heavier elements produce stronger gravity wells.
+- Works alongside Newtonian Gravity (N key) for particle-to-particle attraction.
 
 ### Visual Overlays
-- **B-field display** (E button): Red=N, Blue=S, gradient dot trails.
-- **E-field display** (E button): Yellow=positive, Cyan=negative, gradient dot trails.
+- **B-field display** (M key): Red=N, Blue=S, gradient dot trails showing field direction.
+- **E-field display** (E key): Yellow=positive potential, Cyan=negative potential, gradient dot trails.
+- **Gravity field display** (G key): Colored grid overlay showing gravitational potential.
 - **Debug HUD** (H key): Shows `GX/GY` (gravity), `Bz` (magnetic), `EX/EY` (electric vector) at mouse position.
+
+### Code Architecture
+- **Shared headers**: `ElectricityCommon.h` provides `electricity_chargeContact`, `electricity_diffuseCharge`, `electricity_applyForce`, `electricity_applyLorentz`, `electricity_polarizeCharge`. `MagnetismCommon.h` provides `magnetism_tryInduction`, `magnetism_addBiotSavart`. All 20 conductor elements use these shared functions, eliminating ~770 lines of duplicate code.
+- **prevEField**: Previous-frame electric potential saved before each Poisson solve, used by polarization for clean external gradient direction (avoids self-field feedback).
 
 ---
 
@@ -71,31 +79,35 @@ Sidebar buttons (right column):
 | Key | Action |
 |---|---|
 | **B** | Toggle magnetism simulation |
-| **I** | Toggle magnetic induction (dB/dt sparking) |
-| **J** | Toggle current magnetic field (moving charges) |
-| **K** | Toggle SPRK current magnetic field |
-| **R** | Toggle realistic PSTN (gives velocity to pushed particles) |
-| **E** | Toggle electric field display |
 | **Y** | Toggle electricity simulation |
+| **I** | Toggle magnetic induction (dB/dt sparking) |
+| **J** | Toggle current magnetic field (Biot-Savart, moving charges) |
+| **K** | Toggle SPRK current magnetic field |
+| **Q** | Toggle free charge fields (ELEC/PROT produce fields) |
+| **U** | Toggle dielectric polarization (E-field gradient) |
+| **L** | Toggle particle gravity field (all Gravity>0 particles) |
+| **R** | Toggle realistic PSTN (gives velocity to pushed particles) |
 
 Keyboard shortcuts:
 | Key | Action |
 |---|---|
-| **M** | Toggle magnetism (master) |
-| **B** | Toggle magnetic field display |
+| **M** | Toggle magnetic field display |
 | **E** | Toggle electric field display |
+| **G** | Toggle gravity field display |
 | **H** | Toggle debug HUD |
+| **N** | Toggle Newtonian gravity |
 
 ---
 
 ## Technical Notes
 
-- **FFT Solvers**: `MagFFT` and `ElecFFT` use `fftw3f` with 3x zero-padded grids. Poisson equation `∇²φ = -source` solved in frequency domain with `1/(k²+1)` kernel.
+- **FFT Solvers**: `MagFFT` and `ElecFFT` use `fftw3f` with 3x zero-padded grids. Poisson equation solved in frequency domain with `1/(k^2+1)` kernel. Both solvers run asynchronously on worker threads via the `AsyncFieldSolver::Exchange()` pattern.
 - **Biot-Savart**: All three current-to-field paths (moving charges, solids via PSTN, SPRK conduction) share a single `magnetism_addBiotSavart()` function in `MagnetismCommon.h`.
-- **Particle fields**: `tmp2` = B-field history, `tmp3` = magnetization / induced-flag, `tmp4` = electric charge, `tmp5`/`tmp6` = solid effective velocity (PSTN).
-- **Force Separation**: Charged particles (`tmp4 ≠ 0`) → pure Coulomb. Uncharged → pure dielectrophoresis. No mixing.
-- **Solids Don't Move**: Walls accept charge and produce fields but never receive motion forces.
-- **Gravity Weighting**: `F_effective = F_raw / (Gravity + 0.05)`. Light particles (WATR: 0.10 → 6.7x) respond much faster than heavy ones (MERC: 0.30 → 2.9x).
+- **Particle fields**: `tmp2` = B-field history, `tmp3` = magnetization / LITH charge / induced-flag, `tmp4` = electric charge (conductors), `tmp5`/`tmp6` = solid effective velocity (PSTN).
+- **Force separation**: Charged particles (`tmp4 != 0`) receive pure Coulomb force. Uncharged particles receive pure dielectrophoresis. No mixing.
+- **Solids do not move**: Walls accept charge and produce fields but never receive motion forces.
+- **Gravity weighting**: `F_effective = F_raw / (Gravity + 0.05)`. Light particles (WATR: 0.10) respond much faster than heavy ones (MERC: 0.30).
+- **Polarization**: Direction determined by dominant axis of potential gradient (`prevEField`). Electrons drift toward higher potential. Saturation capped at `|E| * 2.0`, threshold `|E| >= 3.0`, rate-limited to 20% per frame.
 
 ---
 
