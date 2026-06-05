@@ -1,7 +1,9 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v1.2.7 — New induction direction fix: both axes independent, allowing diagonal electron drift.
-Electron drift now properly perpendicular to B-field gradient in all directions.
-Previously dominant-axis approach quantized drift to cardinal directions only.
-README updated with full feature documentation (O/Z/S keys, semiconductor exclusion, ferromagnet dedup).
+v1.2.8 — Induction SPRK now triggers on local charge *difference* (≥16) between neighbours, not absolute charge.
+This allows unlimited charge accumulation as long as adjacent conductors have similar potential.
+Dielectric breakdown only at steep potential gradients (strong local E-field), matching real physics.
+New induction direction: both axes independently computed, allowing diagonal electron drift.
+Semiconductor EM exclusion (PSCN/NSCN/PTCT/NTCT).
+Default: new induction (O), induction SPRK (Z), particle gravity (L) ON. Old induction (I) OFF.
