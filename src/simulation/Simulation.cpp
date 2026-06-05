@@ -4205,16 +4205,17 @@ void Simulation::BeforeSim(bool willUpdate)
 			}
 		}
 
-		// Accumulate eSrc from ALL charged particles (non-conductors may inherit charge via phase transitions)
+		// Accumulate eSrc: solids always (Y key), non-solids gated by Q key
 		if (electricityEnabled)
 		{
 			for (auto i = 0; i < NPART; ++i)
 			{
 				if (!parts[i].type) continue;
 				int t = parts[i].type;
-				// Skip elements that use tmp4 for non-charge purposes
 				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY)
 					continue;
+				bool isSolid = (SimulationData::CRef().elements[t].Properties & TYPE_SOLID) != 0;
+				if (!isSolid && !freeChargeFieldsEnabled) continue;
 				int charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
 				if (charge != 0)
 				{
@@ -4250,6 +4251,8 @@ void Simulation::BeforeSim(bool willUpdate)
 					         type != PT_PLNT && type != PT_SEED && type != PT_STOR &&
 					         type != PT_VIRS && type != PT_ARAY)
 					{
+						bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
+						if (!isSolid && !freeChargeFieldsEnabled) continue;
 						if (type == PT_SPRK && parts[i].tmp3 == 1) continue;
 						q = parts[i].tmp4 * 0.01f;
 					}
@@ -4264,8 +4267,7 @@ void Simulation::BeforeSim(bool willUpdate)
 			}
 		}
 
-		// Apply Coulomb + Lorentz forces to ALL charged particles
-		// (Non-conductors may inherit charge via phase transitions but lack per-element EM update)
+		// Apply Coulomb + Lorentz forces (solids always, non-solids gated by Q)
 		if (electricityEnabled)
 		{
 			auto &sd = SimulationData::CRef();
@@ -4275,6 +4277,8 @@ void Simulation::BeforeSim(bool willUpdate)
 				int t = parts[i].type;
 				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY)
 					continue;
+				bool isSolid = (sd.elements[t].Properties & TYPE_SOLID) != 0;
+				if (!isSolid && !freeChargeFieldsEnabled) continue;
 				int charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
 				if (charge == 0) continue;
 				int cx = int(parts[i].x / CELL), cy = int(parts[i].y / CELL);

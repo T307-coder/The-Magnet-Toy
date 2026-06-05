@@ -220,7 +220,7 @@ void SprkCurrentOption::perform()
 }
 
 FreeChargeFieldsOption::FreeChargeFieldsOption(GameModel * m):
-QuickOption("Q", "ELEC/PROT produce fields", m, Toggle)
+QuickOption("Q", "Free charge fields \bg(powders/liquids/gases)", m, Toggle)
 {
 
 }

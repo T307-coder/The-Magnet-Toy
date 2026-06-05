@@ -97,7 +97,7 @@ struct RenderableSimulation
 	bool currentBFieldEnabled = true;
 	bool sprkCurrentEnabled = true;
 	bool realisticPstnEnabled = false;
-	bool freeChargeFieldsEnabled = true; // ELEC/PROT contribute to Biot-Savart & eSrc
+	bool freeChargeFieldsEnabled = true; // Q key: all charged particles (ELEC/PROT/conductors/plasma) produce fields
 	bool polarizationEnabled = true; // dielectric polarization along E-field gradient
 	bool particleGravityEnabled = false; // all particles with Gravity>0 source gravity field
 	bool electricityEnabled = true;
