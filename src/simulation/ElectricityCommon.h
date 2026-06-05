@@ -51,7 +51,12 @@ static inline void electricity_chargeContact(Simulation *sim, Particle &p, int x
 	if (chargeRef > 100) chargeRef = 100;
 	if (chargeRef < -100) chargeRef = -100;
 	if (chargeRef != 0)
-		sim->eSrc[cy][cx] += chargeRef * 0.05f;
+	{
+		// Non-solid particles only contribute to eSrc when Q key is on
+		bool isSolid = (SimulationData::CRef().elements[p.type].Properties & TYPE_SOLID) != 0;
+		if (isSolid || sim->freeChargeFieldsEnabled)
+			sim->eSrc[cy][cx] += chargeRef * 0.05f;
+	}
 }
 
 // Dielectric polarization: directional charge transfer along E-field gradient.

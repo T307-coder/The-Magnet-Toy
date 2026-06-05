@@ -1,12 +1,9 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v1.2.2 — Plasma EM, charge heredity, universal force pass, THRM support.
-Plasma (PLSM) and hot ionised gases (HYGN>2000°C, NBLE>2000°C, OXYG>3000°C, CO2>4000°C) now polarise, hold charge, and respond to E/B fields.
-Molten LAVA (>1500°C) acts as ionic liquid with full EM response.
-THRM (>2000°C) conducts charge and inherits it from BREC reactions.
-Charge conserved across all phase transitions (melt/solidify via part_change_type).
-Centralised eSrc, Coulomb force, and Lorentz force pass for ALL charged particles (non-conductors included).
-Particle gravity field (L key): all Gravity>0 elements source gravity.
-Electret effect now possible: insulators inherit permanent charge from LAVA solidification.
-Ion thruster and tokamak-like configurations now feasible with charged plasma + E/B fields.
+v1.2.4 — Unified Q key for non-solid charge fields, per-element eSrc gating.
+Q key now controls field production for ALL non-solid charged particles (powders, liquids, gases, plasma).
+Solids always produce fields when electricity is enabled (Y key).
+Per-element eSrc writes and chargeContact now respect Q key for non-solids.
+BRMT/BREC/MERC induction unified with shared magnetism_tryInduction.
+Inline Lorentz and ferromagnetic pull replaced with shared header functions.

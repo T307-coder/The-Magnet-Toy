@@ -88,7 +88,7 @@ static int update(UPDATE_FUNC_ARGS)
 		electricity_polarizeCharge(sim, parts[i], x, y, parts[i].tmp4);
 		electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
 		// Plasma charge feeds back into E-field via eSrc
-		if (parts[i].tmp4 != 0)
+		if (parts[i].tmp4 != 0 && sim->freeChargeFieldsEnabled)
 		{
 			int cx = x / CELL, cy = y / CELL;
 			if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
