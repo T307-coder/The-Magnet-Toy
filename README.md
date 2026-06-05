@@ -43,7 +43,7 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 - **Coulomb force**: Charged particles experience `F = -q grad(V)` with coefficient 0.5, matching native ELEC/PROT behavior.
 - **Dielectrophoresis (DEP)**: Uncharged conductors are pulled toward stronger |E| regions. Polar liquids (WATR, SLTW) respond strongly. Force scales with particle mass via `Gravity` property.
 - **Dielectric polarization** (U key): Conductors develop opposite surface charges along the external potential gradient, like real dielectric polarization. Electrons drift toward higher potential (+grad V). Rate-limited at 20% per frame to allow natural depolarization.
-- **Free charge fields** (Q key): ELEC and PROT particles contribute to the electric field via `eSrc`, making free charges visible in the E-field overlay.
+- **Free charge fields** (Q key): Controls field production for all non-solid charged particles (ELEC, PROT, powders, liquids, gases, plasma). Solids always produce fields when electricity is enabled.
 - **Async E-field solver**: Electric potential computed on a dedicated worker thread via FFT Poisson solver, running in parallel with the B-field solver.
 
 ### Magnetic Field & Magnetism
