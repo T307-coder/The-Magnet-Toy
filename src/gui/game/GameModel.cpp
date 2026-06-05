@@ -274,6 +274,9 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new ElectricityEnableOption(this));
 	quickOptions.push_back(new CurrentBFieldOption(this));
 	quickOptions.push_back(new SprkCurrentOption(this));
+	quickOptions.push_back(new NewInductionOption(this));
+	quickOptions.push_back(new InductionSprkOption(this));
+	quickOptions.push_back(new PotentialCurrentOption(this));
 	quickOptions.push_back(new FreeChargeFieldsOption(this));
 	quickOptions.push_back(new PolarizationOption(this));
 	quickOptions.push_back(new ParticleGravityOption(this));
@@ -1299,6 +1302,51 @@ void GameModel::SetFreeChargeFieldsEnabled(bool enable)
 bool GameModel::GetFreeChargeFieldsEnabled()
 {
 	return sim->freeChargeFieldsEnabled;
+}
+
+void GameModel::SetNewInductionEnabled(bool enable)
+{
+	sim->newInductionEnabled = enable;
+	if (enable)
+		SetInfoTip("New Induction: On");
+	else
+		SetInfoTip("New Induction: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetNewInductionEnabled()
+{
+	return sim->newInductionEnabled;
+}
+
+void GameModel::SetInductionSprkEnabled(bool enable)
+{
+	sim->inductionSprkEnabled = enable;
+	if (enable)
+		SetInfoTip("Induction SPRK: On");
+	else
+		SetInfoTip("Induction SPRK: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetInductionSprkEnabled()
+{
+	return sim->inductionSprkEnabled;
+}
+
+void GameModel::SetPotentialCurrentEnabled(bool enable)
+{
+	sim->potentialCurrentEnabled = enable;
+	if (enable)
+		SetInfoTip("Potential Current: On");
+	else
+		SetInfoTip("Potential Current: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetPotentialCurrentEnabled()
+{
+	return sim->potentialCurrentEnabled;
 }
 
 void GameModel::SetPolarizationEnabled(bool enable)

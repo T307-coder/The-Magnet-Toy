@@ -49,8 +49,5 @@ void Element::Element_PSCN()
 
 static int update(UPDATE_FUNC_ARGS)
 {
-	int cx = x/CELL, cy = y/CELL;
-electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);
-	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
 	return 0;
 }

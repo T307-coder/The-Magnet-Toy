@@ -4249,7 +4249,8 @@ void Simulation::BeforeSim(bool willUpdate)
 					else if (type == PT_LITH) q = parts[i].tmp3 * 0.01f;
 					else if (electricityEnabled && parts[i].tmp4 != 0 &&
 					         type != PT_PLNT && type != PT_SEED && type != PT_STOR &&
-					         type != PT_VIRS && type != PT_ARAY)
+					         type != PT_VIRS && type != PT_ARAY &&
+				         type != PT_PSCN && type != PT_NSCN && type != PT_PTCT && type != PT_NTCT)
 					{
 						bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
 						if (!isSolid && !freeChargeFieldsEnabled) continue;
@@ -4267,6 +4268,20 @@ void Simulation::BeforeSim(bool willUpdate)
 			}
 		}
 
+		// New EM induction: dB/dt orthogonal charge transfer for all conductors (excl. semiconductors)
+		if (newInductionEnabled)
+		{
+			for (int i = 0; i < NPART; i++)
+			{
+				if (!parts[i].type) continue;
+				int t = parts[i].type;
+				if (!(SimulationData::CRef().elements[t].Properties & PROP_CONDUCTS)) continue;
+				if (t == PT_PSCN || t == PT_NSCN || t == PT_PTCT || t == PT_NTCT) continue;
+				int &charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+				magnetism_newInduction(this, parts[i], (int)parts[i].x, (int)parts[i].y, charge);
+			}
+		}
+
 		// Apply Coulomb + Lorentz forces (solids always, non-solids gated by Q)
 		if (electricityEnabled)
 		{
@@ -4275,7 +4290,8 @@ void Simulation::BeforeSim(bool willUpdate)
 			{
 				if (!parts[i].type) continue;
 				int t = parts[i].type;
-				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY)
+				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY ||
+				    t == PT_PSCN || t == PT_NSCN || t == PT_PTCT || t == PT_NTCT)
 					continue;
 				bool isSolid = (sd.elements[t].Properties & TYPE_SOLID) != 0;
 				if (!isSolid && !freeChargeFieldsEnabled) continue;
@@ -4531,6 +4547,30 @@ void Simulation::AfterSim()
 		// pitiful attempt at trying to keep code relating to a given element in the same file
 		Element_EMP_Trigger(this, emp_trigger_count);
 		emp_trigger_count = 0;
+	}
+
+	// New EM induction: runs after particle updates so induced charge isn't overwritten (excl. semiconductors)
+	if (newInductionEnabled)
+	{
+		for (int i = 0; i < NPART; i++)
+		{
+			if (!parts[i].type) continue;
+			int t = parts[i].type;
+			if (!(SimulationData::CRef().elements[t].Properties & PROP_CONDUCTS)) continue;
+			if (t == PT_PSCN || t == PT_NSCN || t == PT_PTCT || t == PT_NTCT) continue;
+			int &charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+			magnetism_newInduction(this, parts[i], (int)parts[i].x, (int)parts[i].y, charge);
+			// Induction SPRK: high negative charge triggers spark (F key)
+			if (inductionSprkEnabled && charge <= -8 && parts[i].type != PT_SPRK && parts[i].life == 0 && rng.chance(1, 2))
+			{
+				int x = (int)(parts[i].x + 0.5f), y = (int)(parts[i].y + 0.5f);
+				int oldType = parts[i].type;
+				part_change_type(i, x, y, PT_SPRK);
+				parts[i].ctype = oldType;
+				parts[i].life = 4;
+				parts[i].tmp3 = 1;
+			}
+		}
 	}
 
 	frameCount += 1;

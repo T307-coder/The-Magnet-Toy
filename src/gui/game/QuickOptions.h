@@ -123,6 +123,30 @@ public:
 	void perform() override;
 };
 
+class NewInductionOption: public QuickOption
+{
+public:
+	NewInductionOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class InductionSprkOption: public QuickOption
+{
+public:
+	InductionSprkOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class PotentialCurrentOption: public QuickOption
+{
+public:
+	PotentialCurrentOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
 class PolarizationOption: public QuickOption
 {
 public:

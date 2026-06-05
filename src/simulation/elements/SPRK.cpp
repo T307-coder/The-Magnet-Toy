@@ -83,10 +83,10 @@ static int update(UPDATE_FUNC_ARGS)
 
 		if (sim->part_change_type(i,x,y,ct))
 			return 1;
-		// Induced SPRK (magnetic induction): give element long cooldown, reset magnetization
+		// Induced SPRK (magnetic induction): short spark like normal SPRK
 		if (parts[i].tmp3 == 1)
 		{
-			parts[i].life = 100;
+			parts[i].life = 4;
 			parts[i].tmp3 = 0;
 		}
 		return 0;
@@ -399,12 +399,33 @@ static int update(UPDATE_FUNC_ARGS)
 					}
 				}
 				else if (parts[ID(r)].life==0 && parts[i].life<4) {
+					// Potential-driven current: SPRK only conducts toward higher potential
+					if (sim->potentialCurrentEnabled && sim->electricityEnabled)
+					{
+						int scx = x / CELL, scy = y / CELL;
+						int dcx = (x + rx) / CELL, dcy = (y + ry) / CELL;
+						if (scx >= 0 && scy >= 0 && dcx >= 0 && dcy >= 0 &&
+						    scx < XCELLS && scy < YCELLS && dcx < XCELLS && dcy < YCELLS)
+						{
+							if (sim->eField[dcy][dcx] < sim->eField[scy][scx])
+								continue; // electrons only flow to higher potential
+						}
+					}
 					parts[ID(r)].life = 4;
 					parts[ID(r)].ctype = receiver;
 				sim->part_change_type(ID(r),x+rx,y+ry,PT_SPRK);
 				// Propagate induced-flag: if source SPRK was induced, new SPRK is too
 				if (parts[i].tmp3 == 1)
 					parts[ID(r)].tmp3 = 1;
+				// SPRK charge redistribution: instant average represents current flow
+				if (sim->electricityEnabled)
+				{
+					int &srcCharge = (parts[i].ctype == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+					int &dstCharge = (receiver == PT_LITH) ? parts[ID(r)].tmp3 : parts[ID(r)].tmp4;
+					int avg = (srcCharge + dstCharge) / 2;
+					srcCharge = avg;
+					dstCharge = avg;
+				}
 				// Biot-Savart: SPRK current element (skip induced SPRK to avoid feedback)
 				if (sim->magnetismEnabled && sim->sprkCurrentEnabled && parts[i].tmp3 != 1)
 				{

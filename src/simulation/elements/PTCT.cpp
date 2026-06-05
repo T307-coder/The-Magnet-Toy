@@ -50,7 +50,5 @@ static int update(UPDATE_FUNC_ARGS)
 {
 	if (parts[i].temp>295.0f)
 		parts[i].temp -= 2.5f;
-	electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);
-	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
 	return 0;
 }

@@ -86,28 +86,12 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 		}
 	}
-	// Magnetization: contact with magnets + DEUT-style internal diffusion
-	int cx = x/CELL, cy = y/CELL;
-	if (sim->magnetismEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
-	{
-		if (parts[i].temp < 773.15f)
-		{
-			magnetism_contactCharge(sim, parts[i], x, y, parts[i].tmp3);
-			magnetism_diffuseCharge(sim, parts[i], x, y, parts[i].tmp3);
-		}
-		else
-		{
-			if (parts[i].tmp3 > 0) parts[i].tmp3 = std::max(0, parts[i].tmp3 - 5);
-			else if (parts[i].tmp3 < 0) parts[i].tmp3 = std::min(0, parts[i].tmp3 + 5);
-		}
-
-		if (parts[i].tmp3 != 0)
-			sim->magSrc[cy][cx] += parts[i].tmp3 * 0.02f;
-	}
-	// Induction: shared function handles cooldown, tmp3 tag, Biot-Savart skip
+	// Magnetization: shared ferromagnet update (contact, diffusion, decay, magSrc)
+	int cx, cy;
+	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, cx, cy);
+	// Induction: shared function handles cooldown, tmp3 tag, Biot-Savart skip (old, not recommended)
 	if (parts[i].tmp3 == 0)
 		magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_BRMT, 1.5f, 8);
-	if (parts[i].tmp3 != 0) parts[i].life = 100;
 	// Ferromagnetic attraction (shared function)
 	magnetism_ferromagneticPull(sim, parts[i], cx, cy);
 	// Electric charging, force, Lorentz, diffusion (shared functions)
