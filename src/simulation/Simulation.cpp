@@ -4552,23 +4552,45 @@ void Simulation::AfterSim()
 	// New EM induction: runs after particle updates so induced charge isn't overwritten (excl. semiconductors)
 	if (newInductionEnabled)
 	{
+		auto &sd = SimulationData::CRef();
 		for (int i = 0; i < NPART; i++)
 		{
 			if (!parts[i].type) continue;
 			int t = parts[i].type;
-			if (!(SimulationData::CRef().elements[t].Properties & PROP_CONDUCTS)) continue;
+			if (!(sd.elements[t].Properties & PROP_CONDUCTS)) continue;
 			if (t == PT_PSCN || t == PT_NSCN || t == PT_PTCT || t == PT_NTCT) continue;
 			int &charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
 			magnetism_newInduction(this, parts[i], (int)parts[i].x, (int)parts[i].y, charge);
-			// Induction SPRK: high negative charge triggers spark (F key)
-			if (inductionSprkEnabled && charge <= -8 && parts[i].type != PT_SPRK && parts[i].life == 0 && rng.chance(1, 2))
+			// Induction SPRK: large charge *difference* between neighbours triggers breakdown
+			// (local E-field strength, not absolute charge — allows charge accumulation)
+			if (inductionSprkEnabled && parts[i].type != PT_SPRK && parts[i].life == 0)
 			{
 				int x = (int)(parts[i].x + 0.5f), y = (int)(parts[i].y + 0.5f);
-				int oldType = parts[i].type;
-				part_change_type(i, x, y, PT_SPRK);
-				parts[i].ctype = oldType;
-				parts[i].life = 4;
-				parts[i].tmp3 = 1;
+				bool breakdown = false;
+				for (int rx = -1; rx <= 1 && !breakdown; rx++)
+					for (int ry = -1; ry <= 1; ry++)
+					{
+						if (!rx && !ry) continue;
+						auto r = pmap[y + ry][x + rx];
+						if (!r) continue;
+						int rt = TYP(r);
+						if (!(sd.elements[rt].Properties & PROP_CONDUCTS)) continue;
+						if (rt == PT_PSCN || rt == PT_NSCN || rt == PT_PTCT || rt == PT_NTCT) continue;
+						int nbrCharge = (rt == PT_LITH) ? parts[ID(r)].tmp3 : parts[ID(r)].tmp4;
+						if (std::abs(charge - nbrCharge) >= 16 && rng.chance(1, 3))
+						{
+							breakdown = true;
+							break;
+						}
+					}
+				if (breakdown)
+				{
+					int oldType = parts[i].type;
+					part_change_type(i, x, y, PT_SPRK);
+					parts[i].ctype = oldType;
+					parts[i].life = 4;
+					parts[i].tmp3 = 1;
+				}
 			}
 		}
 	}
