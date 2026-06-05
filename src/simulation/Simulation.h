@@ -93,13 +93,16 @@ struct RenderableSimulation
 	int currentTick = 0;
 	int emp_decor = 0;
 	bool magnetismEnabled = true;
-	bool inductionEnabled = true;
+	bool inductionEnabled = false; // old induction (not recommended)
+	bool newInductionEnabled = true; // O key: dB/dt orthogonal charge transfer
+	bool inductionSprkEnabled = true; // Z key: auto-SPRK from high negative charge
 	bool currentBFieldEnabled = true;
 	bool sprkCurrentEnabled = true;
+	bool potentialCurrentEnabled = false; // S key: SPRK only conducts toward higher potential
 	bool realisticPstnEnabled = false;
-	bool freeChargeFieldsEnabled = true; // Q key: all charged particles (ELEC/PROT/conductors/plasma) produce fields
+	bool freeChargeFieldsEnabled = false; // Q key: non-solid charged particles produce fields
 	bool polarizationEnabled = true; // dielectric polarization along E-field gradient
-	bool particleGravityEnabled = false; // all particles with Gravity>0 source gravity field
+	bool particleGravityEnabled = true; // all particles with Gravity>0 source gravity field
 	bool electricityEnabled = true;
 	float uniformBField = 0.0f; // global uniform magnetic field added to bField
 

@@ -1,9 +1,11 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v1.2.4 — Unified Q key for non-solid charge fields, per-element eSrc gating.
-Q key now controls field production for ALL non-solid charged particles (powders, liquids, gases, plasma).
-Solids always produce fields when electricity is enabled (Y key).
-Per-element eSrc writes and chargeContact now respect Q key for non-solids.
-BRMT/BREC/MERC induction unified with shared magnetism_tryInduction.
-Inline Lorentz and ferromagnetic pull replaced with shared header functions.
+v1.2.6 — Default settings overhaul, semiconductor EM exclusion, SPRK charge redistribution, ferromagnet dedup.
+Default: new induction (O), induction SPRK (Z), particle gravity (L) ON. Old induction (I) OFF (not recommended).
+Q key (free charge fields) default OFF. S key (potential-driven SPRK) stays OFF.
+Semiconductors (PSCN/NSCN/PTCT/NTCT) excluded from all EM: no charging, polarization, induction, force.
+Ferromagnet magnetization block (BMTL/BRMT/IRON/TTAN) deduplicated into magnetism_ferromagnetUpdate().
+Magnetized ferromagnets keep life=100 to block old induction; induced SPRK life stays short (4).
+SPRK charge redistribution: conducting SPRK instantly averages charge with receiver.
+Unified Q key for non-solid charge fields, per-element eSrc gating.

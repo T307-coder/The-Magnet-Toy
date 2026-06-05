@@ -164,7 +164,7 @@ void ConsoleShowOption::perform()
 }
 
 InductionEnableOption::InductionEnableOption(GameModel * m):
-QuickOption("I", "Magnetic induction \bg(dB/dt sparking)", m, Toggle)
+QuickOption("I", "Magnetic induction \bg(dB/dt sparking, not recommended)", m, Toggle)
 {
 
 }
@@ -231,6 +231,48 @@ bool FreeChargeFieldsOption::GetToggle()
 void FreeChargeFieldsOption::perform()
 {
 	m->SetFreeChargeFieldsEnabled(!m->GetFreeChargeFieldsEnabled());
+}
+
+NewInductionOption::NewInductionOption(GameModel * m):
+QuickOption("O", "New EM induction \bg(dB/dt charge transfer)", m, Toggle)
+{
+
+}
+bool NewInductionOption::GetToggle()
+{
+	return m->GetNewInductionEnabled();
+}
+void NewInductionOption::perform()
+{
+	m->SetNewInductionEnabled(!m->GetNewInductionEnabled());
+}
+
+InductionSprkOption::InductionSprkOption(GameModel * m):
+QuickOption("Z", "Induction SPRK \bg(auto-spark from high charge)", m, Toggle)
+{
+
+}
+bool InductionSprkOption::GetToggle()
+{
+	return m->GetInductionSprkEnabled();
+}
+void InductionSprkOption::perform()
+{
+	m->SetInductionSprkEnabled(!m->GetInductionSprkEnabled());
+}
+
+PotentialCurrentOption::PotentialCurrentOption(GameModel * m):
+QuickOption("S", "Potential-driven current \bg(SPRK to higher V)", m, Toggle)
+{
+
+}
+bool PotentialCurrentOption::GetToggle()
+{
+	return m->GetPotentialCurrentEnabled();
+}
+void PotentialCurrentOption::perform()
+{
+	m->SetPotentialCurrentEnabled(!m->GetPotentialCurrentEnabled());
 }
 
 PolarizationOption::PolarizationOption(GameModel * m):
