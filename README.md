@@ -48,14 +48,18 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 
 ### Magnetic Field & Magnetism
 - **13 conductors** detect changing magnetic flux and spark (dB/dt induction): METL, GOLD, TUNG, PTNM, IRON, BMTL, TTAN, TESC, INWR, INST, MERC, BRMT, BREC.
-- **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields.
+- **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields. Magnetization update deduplicated into `magnetism_ferromagnetUpdate()`.
 - **Async B-field solver**: Magnetic field computed on a dedicated worker thread via FFT Poisson solver.
+- **New EM induction** (O key, default ON): dB/dt drives directional charge separation between conductors. Electrons drift perpendicular to the B-field gradient: `v_e = sign(dB/dt) × (dB/dy, −dB/dx)`. Both axes independently computed, allowing diagonal transfer. Replaces the old spark-only induction with continuous charge transport.
 
 ### Electro-Magnetic Coupling
 - **Lorentz force**: Charged moving particles deflect in magnetic fields. `dtheta = Bz * q * 0.05 / mass`. Pure rotation preserves kinetic energy. Applied via shared header to all charged conductors.
 - **Biot-Savart effect (J key)**: Moving charges (ELEC, PROT, charged conductors) produce their own magnetic field circling around their velocity vector. Solids pushed by PSTN (with Realistic PSTN enabled) also contribute via `tmp5`/`tmp6` effective velocity.
 - **SPRK current effect (K key)**: Each SPRK conduction event acts as a current element, producing a magnetic field around the wire. Strength scales with SPRK life. Induced SPRK tags (tmp3=1) are skipped in Biot-Savart to prevent feedback.
-- **Magnetic induction (I key)**: Conductors detect changing magnetic flux (dB/dt) and spark. Induced SPRK tags propagate through all 5 conduction paths, preventing feedback loops.
+- **Magnetic induction (I key, default OFF, not recommended)**: Conductors detect changing magnetic flux (dB/dt) and spark. Superseded by new EM induction. Induced SPRK tags propagate through all 5 conduction paths, preventing feedback loops.
+- **Induction SPRK (Z key, default ON)**: Conductors with high negative charge (≤ −8) spontaneously spark, simulating dielectric breakdown under induced EMF. SPRK life is short (4 frames).
+- **Potential-driven current (S key, default OFF)**: SPRK only conducts toward elements at higher electric potential. Enables directional current flow guided by E-field.
+- **SPRK charge redistribution**: When SPRK conducts between two elements, their charges instantly average, representing current-driven charge equilibration.
 
 ### Particle Gravity Field (L key)
 - All particles with `Gravity > 0` contribute mass to the gravitational field proportional to their Gravity property. Heavier elements produce stronger gravity wells.
@@ -70,7 +74,8 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 ### Charge Heredity & Universal Force
 - Charge (`tmp4`) is preserved across all phase transitions (melt, solidify, shatter) via `part_change_type`.
 - Centralised eSrc, Coulomb force, and Lorentz force pass in `BeforeSim` applies to ALL charged particles — even non-conductors that inherited charge from LAVA solidification (enabling the electret effect).
-- Particles using `tmp4` for other purposes (PLNT, SEED, STOR, VIRS, ARAY) are excluded from the universal pass.
+- Particles using `tmp4` for other purposes (PLNT, SEED, STOR, VIRS, ARAY, and semiconductors PSCN/NSCN/PTCT/NTCT) are excluded from the universal pass.
+- **Semiconductor exclusion**: PSCN, NSCN, PTCT, NTCT are excluded from ALL EM effects (charge, polarization, induction, force). They retain SPRK conduction for logic circuits but are transparent to electric and magnetic fields.
 
 ### Visual Overlays
 - **B-field display** (M key): Red=N, Blue=S, gradient dot trails showing field direction.
@@ -79,8 +84,8 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 - **Debug HUD** (H key): Shows `GX/GY` (gravity), `Bz` (magnetic), `EX/EY` (electric vector) at mouse position.
 
 ### Code Architecture
-- **Shared headers**: `ElectricityCommon.h` provides `electricity_chargeContact`, `electricity_diffuseCharge`, `electricity_applyForce`, `electricity_applyLorentz`, `electricity_polarizeCharge`. `MagnetismCommon.h` provides `magnetism_tryInduction`, `magnetism_addBiotSavart`. All 20 conductor elements use these shared functions, eliminating ~770 lines of duplicate code.
-- **prevEField**: Previous-frame electric potential saved before each Poisson solve, used by polarization for clean external gradient direction (avoids self-field feedback).
+- **Shared headers**: `ElectricityCommon.h` provides `electricity_chargeContact`, `electricity_diffuseCharge`, `electricity_applyForce`, `electricity_applyLorentz`, `electricity_polarizeCharge`. `MagnetismCommon.h` provides `magnetism_tryInduction`, `magnetism_addBiotSavart`, `magnetism_newInduction`, `magnetism_ferromagnetUpdate`, `magnetism_ferromagneticPull`, `magnetism_contactCharge`, `magnetism_diffuseCharge`. All 20 conductor elements and 4 ferromagnets use these shared functions, eliminating ~800+ lines of duplicate code.
+- **prevEField/prevBField**: Previous-frame field snapshots saved before each Poisson solve, used for temporal difference calculations (avoids self-field feedback in polarization and induction).
 
 ---
 
@@ -91,10 +96,13 @@ Sidebar buttons (right column):
 |---|---|
 | **B** | Toggle magnetism simulation |
 | **Y** | Toggle electricity simulation |
-| **I** | Toggle magnetic induction (dB/dt sparking) |
+| **I** | Toggle magnetic induction (dB/dt sparking, not recommended) |
+| **O** | Toggle new EM induction (dB/dt charge transfer) |
+| **Z** | Toggle induction SPRK (auto-spark from high charge) |
 | **J** | Toggle current magnetic field (Biot-Savart, moving charges) |
 | **K** | Toggle SPRK current magnetic field |
-| **Q** | Toggle free charge fields (ELEC/PROT produce fields) |
+| **Q** | Toggle free charge fields (non-solids produce fields) |
+| **S** | Toggle potential-driven current (SPRK toward higher V) |
 | **U** | Toggle dielectric polarization (E-field gradient) |
 | **L** | Toggle particle gravity field (all Gravity>0 particles) |
 | **R** | Toggle realistic PSTN (gives velocity to pushed particles) |

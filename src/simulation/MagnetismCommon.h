@@ -201,11 +201,12 @@ static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, i
 	float dBdx = sim->bField[cy][cx + 1] - sim->bField[cy][cx - 1];
 	float dBdy = sim->bField[cy + 1][cx] - sim->bField[cy - 1][cx];
 
-	// Electron drift: v_e = sign(dBdt) * (dB/dy, -dB/dx), dominant axis
+	// Electron drift: v_e = sign(dBdt) * (dB/dy, -dB/dx)
+	// Each axis independent — allows diagonal drift perpendicular to ∇B
 	int dx = 0, dy = 0;
-	if (std::fabs(dBdy) > std::fabs(dBdx))
+	if (std::fabs(dBdy) > 0.001f)
 		dx = ((dBdt > 0) == (dBdy > 0)) ? 1 : -1;
-	else
+	if (std::fabs(dBdx) > 0.001f)
 		dy = ((dBdt > 0) == (dBdx > 0)) ? -1 : 1;
 	if (!dx && !dy) return;
 
