@@ -1,8 +1,10 @@
 #include "simulation/ElementCommon.h"
+#include "simulation/ElectricityCommon.h"
 #include "FIRE.h"
 
 static int graphics(GRAPHICS_FUNC_ARGS);
 static void create(ELEMENT_CREATE_FUNC_ARGS);
+static int update(UPDATE_FUNC_ARGS);
 
 void Element::Element_LAVA()
 {
@@ -35,7 +37,7 @@ void Element::Element_LAVA()
 	HeatConduct = 60;
 	Description = "Molten lava. Ignites flammable materials. Generated when metals and other materials melt, solidifies when cold.";
 
-	Properties = TYPE_LIQUID|PROP_LIFE_DEC;
+	Properties = TYPE_LIQUID|PROP_LIFE_DEC|PROP_CONDUCTS;
 	CarriesTypeIn = 1U << FIELD_CTYPE;
 
 	LowPressure = IPL;
@@ -47,7 +49,7 @@ void Element::Element_LAVA()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &Element_FIRE_update;
+	Update = &update;
 	Graphics = &graphics;
 	Create = &create;
 }
@@ -73,4 +75,27 @@ static int graphics(GRAPHICS_FUNC_ARGS)
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
 	sim->parts[i].life = sim->rng.between(240, 359);
+}
+
+static int update(UPDATE_FUNC_ARGS)
+{
+	// Run standard FIRE update first
+	Element_FIRE_update(UPDATE_FUNC_SUBCALL_ARGS);
+
+	// Ionized melt EM response: molten lava is an ionic liquid above ~1500°C
+	if (parts[i].type == PT_LAVA && parts[i].temp > 1773.15f)
+	{
+		electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);
+		electricity_polarizeCharge(sim, parts[i], x, y, parts[i].tmp4);
+		electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
+		if (parts[i].tmp4 != 0 && sim->freeChargeFieldsEnabled)
+		{
+			int cx = x / CELL, cy = y / CELL;
+			if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+				sim->eSrc[cy][cx] += parts[i].tmp4 * 0.05f;
+		}
+		electricity_applyForce(sim, parts[i], x, y, parts[i].tmp4, 0.5f);
+		electricity_applyLorentz(sim, parts[i], x, y, parts[i].tmp4);
+	}
+	return 0;
 }

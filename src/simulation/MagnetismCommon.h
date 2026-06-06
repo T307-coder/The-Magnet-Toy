@@ -52,7 +52,7 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 		sim->part_change_type(i, x, y, PT_SPRK);
 		sim->parts[i].ctype = ctype;
 		sim->parts[i].life = 4;
-		sim->parts[i].tmp3 = 1;  // mark as induced SPRK → element gets life=100 on death
+		sim->parts[i].tmp3 = 1;  // mark as induced SPRK
 		return true;
 	}
 	return false;
@@ -77,8 +77,6 @@ static inline void magnetism_buildSourceList(Simulation *sim)
 		else if (t == PT_ELMG && parts[i].life == 10)
 		{
 			target = (int)((parts[i].temp - 273.15f) / 5.0f);
-			if (target > 100) target = 100;
-			if (target < -100) target = -100;
 		}
 		else if (t == PT_MGPN)
 			target = parts[i].tmp;
@@ -124,7 +122,7 @@ static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, 
 {
 	int reach = 1 + std::abs(tmp3Ref) / 25;
 	if (reach < 2) reach = 2;
-	if (reach > 15) reach = 15;
+
 	int numTrades = reach * reach / 2; // scale probes with area
 	if (numTrades < 4) numTrades = 4;
 	for (int trade = 0; trade < numTrades; trade++)
@@ -154,6 +152,77 @@ static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, 
 			}
 		}
 	}
+}
+
+// Shared ferromagnet magnetization update: contact, diffusion, decay, magSrc.
+// Used by BMTL, BRMT, IRON, TTAN. Returns cx,cy by reference for reuse.
+static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref, int &cx, int &cy)
+{
+	cx = x / CELL; cy = y / CELL;
+	if (!sim->magnetismEnabled || cx < 0 || cx >= XCELLS || cy < 0 || cy >= YCELLS)
+		return;
+
+	if (p.temp < 773.15f)
+	{
+		magnetism_contactCharge(sim, p, x, y, tmp3Ref);
+		magnetism_diffuseCharge(sim, p, x, y, tmp3Ref);
+	}
+	else
+	{
+		if (tmp3Ref > 0) tmp3Ref = std::max(0, tmp3Ref - 5);
+		else if (tmp3Ref < 0) tmp3Ref = std::min(0, tmp3Ref + 5);
+	}
+
+	if (tmp3Ref != 0)
+	{
+		sim->magSrc[cy][cx] += tmp3Ref * 0.02f;
+		// Keep element life > 0 while magnetized → blocks old induction (life cooldown)
+		p.life = 100;
+	}
+}
+
+// New EM induction: dB/dt drives charge separation between conductors.
+// Electrons drift opposite to induced E: v_e = sign(dB/dt) * (dB/dy, -dB/dx).
+// Same pattern as electricity_polarizeCharge — directional transfer, not averaging.
+static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, int y, int &chargeRef)
+{
+	if (!sim->magnetismEnabled || !sim->electricityEnabled || !sim->newInductionEnabled) return;
+
+	int cx = x / CELL, cy = y / CELL;
+	if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) return;
+	if (!sim->prevBFieldValid) return;
+
+	// Local B-field change
+	float dBdt = sim->bField[cy][cx] - sim->prevBField[cy][cx];
+	float dBmag = std::fabs(dBdt);
+	if (dBmag < 0.001f) return;
+
+	// Local B-field gradient (4-neighbour central difference)
+	float dBdx = sim->bField[cy][cx + 1] - sim->bField[cy][cx - 1];
+	float dBdy = sim->bField[cy + 1][cx] - sim->bField[cy - 1][cx];
+
+	// Electron drift: v_e = sign(dBdt) * (dB/dy, -dB/dx)
+	// Each axis independent — allows diagonal drift perpendicular to ∇B
+	int dx = 0, dy = 0;
+	if (std::fabs(dBdy) > 0.001f)
+		dx = ((dBdt > 0) == (dBdy > 0)) ? 1 : -1;
+	if (std::fabs(dBdx) > 0.001f)
+		dy = ((dBdt > 0) == (dBdx > 0)) ? -1 : 1;
+	if (!dx && !dy) return;
+
+	auto r = sim->pmap[y + dy][x + dx];
+	if (!r) return;
+	auto &sd = SimulationData::CRef();
+	if (!(sd.elements[TYP(r)].Properties & PROP_CONDUCTS)) return;
+
+	int &nbrCharge = (TYP(r) == PT_LITH) ? sim->parts[ID(r)].tmp3 : sim->parts[ID(r)].tmp4;
+
+	// Transfer proportional to dB/dt: faster change → more charge moved
+	int transfer = (int)(dBmag * 50.0f);
+	if (transfer < 1) transfer = 1;
+	if (transfer > 5) transfer = 5;
+	nbrCharge -= transfer;
+	chargeRef += transfer;
 }
 
 // Shared Biot-Savart: add magnetic field contribution from a current element to magSrc.

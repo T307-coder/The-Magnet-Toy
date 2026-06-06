@@ -1,4 +1,5 @@
 #include "simulation/ElementCommon.h"
+#include "simulation/ElectricityCommon.h"
 
 static int update(UPDATE_FUNC_ARGS);
 
@@ -31,7 +32,7 @@ void Element::Element_H2()
 	HeatConduct = 251;
 	Description = "Hydrogen. Combusts with OXYG to make WATR. Undergoes fusion at high temperature and pressure.";
 
-	Properties = TYPE_GAS | PROP_PHOTPASS;
+	Properties = TYPE_GAS|PROP_PHOTPASS|PROP_CONDUCTS;
 
 	LowPressure = IPL;
 	LowPressureTransition = NT;
@@ -140,6 +141,21 @@ static int update(UPDATE_FUNC_ARGS)
 			sim->pv[y/CELL][x/CELL] += 30;
 			return 1;
 		}
+	}
+	// Plasma EM response: ionization above 2000°C
+	if (parts[i].temp > 2273.15f)
+	{
+		electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);
+		electricity_polarizeCharge(sim, parts[i], x, y, parts[i].tmp4);
+		electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
+		if (parts[i].tmp4 != 0 && sim->freeChargeFieldsEnabled)
+		{
+			int cx = x / CELL, cy = y / CELL;
+			if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+				sim->eSrc[cy][cx] += parts[i].tmp4 * 0.05f;
+		}
+		electricity_applyForce(sim, parts[i], x, y, parts[i].tmp4, 0.5f);
+		electricity_applyLorentz(sim, parts[i], x, y, parts[i].tmp4);
 	}
 	return 0;
 }

@@ -77,29 +77,12 @@ static int update(UPDATE_FUNC_ARGS)
 		parts[i].tmp = 0;
 		sim->part_change_type(i,x,y,PT_BRMT);
 	}
-	// Magnetization: contact with magnets + DEUT-style internal diffusion
-	int cx = x/CELL, cy = y/CELL;
-	if (sim->magnetismEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
-	{
-		if (parts[i].temp < 773.15f)
-		{
-			magnetism_contactCharge(sim, parts[i], x, y, parts[i].tmp3);
-			magnetism_diffuseCharge(sim, parts[i], x, y, parts[i].tmp3);
-		}
-		else
-		{
-			if (parts[i].tmp3 > 0) parts[i].tmp3 = std::max(0, parts[i].tmp3 - 5);
-			else if (parts[i].tmp3 < 0) parts[i].tmp3 = std::min(0, parts[i].tmp3 + 5);
-		}
-		if (parts[i].tmp3 > 100) parts[i].tmp3 = 100;
-		if (parts[i].tmp3 < -100) parts[i].tmp3 = -100;
-		if (parts[i].tmp3 != 0)
-			sim->magSrc[cy][cx] += parts[i].tmp3 * 0.02f;
-	}
-	// Induction: only when completely unmagnetized
+	// Magnetization: shared ferromagnet update (contact, diffusion, decay, magSrc)
+	int cx, cy;
+	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, cx, cy);
+	// Induction: only when completely unmagnetized (old, not recommended)
 	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_BMTL, 1.5f, 5))
 		return 1;
-	if (parts[i].tmp3 != 0) parts[i].life = 100;
 	// Strong B-field breaks BMTL -> BRMT
 	if (sim->magnetismEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
 	{
@@ -118,53 +101,7 @@ static int update(UPDATE_FUNC_ARGS)
 			return 1;
 		}
 	}
-	// Electric charging: contact POSC, store charge in tmp4
-	if (sim->electricityEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)
-	{
-		for (auto rx = -1; rx <= 1; rx++)
-			for (auto ry = -1; ry <= 1; ry++)
-			{
-				if (!rx && !ry) continue;
-				auto r = pmap[y+ry][x+rx];
-				if (r)
-				{
-					int rt = TYP(r);
-					if (rt == PT_POSC && parts[ID(r)].life==10)
-					{
-						int q = (int)((parts[ID(r)].temp-273.15f)/5.0f);
-						if (q>100) q=100; if (q<-100) q=-100;
-						if (parts[i].tmp4<q) parts[i].tmp4++; else if (parts[i].tmp4>q) parts[i].tmp4--;
-					}
-					else if (rt == PT_FIXC)
-					{
-						int q = parts[ID(r)].tmp;
-						if (q>100) q=100; if (q<-100) q=-100;
-						if (parts[i].tmp4<q) parts[i].tmp4++; else if (parts[i].tmp4>q) parts[i].tmp4--;
-					}
-				}
-				auto pr = sim->photons[y+ry][x+rx];
-				if (pr)
-				{
-					int prt = TYP(pr);
-					if (prt == PT_ELEC) { if (parts[i].tmp4 > -100) parts[i].tmp4--; }
-					else if (prt == PT_PROT) { if (parts[i].tmp4 < 100) parts[i].tmp4++; }
-				}
-			}
-		if (parts[i].tmp4>100) parts[i].tmp4=100; if (parts[i].tmp4<-100) parts[i].tmp4=-100;
-		if (parts[i].tmp4!=0) sim->eSrc[cy][cx] += parts[i].tmp4*0.05f;
-	}
-	// Charge diffusion: equalize between conductors (DEUT-style)
-	for (auto trade = 0; trade < 4; trade++)
-	{
-		auto rx = sim->rng.between(-2,2), ry = sim->rng.between(-2,2);
-		if (!rx && !ry) continue;
-		auto r = pmap[y+ry][x+rx];
-		if (r && (SimulationData::CRef().elements[TYP(r)].Properties & PROP_CONDUCTS))
-		{
-			int diff = parts[i].tmp4 - parts[ID(r)].tmp4;
-			if (diff > 1) { int t = diff/2; parts[ID(r)].tmp4 += t; parts[i].tmp4 -= t; }
-			else if (diff == 1) { parts[ID(r)].tmp4++; parts[i].tmp4--; }
-		}
-	}
+	electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);
+	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
 	return 0;
 }

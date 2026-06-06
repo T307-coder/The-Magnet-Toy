@@ -1,8 +1,10 @@
 #include "simulation/ElementCommon.h"
+#include "simulation/ElectricityCommon.h"
 #include "FIRE.h"
 
 static int graphics(GRAPHICS_FUNC_ARGS);
 static void create(ELEMENT_CREATE_FUNC_ARGS);
+static int update(UPDATE_FUNC_ARGS);
 
 void Element::Element_PLSM()
 {
@@ -34,7 +36,7 @@ void Element::Element_PLSM()
 	HeatConduct = 5;
 	Description = "Plasma, extremely hot.";
 
-	Properties = TYPE_GAS|PROP_LIFE_DEC;
+	Properties = TYPE_GAS|PROP_LIFE_DEC|PROP_CONDUCTS;
 	CarriesTypeIn = 1U << FIELD_CTYPE;
 
 	LowPressure = IPL;
@@ -46,7 +48,7 @@ void Element::Element_PLSM()
 	HighTemperature = ITH;
 	HighTemperatureTransition = NT;
 
-	Update = &Element_FIRE_update;
+	Update = &update;
 	Graphics = &graphics;
 	Create = &create;
 }
@@ -72,4 +74,28 @@ static int graphics(GRAPHICS_FUNC_ARGS)
 static void create(ELEMENT_CREATE_FUNC_ARGS)
 {
 	sim->parts[i].life = sim->rng.between(50, 199);
+}
+
+static int update(UPDATE_FUNC_ARGS)
+{
+	// Run standard FIRE update first (heat, ignition, lava interactions)
+	Element_FIRE_update(UPDATE_FUNC_SUBCALL_ARGS);
+
+	// Plasma electromagnetic response: polarization + diffusion + DEP + Lorentz
+	if (parts[i].type == PT_PLSM)
+	{
+		// Use tmp4 as charge storage (FIRE update doesn't use it)
+		electricity_polarizeCharge(sim, parts[i], x, y, parts[i].tmp4);
+		electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);
+		// Plasma charge feeds back into E-field via eSrc
+		if (parts[i].tmp4 != 0 && sim->freeChargeFieldsEnabled)
+		{
+			int cx = x / CELL, cy = y / CELL;
+			if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+				sim->eSrc[cy][cx] += parts[i].tmp4 * 0.05f;
+		}
+		electricity_applyForce(sim, parts[i], x, y, parts[i].tmp4, 1.0f);
+		electricity_applyLorentz(sim, parts[i], x, y, parts[i].tmp4);
+	}
+	return 0;
 }

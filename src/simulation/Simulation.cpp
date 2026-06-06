@@ -1,4 +1,4 @@
-#include "Simulation.h"
+﻿#include "Simulation.h"
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
@@ -22,6 +22,9 @@
 #include <numbers>
 #include <set>
 #include <stack>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <fftw3.h>
 
 namespace
@@ -254,6 +257,119 @@ struct Simulation::ElecFFT
 	}
 };
 
+// ============================================================================
+// AsyncFieldSolver: B-field and E-field FFT each on its own worker thread.
+// Same Exchange() pattern as DispatchNewtonianGravity.
+// Two persistent threads run B-FFT and E-FFT in parallel, 1-frame pipeline.
+// ============================================================================
+struct Simulation::AsyncFieldSolver
+{
+	static constexpr int N = XCELLS * YCELLS;
+
+	struct FieldWorker
+	{
+		std::thread thread;
+		std::mutex mx;
+		std::condition_variable cv;
+		bool workReady = false;
+		bool workDone  = false;
+		bool shouldStop = false;
+		bool firstFrame = true;
+
+		std::vector<float> srcBuf;
+		std::vector<float> resultBuf;
+		std::unique_ptr<Simulation::MagFFT> magFFT;
+		std::unique_ptr<Simulation::ElecFFT> elecFFT;
+		bool isElectric = false;
+
+		void Run()
+		{
+			while (true)
+			{
+				{
+					std::unique_lock lk(mx);
+					cv.wait(lk, [this]() { return workReady || shouldStop; });
+					if (shouldStop) return;
+					workReady = false;
+				}
+				resultBuf.resize(N);
+				if (isElectric && elecFFT)
+					elecFFT->Solve(srcBuf.data(), resultBuf.data(), XCELLS, YCELLS);
+				else if (!isElectric && magFFT)
+					magFFT->Solve(srcBuf.data(), resultBuf.data(), XCELLS, YCELLS);
+				{
+					std::lock_guard lk(mx);
+					workDone = true;
+				}
+				cv.notify_one();
+			}
+		}
+
+		void Start(bool electric)
+		{
+			isElectric = electric;
+			srcBuf.resize(N, 0.0f);
+			resultBuf.resize(N, 0.0f);
+			if (electric)
+			{
+				elecFFT = std::make_unique<Simulation::ElecFFT>();
+				elecFFT->Init(XCELLS, YCELLS);
+			}
+			else
+			{
+				magFFT = std::make_unique<Simulation::MagFFT>();
+				magFFT->Init(XCELLS, YCELLS);
+			}
+			shouldStop = false;
+			firstFrame = true;
+			thread = std::thread([this]() { Run(); });
+		}
+
+		void Stop()
+		{
+			if (thread.joinable())
+			{
+				{
+					std::lock_guard lk(mx);
+					shouldStop = true;
+					workReady = true;
+				}
+				cv.notify_one();
+				thread.join();
+			}
+		}
+
+		void Exchange(const float *srcFlat, float *dstOut)
+		{
+			{
+				std::unique_lock lk(mx);
+				cv.wait(lk, [this]() { return workDone || firstFrame || shouldStop; });
+			}
+			if (!firstFrame)
+				std::copy(resultBuf.begin(), resultBuf.end(), dstOut);
+			else
+			{
+				std::fill_n(dstOut, N, 0.0f);
+				firstFrame = false;
+			}
+			std::copy_n(srcFlat, N, srcBuf.begin());
+			{
+				std::lock_guard lk(mx);
+				workDone = false;
+				workReady = true;
+			}
+			cv.notify_one();
+		}
+	};
+
+	FieldWorker bWorker;
+	FieldWorker eWorker;
+
+	~AsyncFieldSolver() { Stop(); }
+	void Start() { bWorker.Start(false); eWorker.Start(true); }
+	void Stop() { bWorker.Stop(); eWorker.Stop(); }
+};
+
 void Simulation::InitElecFFT()
 {
 	if (!elecFFT)
@@ -291,6 +407,52 @@ void Simulation::EnableElectricity(bool enable)
 	if (enable && !elecFFT)
 		InitElecFFT();
 	electricityEnabled = enable;
+}
+
+void Simulation::InitAsyncFields()
+{
+	if (!asyncFields)
+	{
+		asyncFields = std::make_unique<AsyncFieldSolver>();
+		asyncFields->Start();
+	}
+}
+
+void Simulation::EnableAsyncFields(bool enable)
+{
+	if (enable)
+		InitAsyncFields();
+	asyncFieldsEnabled = enable;
+	if (!enable && asyncFields)
+	{
+		asyncFields->Stop();
+		asyncFields.reset();
+	}
+}
+
+void Simulation::DispatchAsyncFields()
+{
+	const int N = XCELLS * YCELLS;
+	std::vector<float> magSrcFlat(N), eSrcFlat(N), bFieldFlat(N), eFieldFlat(N);
+	for (int j = 0; j < YCELLS; j++)
+		for (int i = 0; i < XCELLS; i++)
+		{
+			magSrcFlat[j * XCELLS + i] = magSrc[j][i];
+			eSrcFlat[j * XCELLS + i] = eSrc[j][i];
+		}
+	asyncFields->bWorker.Exchange(magSrcFlat.data(), bFieldFlat.data());
+	asyncFields->eWorker.Exchange(eSrcFlat.data(), eFieldFlat.data());
+	for (int j = 0; j < YCELLS; j++)
+		for (int i = 0; i < XCELLS; i++)
+		{
+			bField[j][i] = bFieldFlat[j * XCELLS + i];
+			eField[j][i] = eFieldFlat[j * XCELLS + i];
+		}
+}
+
+void Simulation::WaitAsyncFields()
+{
+	// No-op: Exchange() already waits for previous frame's work.
 }
 
 static float remainder_p(float x, float y)
@@ -4025,15 +4187,51 @@ void Simulation::BeforeSim(bool willUpdate)
 			gravIn.mass[p] = 0.f;
 		}
 
-		// Magnetic field: save previous frame, compute new
+		// Accumulate gravity mass from all particles with non-zero Gravity property
+		if (particleGravityEnabled)
+		{
+			for (auto i = 0; i < NPART; ++i)
+			{
+				if (parts[i].type)
+				{
+					float grav = SimulationData::CRef().elements[parts[i].type].Gravity;
+					if (grav > 0.f)
+					{
+						auto cell = Vec2{ int(parts[i].x / CELL), int(parts[i].y / CELL) };
+						if (cell.X >= 0 && cell.Y >= 0 && cell.X < XCELLS && cell.Y < YCELLS)
+							gravIn.mass[cell] += grav * 0.01f;
+					}
+				}
+			}
+		}
+
+		// Accumulate eSrc: solids always (Y key), non-solids gated by Q key
+		if (electricityEnabled)
+		{
+			for (auto i = 0; i < NPART; ++i)
+			{
+				if (!parts[i].type) continue;
+				int t = parts[i].type;
+				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY)
+					continue;
+				bool isSolid = (SimulationData::CRef().elements[t].Properties & TYPE_SOLID) != 0;
+				if (!isSolid && !freeChargeFieldsEnabled) continue;
+				int charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+				if (charge != 0)
+				{
+					int cx = int(parts[i].x / CELL), cy = int(parts[i].y / CELL);
+					if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+						eSrc[cy][cx] += charge * 0.05f;
+				}
+			}
+		}
+
+		// Magnetic field: save previous frame, compute new (Biot-Savart sources)
 		if (magnetismEnabled)
 		{
-			// Build cached magnetic source list (push model for element lookups)
 			magnetism_buildSourceList(this);
-
 			memcpy(prevBField, bField, sizeof(bField));
 			prevBFieldValid = true;
-			// Biot-Savart: moving charges produce magnetic field circling around velocity
 			if (currentBFieldEnabled)
 			{
 				constexpr float BIOT_SCALE = 2.0f;
@@ -4048,8 +4246,17 @@ void Simulation::BeforeSim(bool willUpdate)
 					float q = 0.0f;
 					if (type == PT_ELEC) q = freeChargeFieldsEnabled ? -1.0f : 0.0f;
 					else if (type == PT_PROT) q = freeChargeFieldsEnabled ? 1.0f : 0.0f;
-					else if (electricityEnabled && (elements[type].Properties & PROP_CONDUCTS))
+					else if (type == PT_LITH) q = parts[i].tmp3 * 0.01f;
+					else if (electricityEnabled && parts[i].tmp4 != 0 &&
+					         type != PT_PLNT && type != PT_SEED && type != PT_STOR &&
+					         type != PT_VIRS && type != PT_ARAY &&
+				         type != PT_PSCN && type != PT_NSCN && type != PT_PTCT && type != PT_NTCT)
+					{
+						bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
+						if (!isSolid && !freeChargeFieldsEnabled) continue;
+						if (type == PT_SPRK && parts[i].tmp3 == 1) continue;
 						q = parts[i].tmp4 * 0.01f;
+					}
 					if (q == 0.0f) continue;
 					bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
 					float vx = isSolid ? (float)parts[i].tmp5 : parts[i].vx;
@@ -4059,24 +4266,102 @@ void Simulation::BeforeSim(bool willUpdate)
 					magnetism_addBiotSavart(this, parts[i].x, parts[i].y, vx, vy, scale, BIOT_RADIUS);
 				}
 			}
-			ComputeBField();
-			// Add global uniform B-field to all cells
-			if (uniformBField != 0.0f)
+		}
+
+		// New EM induction: dB/dt orthogonal charge transfer for all conductors (excl. semiconductors)
+		if (newInductionEnabled)
+		{
+			for (int i = 0; i < NPART; i++)
+			{
+				if (!parts[i].type) continue;
+				int t = parts[i].type;
+				if (!(SimulationData::CRef().elements[t].Properties & PROP_CONDUCTS)) continue;
+				if (t == PT_PSCN || t == PT_NSCN || t == PT_PTCT || t == PT_NTCT) continue;
+				int &charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+				magnetism_newInduction(this, parts[i], (int)parts[i].x, (int)parts[i].y, charge);
+			}
+		}
+
+		// Apply Coulomb + Lorentz forces (solids always, non-solids gated by Q)
+		if (electricityEnabled)
+		{
+			auto &sd = SimulationData::CRef();
+			for (int i = 0; i < NPART; i++)
+			{
+				if (!parts[i].type) continue;
+				int t = parts[i].type;
+				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY ||
+				    t == PT_PSCN || t == PT_NSCN || t == PT_PTCT || t == PT_NTCT)
+					continue;
+				bool isSolid = (sd.elements[t].Properties & TYPE_SOLID) != 0;
+				if (!isSolid && !freeChargeFieldsEnabled) continue;
+				int charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+				if (charge == 0) continue;
+				int cx = int(parts[i].x / CELL), cy = int(parts[i].y / CELL);
+				if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) continue;
+				float massFactor = 1.0f / (sd.elements[t].Gravity + 0.05f);
+				// Coulomb force
+				float dEx = eField[cy][cx + 1] - eField[cy][cx - 1];
+				float dEy = eField[cy + 1][cx] - eField[cy - 1][cx];
+				parts[i].vx -= dEx * charge * 0.5f * massFactor;
+				parts[i].vy -= dEy * charge * 0.5f * massFactor;
+				// Lorentz force
+				if (magnetismEnabled)
+				{
+					float Bz = bField[cy][cx];
+					if (Bz != 0.0f)
+					{
+						float dtheta = Bz * charge * 0.05f * massFactor;
+						float c = cosf(dtheta), s = sinf(dtheta);
+						float vx = parts[i].vx * c - parts[i].vy * s;
+						float vy = parts[i].vx * s + parts[i].vy * c;
+						parts[i].vx = vx; parts[i].vy = vy;
+					}
+				}
+			}
+		}
+
+		// Electric field: save previous frame
+		if (electricityEnabled)
+		{
+			memcpy(prevEField, eField, sizeof(eField));
+			prevEFieldValid = true;
+		}
+
+		// Compute B-field and E-field: async (worker threads) or sync (main thread)
+		// Async: same Exchange() pattern as Newtonian gravity, 1-frame pipeline
+		if (asyncFieldsEnabled && asyncFields && (magnetismEnabled || electricityEnabled))
+		{
+			DispatchAsyncFields();
+
+			if (magnetismEnabled && uniformBField != 0.0f)
 			{
 				for (int y = 0; y < YCELLS; y++)
 					for (int x = 0; x < XCELLS; x++)
 						bField[y][x] += uniformBField;
 			}
-			memset(magSrc, 0, sizeof(magSrc));
+			if (magnetismEnabled) memset(magSrc, 0, sizeof(magSrc));
+			if (electricityEnabled) memset(eSrc, 0, sizeof(eSrc));
 		}
-
-		// Electric field: save previous frame, compute new
-		if (electricityEnabled)
+		else
 		{
-			memcpy(prevEField, eField, sizeof(eField));
-			prevEFieldValid = true;
-			ComputeEField();
-			memset(eSrc, 0, sizeof(eSrc));
+			if (magnetismEnabled)
+			{
+				ComputeBField();
+				if (uniformBField != 0.0f)
+				{
+					for (int y = 0; y < YCELLS; y++)
+						for (int x = 0; x < XCELLS; x++)
+							bField[y][x] += uniformBField;
+				}
+				memset(magSrc, 0, sizeof(magSrc));
+			}
+
+			if (electricityEnabled)
+			{
+				ComputeEField();
+				memset(eSrc, 0, sizeof(eSrc));
+			}
 		}
 
 		if(emp_decor>0)
@@ -4264,6 +4549,52 @@ void Simulation::AfterSim()
 		emp_trigger_count = 0;
 	}
 
+	// New EM induction: runs after particle updates so induced charge isn't overwritten (excl. semiconductors)
+	if (newInductionEnabled)
+	{
+		auto &sd = SimulationData::CRef();
+		for (int i = 0; i < NPART; i++)
+		{
+			if (!parts[i].type) continue;
+			int t = parts[i].type;
+			if (!(sd.elements[t].Properties & PROP_CONDUCTS)) continue;
+			if (t == PT_PSCN || t == PT_NSCN || t == PT_PTCT || t == PT_NTCT) continue;
+			int &charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+			magnetism_newInduction(this, parts[i], (int)parts[i].x, (int)parts[i].y, charge);
+			// Induction SPRK: large charge *difference* between neighbours triggers breakdown
+			// (local E-field strength, not absolute charge — allows charge accumulation)
+			if (inductionSprkEnabled && parts[i].type != PT_SPRK && parts[i].life == 0)
+			{
+				int x = (int)(parts[i].x + 0.5f), y = (int)(parts[i].y + 0.5f);
+				bool breakdown = false;
+				for (int rx = -1; rx <= 1 && !breakdown; rx++)
+					for (int ry = -1; ry <= 1; ry++)
+					{
+						if (!rx && !ry) continue;
+						auto r = pmap[y + ry][x + rx];
+						if (!r) continue;
+						int rt = TYP(r);
+						if (!(sd.elements[rt].Properties & PROP_CONDUCTS)) continue;
+						if (rt == PT_PSCN || rt == PT_NSCN || rt == PT_PTCT || rt == PT_NTCT) continue;
+						int nbrCharge = (rt == PT_LITH) ? parts[ID(r)].tmp3 : parts[ID(r)].tmp4;
+						if (std::abs(charge - nbrCharge) >= 16 && rng.chance(1, 3))
+						{
+							breakdown = true;
+							break;
+						}
+					}
+				if (breakdown)
+				{
+					int oldType = parts[i].type;
+					part_change_type(i, x, y, PT_SPRK);
+					parts[i].ctype = oldType;
+					parts[i].life = 4;
+					parts[i].tmp3 = 1;
+				}
+			}
+		}
+	}
+
 	frameCount += 1;
 }
 
@@ -4286,6 +4617,8 @@ Simulation::Simulation()
 
 	InitMagFFT();
 	InitElecFFT();
+	if (asyncFieldsEnabled)
+		InitAsyncFields();
 }
 
 void Simulation::DispatchNewtonianGravity()

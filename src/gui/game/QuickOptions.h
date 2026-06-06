@@ -122,3 +122,43 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+
+class NewInductionOption: public QuickOption
+{
+public:
+	NewInductionOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class InductionSprkOption: public QuickOption
+{
+public:
+	InductionSprkOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class PotentialCurrentOption: public QuickOption
+{
+public:
+	PotentialCurrentOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class PolarizationOption: public QuickOption
+{
+public:
+	PolarizationOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class ParticleGravityOption: public QuickOption
+{
+public:
+	ParticleGravityOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

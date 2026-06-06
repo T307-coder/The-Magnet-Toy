@@ -281,6 +281,16 @@ public:
 	bool GetRealisticPstnEnabled();
 	void SetFreeChargeFieldsEnabled(bool enable);
 	bool GetFreeChargeFieldsEnabled();
+	void SetNewInductionEnabled(bool enable);
+	bool GetNewInductionEnabled();
+	void SetInductionSprkEnabled(bool enable);
+	bool GetInductionSprkEnabled();
+	void SetPotentialCurrentEnabled(bool enable);
+	bool GetPotentialCurrentEnabled();
+	void SetPolarizationEnabled(bool enable);
+	bool GetPolarizationEnabled();
+	void SetParticleGravityEnabled(bool enable);
+	bool GetParticleGravityEnabled();
 	void SetSprkCurrentEnabled(bool enable);
 	bool GetSprkCurrentEnabled();
 	void SetElectricityEnabled(bool enable);
