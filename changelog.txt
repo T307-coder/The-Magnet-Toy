@@ -1,4 +1,4 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v1.2.12 — Retrigger release (no code changes). CI infra: i686 MinGW MSYS2 issue tracked upstream.
+v1.2.13 — CI: fix i686 MinGW build (7zip→p7zip package), update upstream base to 100.0.398.
