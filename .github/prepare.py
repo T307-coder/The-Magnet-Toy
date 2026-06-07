@@ -14,6 +14,7 @@ def set_output(key, value):
 		f.write(f"{key}={value}\n")
 
 subprocess.run([ 'meson', 'setup', '-Dprepare=true', 'build-prepare' ], check = True)
+print(f"DEBUG: GITHUB_REF={os.getenv('GITHUB_REF')}", flush=True)
 build_options = {}
 with open('build-prepare/meson-info/intro-buildoptions.json') as f:
 	for option in json.loads(f.read()):
@@ -29,9 +30,11 @@ if int(build_options['mod_id']) == 0 and os.path.exists('.github/mod_id.txt'):
 	with open('.github/mod_id.txt') as f:
 		build_options['mod_id'] = f.read()
 mod_id = int(build_options['mod_id'])
+print(f"DEBUG: mod_id={mod_id}", flush=True)
 
 release_name_prefix = ''
 match_modx = re.fullmatch(r'refs/tags/mod([0-9]+)-(.*)', ref)
+print(f"DEBUG: match_modx={bool(match_modx)}, ref={ref}", flush=True)
 if match_modx and mod_id and int(match_modx.group(1)) == mod_id:
 	release_name_prefix = f'mod{match_modx.group(1)}-'
 	ref = f'refs/tags/{match_modx.group(2)}'
@@ -41,6 +44,7 @@ if match_varx:
 	ref = f'refs/tags/{match_varx.group(2)}'
 
 match_stable     = re.fullmatch(r'refs/tags/v([0-9]+)\.([0-9]+)\.([0-9]+)', ref)
+print(f"DEBUG: ref after modx={ref}, match_stable={bool(match_stable)}", flush=True)
 match_beta       = re.fullmatch(r'refs/tags/v([0-9]+)\.([0-9]+)\.([0-9]+)b', ref)
 match_snapshot   = re.fullmatch(r'refs/tags/snapshot-([0-9]+)', ref)
 match_tptlibsdev = re.fullmatch(r'refs/heads/tptlibsdev-(.*)', ref)
@@ -154,14 +158,14 @@ for        arch,     platform,         libc,   statdyn, bplatform,         runso
 #	(  'x86_64',    'windows',      'mingw', 'dynamic',   'linux', 'ubuntu-22.04',     '',         'check',      None,         None,                     None,   'debug',       10, False ), # ubuntu-22.04 doesn't have ucrt64-capable mingw >_>
 #	(  'x86_64',    'windows',      'mingw', 'dynamic',   'linux', 'ubuntu-22.04',     '',         'check',      None,         None,                     None, 'release',       10, False ), # ubuntu-22.04 doesn't have ucrt64-capable mingw >_>
 	(  'x86_64',    'windows',      'mingw',  'static', 'windows', 'windows-2022', '.exe',         'check',      None,         None,                     None,   'debug',        0, False ), # priority = 0: static debug build
-	(  'x86_64',    'windows',      'mingw',  'static', 'windows', 'windows-2022', '.exe',       'publish',    '.dbg',         None,'x86_64-win-mingw-static', 'release',       10, False ),
-	(  'x86_64',    'windows',      'mingw',  'static', 'windows', 'windows-2022', '.exe',       'publish',    '.dbg',      'steam','x86_64-win-mingw-static', 'release',       -5, False ), # priority = -5: steam build
+	(  'x86_64',    'windows',      'mingw',  'static', 'windows', 'windows-2022', '.exe',       'archive',    '.dbg',         None,                     None, 'release',       10, False ),
 	(     'x86',    'windows',      'mingw',  'static', 'windows', 'windows-2022', '.exe',       'publish',    '.dbg',         None,  'i686-win-mingw-static', 'release',       10, False ), # windows xp
 	( 'x86_old',    'windows',      'mingw',  'static', 'windows', 'windows-2022', '.exe',       'archive',    '.dbg',         None,                     None, 'release',       10, False ), # windows xp, no sse, doesn't work because https://github.com/msys2/MINGW-packages/issues/24932
 	(  'x86_64',    'windows',      'mingw', 'dynamic', 'windows', 'windows-2022', '.exe',         'check',      None,         None,                     None,   'debug',       10, False ),
 	(  'x86_64',    'windows',      'mingw', 'dynamic', 'windows', 'windows-2022', '.exe',         'check',      None,         None,                     None, 'release',       10,  True ),
 	(  'x86_64',    'windows',       'msvc',  'static', 'windows', 'windows-2022', '.exe',         'check',      None,         None,                     None,   'debug',        0, False ), # priority = 0: static debug build
-	(  'x86_64',    'windows',       'msvc',  'static', 'windows', 'windows-2022', '.exe',       'archive',    '.pdb',         None, 'x86_64-win-msvc-static', 'release',       10, False ),
+	(  'x86_64',    'windows',       'msvc',  'static', 'windows', 'windows-2022', '.exe',       'publish',    '.pdb',         None, 'x86_64-win-msvc-static', 'release',       10, False ),
+	(  'x86_64',    'windows',       'msvc',  'static', 'windows', 'windows-2022', '.exe',       'publish',    '.pdb',      'steam', 'x86_64-win-msvc-static', 'release',       -5, False ), # priority = -5: steam build
 	(  'x86_64',    'windows',       'msvc', 'dynamic', 'windows', 'windows-2022', '.exe',         'check',      None,         None,                     None,   'debug',       10, False ),
 #	(  'x86_64',    'windows',       'msvc', 'dynamic', 'windows', 'windows-2022', '.exe',         'check',      None,  'backendvs',                     None,   'debug',        0, False ), # priority = 0: backend=vs build
 	(  'x86_64',    'windows',       'msvc', 'dynamic', 'windows', 'windows-2022', '.exe',         'check',      None,         None,                     None, 'release',       10, False ),
