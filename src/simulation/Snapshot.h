@@ -23,6 +23,13 @@ public:
 	std::vector<float> GravMass;
 	std::vector<uint32_t> GravMask;
 
+	std::vector<float> EField;
+	std::vector<float> BField;
+	std::vector<float> PrevEField;
+	std::vector<float> PrevBField;
+	std::vector<float> ESrc;
+	std::vector<float> MagSrc;
+
 	std::vector<unsigned char> BlockMap;
 	std::vector<unsigned char> ElecMap;
 	std::vector<unsigned char> BlockAir;

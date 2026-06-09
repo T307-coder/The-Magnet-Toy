@@ -745,6 +745,22 @@ void Simulation::Load(const GameSave *save, bool includePressure, Vec2<int> bloc
 		ResetNewtonianGravity(gravIn, gravOut);
 	}
 
+	if (save->hasEField || save->hasBField)
+	{
+		for (auto bpos : targetBlocks)
+		{
+			auto spos = bpos - blockP;
+			auto cx = bpos.X, cy = bpos.Y;
+			if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+			{
+				eField    [cy][cx] = save->eField    [spos];
+				bField    [cy][cx] = save->bField    [spos];
+				prevEField[cy][cx] = save->prevEField[spos];
+				prevBField[cy][cx] = save->prevBField[spos];
+			}
+		}
+	}
+
 	gravWallChanged = true;
 	if (!save->hasBlockAirMaps)
 	{
@@ -860,6 +876,17 @@ std::unique_ptr<GameSave> Simulation::Save(bool includePressure, Rect<int> partR
 			newSave->gravForceX[bpos] = gravOut.forceX[bpos + blockP];
 			newSave->gravForceY[bpos] = gravOut.forceY[bpos + blockP];
 		}
+		// EM fields for copy-paste / file save compatibility
+		{
+			int cx = (bpos + blockP).X, cy = (bpos + blockP).Y;
+			if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+			{
+				newSave->eField    [bpos] = eField    [cy][cx];
+				newSave->bField    [bpos] = bField    [cy][cx];
+				newSave->prevEField[bpos] = prevEField[cy][cx];
+				newSave->prevBField[bpos] = prevBField[cy][cx];
+			}
+		}
 	}
 	if (includePressure)
 	{
@@ -869,6 +896,8 @@ std::unique_ptr<GameSave> Simulation::Save(bool includePressure, Rect<int> partR
 	{
 		newSave->hasGravityMaps = true;
 	}
+	newSave->hasEField = electricityEnabled;
+	newSave->hasBField = magnetismEnabled;
 	if (includePressure || ensureDeterminism)
 	{
 		newSave->hasPressure = true;

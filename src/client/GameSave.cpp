@@ -257,6 +257,10 @@ void GameSave::setSize(Vec2<int> newBlockSize)
 	gravMask = PlaneAdapter<std::vector<uint32_t>>(blockSize, UINT32_C(0xFFFFFFFF));
 	gravForceX = PlaneAdapter<std::vector<float>>(blockSize, 0.f);
 	gravForceY = PlaneAdapter<std::vector<float>>(blockSize, 0.f);
+	eField = PlaneAdapter<std::vector<float>>(blockSize, 0.f);
+	bField = PlaneAdapter<std::vector<float>>(blockSize, 0.f);
+	prevEField = PlaneAdapter<std::vector<float>>(blockSize, 0.f);
+	prevBField = PlaneAdapter<std::vector<float>>(blockSize, 0.f);
 }
 
 std::pair<bool, std::vector<char>> GameSave::Serialise() const
@@ -382,6 +386,10 @@ void GameSave::Transform(Mat2<int> transform, Vec2<int> nudge)
 	PlaneAdapter<std::vector<uint32_t>> newGravMask(newBlockS, UINT32_C(0xFFFFFFFF));
 	PlaneAdapter<std::vector<float>> newGravForceX(newBlockS, 0.f);
 	PlaneAdapter<std::vector<float>> newGravForceY(newBlockS, 0.f);
+	PlaneAdapter<std::vector<float>> newEField(newBlockS, 0.f);
+	PlaneAdapter<std::vector<float>> newBField(newBlockS, 0.f);
+	PlaneAdapter<std::vector<float>> newPrevEField(newBlockS, 0.f);
+	PlaneAdapter<std::vector<float>> newPrevBField(newBlockS, 0.f);
 	for (auto bpos : blockSize.OriginRect())
 	{
 		auto newBpos = transform * bpos + btranslate;
@@ -409,6 +417,10 @@ void GameSave::Transform(Mat2<int> transform, Vec2<int> nudge)
 		newGravMask[newBpos] = gravMask[bpos];
 		newGravForceX[newBpos] = gravForceX[bpos];
 		newGravForceY[newBpos] = gravForceY[bpos];
+		newEField[newBpos] = eField[bpos];
+		newBField[newBpos] = bField[bpos];
+		newPrevEField[newBpos] = prevEField[bpos];
+		newPrevBField[newBpos] = prevBField[bpos];
 	}
 	blockMap = std::move(newBlockMap);
 	fanVelX = std::move(newFanVelX);
@@ -423,6 +435,10 @@ void GameSave::Transform(Mat2<int> transform, Vec2<int> nudge)
 	gravMask = std::move(newGravMask);
 	gravForceX = std::move(newGravForceX);
 	gravForceY = std::move(newGravForceY);
+	eField = std::move(newEField);
+	bField = std::move(newBField);
+	prevEField = std::move(newPrevEField);
+	prevBField = std::move(newPrevBField);
 
 	blockSize = newBlockS;
 }
@@ -474,6 +490,7 @@ void GameSave::readOPS(const std::vector<char> &data)
 	std::span<const unsigned char> ambientData;
 	std::span<const unsigned char> blockAirData;
 	std::span<const unsigned char> gravityData;
+	std::span<const unsigned char> emFieldData;
 	unsigned partsCount = 0;
 	unsigned int savedVersion = inputData[4];
 	version = { savedVersion, 0 };
@@ -628,6 +645,7 @@ void GameSave::readOPS(const std::vector<char> &data)
 	getAddressIfUser(b, "ambientMap", ambientData);
 	getAddressIfUser(b, "blockAir", blockAirData);
 	getAddressIfUser(b, "gravity", gravityData);
+	getAddressIfUser(b, "emField", emFieldData);
 	getAddressIfUser(b, "fanMap", fanData);
 	getAddressIfUser(b, "soapLinks", soapLinkData);
 	copyIfBool(b, "legacyEnable", legacyEnable);
@@ -923,6 +941,27 @@ void GameSave::readOPS(const std::vector<char> &data)
 			gravForceY[blockP + bpos] = forceYDataPlane[bpos];
 		}
 		hasGravityMaps = true;
+	}
+
+	if (emFieldData.data())
+	{
+		if (blockS.X * blockS.Y * 4 > int(emFieldData.size() / int(sizeof(float))))
+		{
+			throw ParseException(ParseException::Corrupt, "Not enough EM field data");
+		}
+		auto eFieldPlane     = MakePlane(blockS, reinterpret_cast<const float *>(emFieldData.data()));
+		auto bFieldPlane     = MakePlane(blockS, reinterpret_cast<const float *>(emFieldData.data() +     blockS.X * blockS.Y * sizeof(float)));
+		auto prevEFieldPlane = MakePlane(blockS, reinterpret_cast<const float *>(emFieldData.data() + 2 * blockS.X * blockS.Y * sizeof(float)));
+		auto prevBFieldPlane = MakePlane(blockS, reinterpret_cast<const float *>(emFieldData.data() + 3 * blockS.X * blockS.Y * sizeof(float)));
+		for (auto bpos : blockS.OriginRect().Range<LEFT_TO_RIGHT, TOP_TO_BOTTOM>())
+		{
+			eField    [blockP + bpos] = eFieldPlane    [bpos];
+			bField    [blockP + bpos] = bFieldPlane    [bpos];
+			prevEField[blockP + bpos] = prevEFieldPlane[bpos];
+			prevBField[blockP + bpos] = prevBFieldPlane[bpos];
+		}
+		hasEField = true;
+		hasBField = true;
 	}
 
 	//Read particle data
@@ -2001,6 +2040,12 @@ std::pair<bool, std::vector<char>> GameSave::serialiseOPS() const
 	auto forceXDataPlane = MakePlane(blockSize, reinterpret_cast<float    *>(gravityData.data() + 2 * blockSize.X * blockSize.Y * sizeof(float)));
 	auto forceYDataPlane = MakePlane(blockSize, reinterpret_cast<float    *>(gravityData.data() + 3 * blockSize.X * blockSize.Y * sizeof(float)));
 
+	std::vector<unsigned char> emFieldData(blockSize.X * blockSize.Y * 4 * sizeof(float));
+	auto eFieldPlane     = MakePlane(blockSize, reinterpret_cast<float *>(emFieldData.data()));
+	auto bFieldPlane     = MakePlane(blockSize, reinterpret_cast<float *>(emFieldData.data() +     blockSize.X * blockSize.Y * sizeof(float)));
+	auto prevEFieldPlane = MakePlane(blockSize, reinterpret_cast<float *>(emFieldData.data() + 2 * blockSize.X * blockSize.Y * sizeof(float)));
+	auto prevBFieldPlane = MakePlane(blockSize, reinterpret_cast<float *>(emFieldData.data() + 3 * blockSize.X * blockSize.Y * sizeof(float)));
+
 	unsigned int fanDataLen = 0, pressDataLen = 0, vxDataLen = 0, vyDataLen = 0, ambientDataLen = 0;
 
 	for (auto bpos : RectSized(blockP, blockS).Range<LEFT_TO_RIGHT, TOP_TO_BOTTOM>())
@@ -2031,6 +2076,11 @@ std::pair<bool, std::vector<char>> GameSave::serialiseOPS() const
 			maskDataPlane  [bpos - blockP] = gravMask  [bpos];
 			forceXDataPlane[bpos - blockP] = gravForceX[bpos];
 			forceYDataPlane[bpos - blockP] = gravForceY[bpos];
+
+			eFieldPlane    [bpos - blockP] = eField    [bpos];
+			bFieldPlane    [bpos - blockP] = bField    [bpos];
+			prevEFieldPlane[bpos - blockP] = prevEField[bpos];
+			prevBFieldPlane[bpos - blockP] = prevBField[bpos];
 		}
 
 		if (hasAmbientHeat)
@@ -2642,6 +2692,10 @@ std::pair<bool, std::vector<char>> GameSave::serialiseOPS() const
 	if (gravityEnable)
 	{
 		b["gravity"] = std::move(gravityData);
+	}
+	if (hasPressure && (hasEField || hasBField))
+	{
+		b["emField"] = std::move(emFieldData);
 	}
 	unsigned int signsCount = 0;
 	for (size_t i = 0; i < signs.size(); i++)

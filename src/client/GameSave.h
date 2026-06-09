@@ -77,6 +77,8 @@ public:
 	bool hasAmbientHeat = false;
 	bool hasBlockAirMaps = false;
 	bool hasGravityMaps = false;
+	bool hasEField = false;
+	bool hasBField = false;
 	bool ensureDeterminism = false; // only taken seriously by serializeOPS; readOPS may set this even if the save does not have everything required for determinism
 	bool hasRngState = false; // only written by readOPS, never read
 	RNG::State rngState;
@@ -98,6 +100,10 @@ public:
 	PlaneAdapter<std::vector<uint32_t>> gravMask;
 	PlaneAdapter<std::vector<float>> gravForceX;
 	PlaneAdapter<std::vector<float>> gravForceY;
+	PlaneAdapter<std::vector<float>> eField;
+	PlaneAdapter<std::vector<float>> bField;
+	PlaneAdapter<std::vector<float>> prevEField;
+	PlaneAdapter<std::vector<float>> prevBField;
 
 	//Simulation Options
 	bool waterEEnabled = false;
