@@ -1,9 +1,8 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v2.0.6 — Clean release: all EM features, upstream 100.0 sync, p7zip i686 fix.
-Induction SPRK: charge-difference trigger (>=16), unlimited charge accumulation.
-New induction: both axes independent, diagonal electron drift perpendicular to ∇B.
-Semiconductor EM exclusion (PSCN/NSCN/PTCT/NTCT). Ferromagnet magnetization dedup.
-Default: O/Z/L keys ON. Old induction (I) OFF. Q key OFF. S key OFF.
-SPRK charge redistribution, magnetized ferromagnet life=100 cooldown.
+v2.0.10 — EM field undo/save consistency, match gravity pattern.
+Undo: EM fields now properly roll back (eField/bField/eSrc/magSrc in snapshot, async worker priming).
+Save/load: eSrc/magSrc serialized (6 floats/cell, backward compat with 4). Field no longer disappears after load.
+Second undo: zero eSrc/magSrc after restore, matching gravity's zero-and-reaccumulate gravIn.mass.
+Biot-Savart: consume solid tmp5/tmp6 after read — magnetic field stops when charges stop moving.

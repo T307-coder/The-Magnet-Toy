@@ -4339,6 +4339,8 @@ void Simulation::BeforeSim(bool willUpdate)
 					if (vx == 0.0f && vy == 0.0f) continue;
 					float scale = (isSolid ? BIOT_SCALE_SOLID : BIOT_SCALE) * q;
 					magnetism_addBiotSavart(this, parts[i].x, parts[i].y, vx, vy, scale, BIOT_RADIUS);
+					// Consume solid velocity: B-field only while charges are actively moving
+					if (isSolid) { parts[i].tmp5 = 0; parts[i].tmp6 = 0; }
 				}
 			}
 		}
