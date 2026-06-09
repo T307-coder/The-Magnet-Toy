@@ -360,6 +360,20 @@ struct Simulation::AsyncFieldSolver
 			}
 			cv.notify_one();
 		}
+
+		// Prime the worker's internal buffers after an external field change
+		// (undo, load). resultBuf → field so next Exchange returns the truth;
+		// srcBuf → sources so next computation starts from the right state.
+		void PrimeResult(const float *field, const float *src)
+		{
+			std::unique_lock lk(mx);
+			cv.wait(lk, [this]() { return workDone || firstFrame || shouldStop; });
+			std::copy_n(field, N, resultBuf.begin());
+			std::copy_n(src, N, srcBuf.begin());
+			firstFrame = false;
+			workDone = true;
+			workReady = false;
+		}
 	};
 
 	FieldWorker bWorker;
@@ -368,6 +382,23 @@ struct Simulation::AsyncFieldSolver
 	~AsyncFieldSolver() { Stop(); }
 	void Start() { bWorker.Start(false); eWorker.Start(true); }
 	void Stop() { bWorker.Stop(); eWorker.Stop(); }
+
+	// Call after external eField/bField/eSrc/magSrc changes (undo, load)
+	void SyncFields(const float (*eField)[XCELLS], const float (*bField)[XCELLS],
+	                const float (*eSrc)[XCELLS], const float (*magSrc)[XCELLS])
+	{
+		std::vector<float> eF(N), bF(N), eS(N), mS(N);
+		for (int j = 0; j < YCELLS; j++)
+			for (int i = 0; i < XCELLS; i++)
+			{
+				eF[j * XCELLS + i] = eField[j][i];
+				bF[j * XCELLS + i] = bField[j][i];
+				eS[j * XCELLS + i] = eSrc[j][i];
+				mS[j * XCELLS + i] = magSrc[j][i];
+			}
+		eWorker.PrimeResult(eF.data(), eS.data());
+		bWorker.PrimeResult(bF.data(), mS.data());
+	}
 };
 
 void Simulation::InitElecFFT()
@@ -453,6 +484,14 @@ void Simulation::DispatchAsyncFields()
 void Simulation::WaitAsyncFields()
 {
 	// No-op: Exchange() already waits for previous frame's work.
+}
+
+void Simulation::SyncAsyncFields()
+{
+	// Prime async field workers so the next Exchange returns current eField/bField
+	// instead of stale resultBuf. Call after external field changes (undo, load).
+	if (asyncFieldsEnabled && asyncFields)
+		asyncFields->SyncFields(eField, bField, eSrc, magSrc);
 }
 
 static float remainder_p(float x, float y)
@@ -757,8 +796,13 @@ void Simulation::Load(const GameSave *save, bool includePressure, Vec2<int> bloc
 				bField    [cy][cx] = save->bField    [spos];
 				prevEField[cy][cx] = save->prevEField[spos];
 				prevBField[cy][cx] = save->prevBField[spos];
+				eSrc      [cy][cx] = save->eSrc      [spos];
+				magSrc    [cy][cx] = save->magSrc    [spos];
 			}
 		}
+		prevEFieldValid = true;
+		prevBFieldValid = true;
+		SyncAsyncFields();
 	}
 
 	gravWallChanged = true;
@@ -885,6 +929,8 @@ std::unique_ptr<GameSave> Simulation::Save(bool includePressure, Rect<int> partR
 				newSave->bField    [bpos] = bField    [cy][cx];
 				newSave->prevEField[bpos] = prevEField[cy][cx];
 				newSave->prevBField[bpos] = prevBField[cy][cx];
+				newSave->eSrc      [bpos] = eSrc      [cy][cx];
+				newSave->magSrc    [bpos] = magSrc    [cy][cx];
 			}
 		}
 	}

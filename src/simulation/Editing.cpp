@@ -82,14 +82,18 @@ void Simulation::Restore(const Snapshot &snap)
 		std::copy(snap.BField    .begin(), snap.BField    .end(), &bField   [0][0]);
 		std::copy(snap.PrevEField.begin(), snap.PrevEField.end(), &prevEField[0][0]);
 		std::copy(snap.PrevBField.begin(), snap.PrevBField.end(), &prevBField[0][0]);
-		// Match gravity's ResetNewtonianGravity: compute to consume restored sources,
-		// then overwrite result with snapshot truth, then zero sources for clean start
-		if (electricityEnabled) { ComputeEField(); std::copy(snap.EField.begin(), snap.EField.end(), &eField[0][0]); }
-		if (magnetismEnabled) { ComputeBField(); std::copy(snap.BField.begin(), snap.BField.end(), &bField[0][0]); }
-		memset(eSrc, 0, sizeof(eSrc));
-		memset(magSrc, 0, sizeof(magSrc));
+		std::copy(snap.ESrc      .begin(), snap.ESrc      .end(), &eSrc      [0][0]);
+		std::copy(snap.MagSrc    .begin(), snap.MagSrc    .end(), &magSrc    [0][0]);
 		prevEFieldValid = true;
 		prevBFieldValid = true;
+		// Sync async field workers so next Exchange returns restored fields,
+		// matching gravity's ResetNewtonianGravity pattern.
+		SyncAsyncFields();
+		// Zero eSrc/magSrc so BeforeSim starts fresh (matching gravity's
+		// zero-and-reaccumulate pattern for gravIn.mass). The primed resultBuf
+		// ensures the correct field is displayed on the first frame.
+		memset(eSrc, 0, sizeof(eSrc));
+		memset(magSrc, 0, sizeof(magSrc));
 		// we apply the old grav values but Newtonian gravity enable state is not part of the snapshot so this may be pointless
 		// TODO: maybe track settings like Newtonian gravity enable state in the history
 		ResetNewtonianGravity(newGravIn, newGravOut);

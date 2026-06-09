@@ -104,6 +104,8 @@ public:
 	PlaneAdapter<std::vector<float>> bField;
 	PlaneAdapter<std::vector<float>> prevEField;
 	PlaneAdapter<std::vector<float>> prevBField;
+	PlaneAdapter<std::vector<float>> eSrc;
+	PlaneAdapter<std::vector<float>> magSrc;
 
 	//Simulation Options
 	bool waterEEnabled = false;

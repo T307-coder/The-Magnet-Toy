@@ -179,6 +179,7 @@ public:
 	void EnableAsyncFields(bool enable);
 	void DispatchAsyncFields();
 	void WaitAsyncFields();
+	void SyncAsyncFields();   // prime workers after undo/load
 
 	Particle portalp[CHANNELS][8][80];
 	int wireless[CHANNELS][2];
