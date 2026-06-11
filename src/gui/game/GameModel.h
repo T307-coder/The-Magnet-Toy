@@ -277,6 +277,8 @@ public:
 	bool GetInductionEnabled();
 	void SetCurrentBFieldEnabled(bool enable);
 	bool GetCurrentBFieldEnabled();
+	void SetNonferroFieldsEnabled(bool enable);
+	bool GetNonferroFieldsEnabled();
 	void SetRealisticPstnEnabled(bool enable);
 	bool GetRealisticPstnEnabled();
 	void SetFreeChargeFieldsEnabled(bool enable);

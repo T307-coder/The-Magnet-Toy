@@ -302,3 +302,17 @@ void ParticleGravityOption::perform()
 {
 	m->SetParticleGravityEnabled(!m->GetParticleGravityEnabled());
 }
+
+NonferroFieldsOption::NonferroFieldsOption(GameModel * m):
+QuickOption("F", "Para/Diamagnetic force \bg(gradient pull/push)", m, Toggle)
+{
+
+}
+bool NonferroFieldsOption::GetToggle()
+{
+	return m->GetNonferroFieldsEnabled();
+}
+void NonferroFieldsOption::perform()
+{
+	m->SetNonferroFieldsEnabled(!m->GetNonferroFieldsEnabled());
+}

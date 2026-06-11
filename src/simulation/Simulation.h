@@ -97,6 +97,7 @@ struct RenderableSimulation
 	bool newInductionEnabled = true; // O key: dB/dt orthogonal charge transfer
 	bool inductionSprkEnabled = true; // Z key: auto-SPRK from high negative charge
 	bool currentBFieldEnabled = true;
+	bool nonferroFieldsEnabled = false; // D key: para-/diamagnetic gradient force
 	bool sprkCurrentEnabled = true;
 	bool potentialCurrentEnabled = false; // S key: SPRK only conducts toward higher potential
 	bool realisticPstnEnabled = false;
@@ -318,6 +319,7 @@ public:
 	void EnableMagnetism(bool enable);
 	void EnableInduction(bool enable);
 	void EnableCurrentBField(bool enable);
+	void EnableNonferroFields(bool enable);
 	void EnableSprkCurrent(bool enable);
 	void EnableElectricity(bool enable);
 

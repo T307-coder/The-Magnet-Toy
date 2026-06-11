@@ -162,3 +162,11 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+
+class NonferroFieldsOption: public QuickOption
+{
+public:
+	NonferroFieldsOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

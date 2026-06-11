@@ -175,6 +175,11 @@ void Simulation::EnableCurrentBField(bool enable)
 	currentBFieldEnabled = enable;
 }
 
+void Simulation::EnableNonferroFields(bool enable)
+{
+	nonferroFieldsEnabled = enable;
+}
+
 void Simulation::EnableSprkCurrent(bool enable)
 {
 	sprkCurrentEnabled = enable;
@@ -4395,6 +4400,24 @@ void Simulation::BeforeSim(bool willUpdate)
 						parts[i].vx = vx; parts[i].vy = vy;
 					}
 				}
+			}
+		}
+
+		// Para/diamagnetic gradient force (non-ferro, D key)
+		if (nonferroFieldsEnabled && magnetismEnabled)
+		{
+			for (int i = 0; i < NPART; i++)
+			{
+				if (!parts[i].type) continue;
+				int t = parts[i].type;
+				float scale = 0.0f;
+				if (magnetism_isParamagnetic(t))
+					scale = 0.02f;  // ~25x weaker than ferromagnetic
+				else if (magnetism_isDiamagnetic(t))
+					scale = -0.005f; // ~100x weaker, opposite direction
+				else continue;
+				int cx = int(parts[i].x / CELL), cy = int(parts[i].y / CELL);
+				magnetism_nonferroForce(this, parts[i], cx, cy, scale);
 			}
 		}
 

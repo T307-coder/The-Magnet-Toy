@@ -1,6 +1,7 @@
 #pragma once
 #include "simulation/Simulation.h"
 #include "simulation/SimulationData.h"
+#include "simulation/ElementClasses.h"
 
 // ============================================================================
 // Shared magnetic field interaction functions
@@ -17,6 +18,36 @@ static inline void magnetism_ferromagneticPull(Simulation *sim, Particle &p, int
 	float massFactor = 1.0f / (SimulationData::CRef().elements[p.type].Gravity + 0.05f);
 	p.vx += dAbsBx * 0.5f * massFactor;
 	p.vy += dAbsBy * 0.5f * massFactor;
+}
+
+// Para/diamagnetic gradient force: weak pull toward (para, scale>0) or push
+// from (dia, scale<0) stronger |B|. Call from BeforeSim for non-ferro types.
+// Scale: para ~0.02 (O2, LOXY, URAN), dia ~0.005 (water, carbon, salts, etc.)
+// Both ~25-100x weaker than ferromagnetic (0.5).
+static inline void magnetism_nonferroForce(Simulation *sim, Particle &p, int cx, int cy, float scale)
+{
+	if (!sim->magnetismEnabled || !sim->nonferroFieldsEnabled) return;
+	if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) return;
+
+	float dAbsBx = fabsf(sim->bField[cy][cx + 1]) - fabsf(sim->bField[cy][cx - 1]);
+	float dAbsBy = fabsf(sim->bField[cy + 1][cx]) - fabsf(sim->bField[cy - 1][cx]);
+	float massFactor = 1.0f / (SimulationData::CRef().elements[p.type].Gravity + 0.05f);
+	p.vx += dAbsBx * scale * massFactor;
+	p.vy += dAbsBy * scale * massFactor;
+}
+
+// Returns true if the given type is paramagnetic (weakly attracted to strong |B|).
+static inline bool magnetism_isParamagnetic(int type)
+{
+	return type == PT_O2 || type == PT_URAN || type == PT_PLUT;
+}
+
+// Returns true if the given type is diamagnetic (weakly repelled from strong |B|).
+static inline bool magnetism_isDiamagnetic(int type)
+{
+	return type == PT_WATR || type == PT_SLTW || type == PT_CBNW ||
+	       type == PT_SNOW || type == PT_BGLA || type == PT_SALT ||
+	       type == PT_SAWD || type == PT_BCOL;
 }
 
 // Unified magnetic induction: if dB/dt exceeds threshold, convert to SPRK.
@@ -214,6 +245,10 @@ static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, i
 	if (!r) return;
 	auto &sd = SimulationData::CRef();
 	if (!(sd.elements[TYP(r)].Properties & PROP_CONDUCTS)) return;
+
+	// Water-based conductors are poor electrolytes — no meaningful induced current
+	if (TYP(r) == PT_WATR || TYP(r) == PT_SLTW || TYP(r) == PT_CBNW ||
+	    TYP(r) == PT_SNOW) return;
 
 	int &nbrCharge = (TYP(r) == PT_LITH) ? sim->parts[ID(r)].tmp3 : sim->parts[ID(r)].tmp4;
 

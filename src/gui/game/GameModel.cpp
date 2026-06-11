@@ -281,6 +281,7 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new PolarizationOption(this));
 	quickOptions.push_back(new ParticleGravityOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
+	quickOptions.push_back(new NonferroFieldsOption(this));
 
 	notifyQuickOptionsChanged();
 	UpdateQuickOptions();
@@ -1272,6 +1273,21 @@ void GameModel::SetCurrentBFieldEnabled(bool enable)
 bool GameModel::GetCurrentBFieldEnabled()
 {
 	return sim->currentBFieldEnabled;
+}
+
+void GameModel::SetNonferroFieldsEnabled(bool enable)
+{
+	sim->EnableNonferroFields(enable);
+	if (enable)
+		SetInfoTip("Para/Diamagnetism: On");
+	else
+		SetInfoTip("Para/Diamagnetism: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetNonferroFieldsEnabled()
+{
+	return sim->nonferroFieldsEnabled;
 }
 
 void GameModel::SetRealisticPstnEnabled(bool enable)
