@@ -99,7 +99,6 @@ struct RenderableSimulation
 	bool currentBFieldEnabled = true;
 	bool nonferroFieldsEnabled = false; // D key: para-/diamagnetic gradient force
 	bool sprkCurrentEnabled = true;
-	bool coilMagnetizeEnabled = true; // X key: SPRK coil magnetizes ferromagnets
 	bool potentialCurrentEnabled = false; // S key: SPRK only conducts toward higher potential
 	bool realisticPstnEnabled = false;
 	bool freeChargeFieldsEnabled = false; // Q key: non-solid charged particles produce fields
@@ -322,7 +321,6 @@ public:
 	void EnableCurrentBField(bool enable);
 	void EnableNonferroFields(bool enable);
 	void EnableSprkCurrent(bool enable);
-	void EnableCoilMagnetize(bool enable);
 	void EnableElectricity(bool enable);
 
 	FrameTime *frameTime = nullptr;

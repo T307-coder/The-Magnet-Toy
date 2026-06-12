@@ -1,11 +1,8 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v2.0.11 — Coil magnetization, para/diamagnetism, water exclusion, field undo/save fixes.
-Coil magnetization (X key): SPRK current acts as magnetic probe along normal (right-hand rule),
-+target on +B side, -target on -B side. Reuses existing magnetization infrastructure.
-Para/diamagnetism (F key): O2, URAN, PLUT pulled toward strong |B|; WATR, SLTW, CBNW, SNOW,
-BGLA, SALT, SAWD, BCOL pushed toward weak |B|. Scales: para 0.02, dia 0.005 (vs ferro 0.5).
-Water (WATR/SLTW/CBNW/SNOW) excluded from new EM induction — poor electrolytes.
-Biot-Savart solid tmp5/tmp6 consumed after read — magnetic field stops when charges stop.
-EM field undo/save: eSrc/magSrc serialized (6 floats/cell), async workers primed, second undo fixed.
+v2.0.10 — EM field undo/save consistency, match gravity pattern.
+Undo: EM fields now properly roll back (eField/bField/eSrc/magSrc in snapshot, async worker priming).
+Save/load: eSrc/magSrc serialized (6 floats/cell, backward compat with 4). Field no longer disappears after load.
+Second undo: zero eSrc/magSrc after restore, matching gravity's zero-and-reaccumulate gravIn.mass.
+Biot-Savart: consume solid tmp5/tmp6 after read — magnetic field stops when charges stop moving.
