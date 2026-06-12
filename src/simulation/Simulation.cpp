@@ -185,6 +185,11 @@ void Simulation::EnableSprkCurrent(bool enable)
 	sprkCurrentEnabled = enable;
 }
 
+void Simulation::EnableCoilMagnetize(bool enable)
+{
+	coilMagnetizeEnabled = enable;
+}
+
 // Electric FFT Poisson solver for E-field computation (identical to MagFFT)
 struct Simulation::ElecFFT
 {

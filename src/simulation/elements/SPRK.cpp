@@ -435,6 +435,9 @@ static int update(UPDATE_FUNC_ARGS)
 					float dx = (float)(rx * CELL);
 					float dy = (float)(ry * CELL);
 					magnetism_addBiotSavart(sim, (float)x, (float)y, dx, dy, scale, SPRK_BIOT_R);
+					// Store current direction for coil magnetization (BeforeSim reads tmp5/tmp6)
+					parts[i].tmp5 = rx;
+					parts[i].tmp6 = ry;
 				}
 				if (parts[ID(r)].temp+10.0f<673.0f&&!sim->legacy_enable&&(receiver==PT_METL||receiver==PT_BMTL||receiver==PT_BRMT||receiver==PT_PSCN||receiver==PT_NSCN||receiver==PT_ETRD||receiver==PT_NBLE||receiver==PT_IRON))
 					parts[ID(r)].temp = parts[ID(r)].temp+10.0f;

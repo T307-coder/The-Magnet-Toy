@@ -115,6 +115,14 @@ public:
 	void perform() override;
 };
 
+class CoilMagnetizeOption: public QuickOption
+{
+public:
+	CoilMagnetizeOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
 class FreeChargeFieldsOption: public QuickOption
 {
 public:

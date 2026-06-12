@@ -118,6 +118,40 @@ static inline void magnetism_buildSourceList(Simulation *sim)
 		sim->magSourceY[idx] = y;
 		sim->magSourceTarget[idx] = target;
 	}
+
+	// Coil probes: SPRK current creates ± probes along normal (right-hand rule)
+	if (sim->sprkCurrentEnabled && sim->coilMagnetizeEnabled && sim->magSourceCount < maxSources - 2)
+	{
+		for (int i = 0; i < parts.active && sim->magSourceCount < maxSources - 2; i++)
+		{
+			if (parts[i].type != PT_SPRK) continue;
+			if (parts[i].life <= 0 || parts[i].tmp3 == 1) continue;
+			int rx = parts[i].tmp5, ry = parts[i].tmp6;
+			if (!rx && !ry) continue;
+			// Normal direction: B +z points along (-ry, rx)
+			// Place probes 6 cells from SPRK along normal
+			float mag = std::sqrt((float)(rx*rx + ry*ry));
+			int nx = (int)(-ry / mag * 6.0f);
+			int ny = (int)( rx / mag * 6.0f);
+			int sx = (int)(parts[i].x + 0.5f);
+			int sy = (int)(parts[i].y + 0.5f);
+			int target = 80 + (parts[i].life - 1) * 20; // life 4→140, life 1→80
+			// + side (B out of plane): target > 0
+			if (sim->magSourceCount < maxSources) {
+				sim->magSourceX[sim->magSourceCount] = sx + nx;
+				sim->magSourceY[sim->magSourceCount] = sy + ny;
+				sim->magSourceTarget[sim->magSourceCount] = target;
+				sim->magSourceCount++;
+			}
+			// - side (B into plane): target < 0
+			if (sim->magSourceCount < maxSources) {
+				sim->magSourceX[sim->magSourceCount] = sx - nx;
+				sim->magSourceY[sim->magSourceCount] = sy - ny;
+				sim->magSourceTarget[sim->magSourceCount] = -target;
+				sim->magSourceCount++;
+			}
+		}
+	}
 }
 
 // Range-based magnetization: ferromagnets receive magnetization from cached source list.
@@ -277,4 +311,44 @@ static inline void magnetism_addBiotSavart(Simulation *sim, float px, float py, 
 			float dB = scale * (vx * ry - vy * rx) / (r2 * r);
 			sim->magSrc[cy][cx] += dB;
 		}
+}
+
+// Coil magnetization: SPRK current magnetizes nearby ferromagnets directionally.
+// Uses same radius-based search as Biot-Savart. Sign from right-hand rule:
+// B ∝ (v × r)_z = vx*ry - vy*rx → +B side gets +tmp3, -B side gets -tmp3.
+static inline void magnetism_coilMagnetize(Simulation *sim, float px, float py, float vx, float vy, float scale, int radius)
+{
+	if (!sim->magnetismEnabled) return;
+	float mag = std::sqrt(vx * vx + vy * vy);
+	if (mag < 0.5f) return;
+	int pcx = (int)(px) / CELL;
+	int pcy = (int)(py) / CELL;
+	int ms = (int)(scale * 5.0f);
+	if (ms < 1) ms = 1;
+	if (ms > 80) ms = 80;
+
+	for (int dy = -radius; dy <= radius; dy++)
+	{
+		for (int dx = -radius; dx <= radius; dx++)
+		{
+			int cx = pcx + dx, cy = pcy + dy;
+			if (cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS) continue;
+			int p = sim->pmap[cy][cx];
+			if (!p) continue;
+			int t = TYP(p);
+			if (!(t == PT_IRON || t == PT_BMTL || t == PT_BRMT || t == PT_TTAN)) continue;
+
+			auto &part = sim->parts[ID(p)];
+			if (part.temp >= 773.15f) continue;
+
+			// Biot-Savart cross product: v × r
+			float rx = cx * CELL + CELL * 0.5f - px;
+			float ry = cy * CELL + CELL * 0.5f - py;
+			float cross = vx * ry - vy * rx;
+
+			int &m = part.tmp3;
+			if (cross > 0) { m += ms; if (m > 100) m = 100; }
+			else           { m -= ms; if (m < -100) m = -100; }
+		}
+	}
 }

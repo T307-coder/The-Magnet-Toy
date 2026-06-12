@@ -219,6 +219,20 @@ void SprkCurrentOption::perform()
 	m->SetSprkCurrentEnabled(!m->GetSprkCurrentEnabled());
 }
 
+CoilMagnetizeOption::CoilMagnetizeOption(GameModel * m):
+QuickOption("X", "Coil magnetization \bg(SPRK charges magnets)", m, Toggle)
+{
+
+}
+bool CoilMagnetizeOption::GetToggle()
+{
+	return m->GetCoilMagnetizeEnabled();
+}
+void CoilMagnetizeOption::perform()
+{
+	m->SetCoilMagnetizeEnabled(!m->GetCoilMagnetizeEnabled());
+}
+
 FreeChargeFieldsOption::FreeChargeFieldsOption(GameModel * m):
 QuickOption("Q", "Free charge fields \bg(powders/liquids/gases)", m, Toggle)
 {

@@ -50,7 +50,9 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 - **13 conductors** detect changing magnetic flux and spark (dB/dt induction): METL, GOLD, TUNG, PTNM, IRON, BMTL, TTAN, TESC, INWR, INST, MERC, BRMT, BREC.
 - **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields. Magnetization update deduplicated into `magnetism_ferromagnetUpdate()`.
 - **Async B-field solver**: Magnetic field computed on a dedicated worker thread via FFT Poisson solver.
-- **New EM induction** (O key, default ON): dB/dt drives directional charge separation between conductors. Electrons drift perpendicular to the B-field gradient: `v_e = sign(dB/dt) × (dB/dy, −dB/dx)`. Both axes independently computed, allowing diagonal transfer. Replaces the old spark-only induction with continuous charge transport.
+- **New EM induction** (O key, default ON): dB/dt drives directional charge separation between conductors. Electrons drift perpendicular to the B-field gradient: `v_e = sign(dB/dt) × (dB/dy, −dB/dx)`. Both axes independently computed, allowing diagonal transfer. Replaces the old spark-only induction with continuous charge transport. **Water-based conductors** (WATR, SLTW, CBNW, SNOW) are excluded — poor electrolytes.
+- **Coil magnetization** (X key, default ON): SPRK current magnetizes nearby ferromagnets directionally. Right-hand rule determines probe placement along the normal to current flow. Positive tmp3 on +B side, negative on −B side. Reuses existing magnetization probe infrastructure for natural diffusion and contact charging.
+- **Para/diamagnetism** (F key, default OFF): Non-ferromagnetic materials respond to magnetic field gradients. Paramagnetic (O2, URAN, PLUT) are weakly pulled toward strong |B|. Diamagnetic (WATR, SLTW, CBNW, SNOW, BGLA, SALT, SAWD, BCOL) are weakly pushed toward weak |B|. Scales: para 0.02, dia 0.005 (vs ferromagnetic 0.5).
 
 ### Electro-Magnetic Coupling
 - **Lorentz force**: Charged moving particles deflect in magnetic fields. `dtheta = Bz * q * 0.05 / mass`. Pure rotation preserves kinetic energy. Applied via shared header to all charged conductors.
@@ -106,6 +108,8 @@ Sidebar buttons (right column):
 | **U** | Toggle dielectric polarization (E-field gradient) |
 | **L** | Toggle particle gravity field (all Gravity>0 particles) |
 | **R** | Toggle realistic PSTN (gives velocity to pushed particles) |
+| **F** | Toggle para/diamagnetic force (gradient pull/push) |
+| **X** | Toggle coil magnetization (SPRK charges magnets) |
 
 Keyboard shortcuts:
 | Key | Action |
