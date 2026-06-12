@@ -43,6 +43,7 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 - **Coulomb force**: Charged particles experience `F = -q grad(V)` with coefficient 0.5, matching native ELEC/PROT behavior.
 - **Dielectrophoresis (DEP)**: Uncharged conductors are pulled toward stronger |E| regions. Polar liquids (WATR, SLTW) respond strongly. Force scales with particle mass via `Gravity` property.
 - **Dielectric polarization** (U key): Conductors develop opposite surface charges along the external potential gradient, like real dielectric polarization. Electrons drift toward higher potential (+grad V). Rate-limited at 20% per frame to allow natural depolarization.
+- **Triboelectricity** (T key): Non-conductors exchange charge on contact based on affinity table. GLAS(+3), BGLA(+3) lose electrons; GEL(−3), GOO(−3) gain electrons. Equilibrium cap = affinity difference. Covers 15 insulator types.
 - **Free charge fields** (Q key): Controls field production for all non-solid charged particles (ELEC, PROT, powders, liquids, gases, plasma). Solids always produce fields when electricity is enabled.
 - **Async E-field solver**: Electric potential computed on a dedicated worker thread via FFT Poisson solver, running in parallel with the B-field solver.
 
@@ -50,6 +51,8 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 - **13 conductors** detect changing magnetic flux and spark (dB/dt induction): METL, GOLD, TUNG, PTNM, IRON, BMTL, TTAN, TESC, INWR, INST, MERC, BRMT, BREC.
 - **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields. Magnetization update deduplicated into `magnetism_ferromagnetUpdate()`.
 - **Async B-field solver**: Magnetic field computed on a dedicated worker thread via FFT Poisson solver.
+- **Coil magnetization** (X key): SPRK current magnetizes nearby ferromagnets directionally via right-hand rule. ± probes placed along normal to current flow, target proportional to SPRK life.
+- **Para/diamagnetism** (F key): O2, URAN, PLUT pulled toward strong |B|; WATR, SLTW, CBNW, SNOW, BGLA, SALT, SAWD, BCOL pushed toward weak |B|.
 - **New EM induction** (O key, default ON): dB/dt drives directional charge separation between conductors. Electrons drift perpendicular to the B-field gradient: `v_e = sign(dB/dt) × (dB/dy, −dB/dx)`. Both axes independently computed, allowing diagonal transfer. Replaces the old spark-only induction with continuous charge transport.
 
 ### Electro-Magnetic Coupling
@@ -106,6 +109,9 @@ Sidebar buttons (right column):
 | **U** | Toggle dielectric polarization (E-field gradient) |
 | **L** | Toggle particle gravity field (all Gravity>0 particles) |
 | **R** | Toggle realistic PSTN (gives velocity to pushed particles) |
+| **F** | Toggle para/diamagnetic force (gradient pull/push) |
+| **X** | Toggle coil magnetization (SPRK charges magnets) |
+| **T** | Toggle triboelectricity (insulator contact charging) |
 
 Keyboard shortcuts:
 | Key | Action |

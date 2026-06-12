@@ -219,6 +219,34 @@ void SprkCurrentOption::perform()
 	m->SetSprkCurrentEnabled(!m->GetSprkCurrentEnabled());
 }
 
+CoilMagnetizeOption::CoilMagnetizeOption(GameModel * m):
+QuickOption("X", "Coil magnetization \bg(SPRK charges magnets)", m, Toggle)
+{
+
+}
+bool CoilMagnetizeOption::GetToggle()
+{
+	return m->GetCoilMagnetizeEnabled();
+}
+void CoilMagnetizeOption::perform()
+{
+	m->SetCoilMagnetizeEnabled(!m->GetCoilMagnetizeEnabled());
+}
+
+TriboElectricOption::TriboElectricOption(GameModel * m):
+QuickOption("T", "Triboelectricity \bg(insulator contact charging)", m, Toggle)
+{
+
+}
+bool TriboElectricOption::GetToggle()
+{
+	return m->GetTriboElectricEnabled();
+}
+void TriboElectricOption::perform()
+{
+	m->SetTriboElectricEnabled(!m->GetTriboElectricEnabled());
+}
+
 FreeChargeFieldsOption::FreeChargeFieldsOption(GameModel * m):
 QuickOption("Q", "Free charge fields \bg(powders/liquids/gases)", m, Toggle)
 {

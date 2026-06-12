@@ -2,6 +2,7 @@
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
+#include "ElectricityCommon.h"
 #include "TransitionConstants.h"
 #include "gravity/Gravity.h"
 #include "ToolClasses.h"
@@ -183,6 +184,11 @@ void Simulation::EnableNonferroFields(bool enable)
 void Simulation::EnableSprkCurrent(bool enable)
 {
 	sprkCurrentEnabled = enable;
+}
+
+void Simulation::EnableCoilMagnetize(bool enable)
+{
+	coilMagnetizeEnabled = enable;
 }
 
 // Electric FFT Poisson solver for E-field computation (identical to MagFFT)
@@ -4418,6 +4424,21 @@ void Simulation::BeforeSim(bool willUpdate)
 				else continue;
 				int cx = int(parts[i].x / CELL), cy = int(parts[i].y / CELL);
 				magnetism_nonferroForce(this, parts[i], cx, cy, scale);
+			}
+		}
+
+		// Triboelectric contact: pmap-scan (same pattern as electricity_chargeContact)
+		if (triboElectricEnabled && electricityEnabled)
+		{
+			for (int i = 0; i < NPART; i++)
+			{
+				if (!parts[i].type) continue;
+				if (triboAffinity(parts[i].type) == -999) continue;
+				int cx = (int)(parts[i].x + 0.5f) / CELL;
+				int cy = (int)(parts[i].y + 0.5f) / CELL;
+				if (cx < 0 || cy < 0 || cx >= XCELLS || cy >= YCELLS) continue;
+				int &ch = (parts[i].type == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
+				electricity_triboContact(this, parts[i], (int)parts[i].x, (int)parts[i].y, ch);
 			}
 		}
 

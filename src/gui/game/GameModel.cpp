@@ -274,6 +274,8 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new ElectricityEnableOption(this));
 	quickOptions.push_back(new CurrentBFieldOption(this));
 	quickOptions.push_back(new SprkCurrentOption(this));
+	quickOptions.push_back(new CoilMagnetizeOption(this));
+	quickOptions.push_back(new TriboElectricOption(this));
 	quickOptions.push_back(new NewInductionOption(this));
 	quickOptions.push_back(new InductionSprkOption(this));
 	quickOptions.push_back(new PotentialCurrentOption(this));
@@ -1408,6 +1410,34 @@ void GameModel::SetSprkCurrentEnabled(bool enable)
 bool GameModel::GetSprkCurrentEnabled()
 {
 	return sim->sprkCurrentEnabled;
+}
+
+void GameModel::SetCoilMagnetizeEnabled(bool enable)
+{
+	sim->EnableCoilMagnetize(enable);
+	if (enable)
+		SetInfoTip("Coil Magnetization: On");
+	else
+		SetInfoTip("Coil Magnetization: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetCoilMagnetizeEnabled()
+{
+	return sim->coilMagnetizeEnabled;
+}
+
+void GameModel::SetTriboElectricEnabled(bool enable)
+{
+	sim->triboElectricEnabled = enable;
+	if (enable) SetInfoTip("Triboelectricity: On");
+	else SetInfoTip("Triboelectricity: Off");
+	UpdateQuickOptions();
+}
+
+bool GameModel::GetTriboElectricEnabled()
+{
+	return sim->triboElectricEnabled;
 }
 
 void GameModel::ShowElectricField(bool show)

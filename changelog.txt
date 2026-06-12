@@ -1,8 +1,10 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v2.0.10 — EM field undo/save consistency, match gravity pattern.
-Undo: EM fields now properly roll back (eField/bField/eSrc/magSrc in snapshot, async worker priming).
-Save/load: eSrc/magSrc serialized (6 floats/cell, backward compat with 4). Field no longer disappears after load.
-Second undo: zero eSrc/magSrc after restore, matching gravity's zero-and-reaccumulate gravIn.mass.
-Biot-Savart: consume solid tmp5/tmp6 after read — magnetic field stops when charges stop moving.
+v2.0.12 — Triboelectricity, coil magnetization, para/diamagnetism, water exclusion.
+Triboelectricity (T key): insulator contact charging via affinity table (±1/contact,
+equilibrium cap = affinity difference). GLAS/GOO strongest pair (±3 each).
+Coil magnetization (X key): SPRK current magnetizes ferromagnets along normal (RHR).
+Para/diamagnetism (F key): O2/URAN/PLUT pulled to strong |B|, 8 types pushed to weak |B|.
+Water (WATR/SLTW/CBNW/SNOW) excluded from O key EM induction — poor electrolytes.
+Biot-Savart solid tmp5/tmp6 consumed after read. EM field undo/save fully fixed.

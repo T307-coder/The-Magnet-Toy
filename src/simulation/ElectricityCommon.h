@@ -1,11 +1,59 @@
 #pragma once
 #include "simulation/Simulation.h"
 #include "simulation/SimulationData.h"
+#include "simulation/ElementClasses.h"
 
 // ============================================================================
 // Shared electric field interaction functions
-// Use these in element update() to avoid duplicating code across 20+ elements
 // ============================================================================
+
+// Triboelectric affinity: higher = loses electrons → positive.
+static inline int triboAffinity(int type)
+{
+	switch (type)
+	{
+	case PT_GLAS: case PT_BGLA: return +3;
+	case PT_BCOL: case PT_COAL: return +2;
+	case PT_WOOD: case PT_SAWD: case PT_DUST: case PT_SAND: return +1;
+	case PT_WATR: case PT_DSTW: case PT_SLTW: case PT_CBNW: case PT_SNOW: return 0;
+	case PT_OIL:  case PT_DESL: return -1;
+	case PT_INSL: return -2;
+	case PT_GEL:  case PT_GOO:  return -3;
+	default: return -999;
+	}
+}
+
+// Triboelectric contact: pmap-scan (same pattern as electricity_chargeContact).
+static inline void electricity_triboContact(Simulation *sim, Particle &p, int x, int y, int &chargeRef)
+{
+	if (!sim->electricityEnabled || !sim->triboElectricEnabled) return;
+	int myAff = triboAffinity(p.type);
+	if (myAff == -999) return;
+
+	for (int rx = -1; rx <= 1; rx++)
+		for (int ry = -1; ry <= 1; ry++)
+		{
+			if (!rx && !ry) continue;
+			auto r = sim->pmap[y + ry][x + rx];
+			if (!r) continue;
+			int rt = TYP(r);
+			if (rt == p.type) continue;
+			int nAff = triboAffinity(rt);
+			if (nAff == -999 || nAff == myAff) continue;
+
+			int &nCharge = (rt == PT_LITH) ? sim->parts[ID(r)].tmp3 : sim->parts[ID(r)].tmp4;
+			if (myAff > nAff)
+			{
+				if (chargeRef < 100 && nCharge > -100 && chargeRef - nCharge < myAff - nAff)
+				{ chargeRef++; nCharge--; }
+			}
+			else
+			{
+				if (chargeRef > -100 && nCharge < 100 && nCharge - chargeRef < nAff - myAff)
+				{ chargeRef--; nCharge++; }
+			}
+		}
+}
 
 // Contact charging: POSC, FIXC, ELEC, PROT transfer charge to this particle.
 // chargeRef = reference to the charge variable (tmp4 for most, tmp3 for LITH).

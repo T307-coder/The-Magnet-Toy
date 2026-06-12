@@ -295,6 +295,10 @@ public:
 	bool GetParticleGravityEnabled();
 	void SetSprkCurrentEnabled(bool enable);
 	bool GetSprkCurrentEnabled();
+	void SetCoilMagnetizeEnabled(bool enable);
+	bool GetCoilMagnetizeEnabled();
+	void SetTriboElectricEnabled(bool enable);
+	bool GetTriboElectricEnabled();
 	void SetElectricityEnabled(bool enable);
 	bool GetElectricityEnabled();
 	void SetUniformBField(float value);
