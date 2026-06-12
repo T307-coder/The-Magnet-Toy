@@ -299,6 +299,10 @@ public:
 	bool GetCoilMagnetizeEnabled();
 	void SetTriboElectricEnabled(bool enable);
 	bool GetTriboElectricEnabled();
+	void SetEddyCurrentEnabled(bool enable);
+	bool GetEddyCurrentEnabled();
+	void SetCurieQuenchEnabled(bool enable);
+	bool GetCurieQuenchEnabled();
 	void SetElectricityEnabled(bool enable);
 	bool GetElectricityEnabled();
 	void SetUniformBField(float value);

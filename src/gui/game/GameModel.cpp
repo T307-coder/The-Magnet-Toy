@@ -12,6 +12,7 @@
 #include "RectangleBrush.h"
 #include "TriangleBrush.h"
 #include "QuickOptions.h"
+#include "common/Lang.h"
 #include "lua/CommandInterface.h"
 #include "prefs/GlobalPrefs.h"
 #include "client/Client.h"
@@ -284,6 +285,8 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new ParticleGravityOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
 	quickOptions.push_back(new NonferroFieldsOption(this));
+	quickOptions.push_back(new EddyCurrentOption(this));
+	quickOptions.push_back(new CurieQuenchOption(this));
 
 	notifyQuickOptionsChanged();
 	UpdateQuickOptions();
@@ -1438,6 +1441,30 @@ void GameModel::SetTriboElectricEnabled(bool enable)
 bool GameModel::GetTriboElectricEnabled()
 {
 	return sim->triboElectricEnabled;
+}
+
+void GameModel::SetEddyCurrentEnabled(bool enable)
+{
+	sim->eddyCurrentEnabled = enable;
+	if (enable) SetInfoTip(TPT_LANG("Eddy Current: On", "涡流耗散: 开"));
+	else SetInfoTip(TPT_LANG("Eddy Current: Off", "涡流耗散: 关"));
+	UpdateQuickOptions();
+}
+bool GameModel::GetEddyCurrentEnabled()
+{
+	return sim->eddyCurrentEnabled;
+}
+
+void GameModel::SetCurieQuenchEnabled(bool enable)
+{
+	sim->curieQuenchEnabled = enable;
+	if (enable) SetInfoTip(TPT_LANG("Curie Quench: On", "居里淬火: 开"));
+	else SetInfoTip(TPT_LANG("Curie Quench: Off", "居里淬火: 关"));
+	UpdateQuickOptions();
+}
+bool GameModel::GetCurieQuenchEnabled()
+{
+	return sim->curieQuenchEnabled;
 }
 
 void GameModel::ShowElectricField(bool show)

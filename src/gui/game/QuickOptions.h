@@ -186,3 +186,19 @@ public:
 	bool GetToggle() override;
 	void perform() override;
 };
+
+class EddyCurrentOption: public QuickOption
+{
+public:
+	EddyCurrentOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class CurieQuenchOption: public QuickOption
+{
+public:
+	CurieQuenchOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};

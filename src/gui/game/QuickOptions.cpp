@@ -344,3 +344,31 @@ void NonferroFieldsOption::perform()
 {
 	m->SetNonferroFieldsEnabled(!m->GetNonferroFieldsEnabled());
 }
+
+EddyCurrentOption::EddyCurrentOption(GameModel * m):
+QuickOption("V", TPT_LANG("Eddy current \bg(induction heating)", "涡流耗散 \bg(感应加热)"), m, Toggle)
+{
+
+}
+bool EddyCurrentOption::GetToggle()
+{
+	return m->GetEddyCurrentEnabled();
+}
+void EddyCurrentOption::perform()
+{
+	m->SetEddyCurrentEnabled(!m->GetEddyCurrentEnabled());
+}
+
+CurieQuenchOption::CurieQuenchOption(GameModel * m):
+QuickOption("W", TPT_LANG("Curie quench \bg(freeze domains at 773K)", "居里淬火 \bg(773K冻结磁畴)"), m, Toggle)
+{
+
+}
+bool CurieQuenchOption::GetToggle()
+{
+	return m->GetCurieQuenchEnabled();
+}
+void CurieQuenchOption::perform()
+{
+	m->SetCurieQuenchEnabled(!m->GetCurieQuenchEnabled());
+}

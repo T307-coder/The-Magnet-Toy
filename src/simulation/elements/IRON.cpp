@@ -31,6 +31,7 @@ void Element::Element_IRON()
 	Weight = 100;
 
 	HeatConduct = 251;
+	DefaultProperties.ctype = 0;
 	Description = "Rusts with salt, can be used for electrolysis of WATR.";
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_LIFE_DEC|PROP_HOT_GLOW;
@@ -97,11 +98,11 @@ static int update(UPDATE_FUNC_ARGS)
 		sim->part_change_type(i,x,y,PT_BMTL);
 		parts[i].tmp = sim->rng.between(20, 29);
 	}
-	// Magnetization: shared ferromagnet update (contact, diffusion, decay, magSrc)
+	// Magnetization: shared ferromagnet update (tmp3=induced, ctype=permanent)
 	int cx, cy;
-	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, cx, cy);
-	// Induction: only when completely unmagnetized (old, not recommended)
-	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_IRON, 1.5f, 5))
+	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, parts[i].ctype, cx, cy);
+	// Induction: only when completely unmagnetized (both induced and permanent = 0)
+	if (parts[i].ctype == 0 && parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_IRON, 1.5f, 5))
 		return 1;
 	// Electric charging and diffusion (shared functions)
 	electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);

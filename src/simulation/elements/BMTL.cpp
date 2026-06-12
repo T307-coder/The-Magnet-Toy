@@ -31,6 +31,7 @@ void Element::Element_BMTL()
 	Weight = 100;
 
 	HeatConduct = 251;
+	DefaultProperties.ctype = 0;
 	Description = "Breakable metal. Common conductive building material, can melt and break under pressure.";
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_LIFE_DEC|PROP_HOT_GLOW;
@@ -77,11 +78,11 @@ static int update(UPDATE_FUNC_ARGS)
 		parts[i].tmp = 0;
 		sim->part_change_type(i,x,y,PT_BRMT);
 	}
-	// Magnetization: shared ferromagnet update (contact, diffusion, decay, magSrc)
+	// Magnetization: shared ferromagnet update (tmp3=induced, ctype=permanent)
 	int cx, cy;
-	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, cx, cy);
-	// Induction: only when completely unmagnetized (old, not recommended)
-	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_BMTL, 1.5f, 5))
+	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, parts[i].ctype, cx, cy);
+	// Induction: only when completely unmagnetized (both induced and permanent = 0)
+	if (parts[i].ctype == 0 && parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_BMTL, 1.5f, 5))
 		return 1;
 	// Strong B-field breaks BMTL -> BRMT
 	if (sim->magnetismEnabled && cx>=0 && cx<XCELLS && cy>=0 && cy<YCELLS)

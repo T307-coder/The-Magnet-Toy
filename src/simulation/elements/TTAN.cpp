@@ -32,6 +32,7 @@ void Element::Element_TTAN()
 	Weight = 100;
 
 	HeatConduct = 251;
+	DefaultProperties.ctype = 0;
 	Description = "Titanium. Higher melting temperature than most other metals, blocks all air pressure.";
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_HOT_GLOW|PROP_LIFE_DEC;
@@ -75,11 +76,11 @@ static int update(UPDATE_FUNC_ARGS)
 		sim->air->bmap_blockair[y/CELL][x/CELL] = 1;
 		sim->air->bmap_blockairh[y/CELL][x/CELL] = 0x8;
 	}
-	// Magnetization: shared ferromagnet update (contact, diffusion, decay, magSrc)
+	// Magnetization: shared ferromagnet update (tmp3=induced, ctype=permanent)
 	int cx, cy;
-	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, cx, cy);
-	// Induction: only when completely unmagnetized (old, not recommended)
-	if (parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_TTAN, 1.5f, 6))
+	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, parts[i].ctype, cx, cy);
+	// Induction: only when completely unmagnetized (both induced and permanent = 0)
+	if (parts[i].ctype == 0 && parts[i].tmp3 == 0 && magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_TTAN, 1.5f, 6))
 		return 1;
 	electricity_chargeContact(sim, parts[i], x, y, parts[i].tmp4);
 	electricity_diffuseCharge(sim, parts[i], x, y, parts[i].tmp4);

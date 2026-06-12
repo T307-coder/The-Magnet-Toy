@@ -31,6 +31,7 @@ void Element::Element_BRMT()
 	Weight = 90;
 
 	HeatConduct = 211;
+	DefaultProperties.ctype = 0;
 	Description = "Broken metal. Created when iron rusts or when metals break from pressure.";
 
 	Properties = TYPE_PART|PROP_CONDUCTS|PROP_LIFE_DEC|PROP_HOT_GLOW;
@@ -86,11 +87,11 @@ static int update(UPDATE_FUNC_ARGS)
 			}
 		}
 	}
-	// Magnetization: shared ferromagnet update (contact, diffusion, decay, magSrc)
+	// Magnetization: shared ferromagnet update (tmp3=induced, ctype=permanent)
 	int cx, cy;
-	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, cx, cy);
-	// Induction: shared function handles cooldown, tmp3 tag, Biot-Savart skip (old, not recommended)
-	if (parts[i].tmp3 == 0)
+	magnetism_ferromagnetUpdate(sim, parts[i], x, y, parts[i].tmp3, parts[i].ctype, cx, cy);
+	// Induction: shared function handles cooldown, tmp3 tag, Biot-Savart skip
+	if (parts[i].ctype == 0 && parts[i].tmp3 == 0)
 		magnetism_tryInduction(sim, i, x, y, cx, cy, parts[i].tmp2, PT_BRMT, 1.5f, 8);
 	// Ferromagnetic attraction (shared function)
 	magnetism_ferromagneticPull(sim, parts[i], cx, cy);

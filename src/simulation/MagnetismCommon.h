@@ -183,9 +183,11 @@ static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, 
 // DEUT-style magnetization diffusion between ferromagnets in range.
 // reach = 1 + |strength|/25; stronger magnets spread further.
 // Probe count scales with reach² to maintain hit rate.
-static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref)
+// Templated on which field to read from neighbours.
+template<bool IsPermanent>
+static inline void magnetism_diffuseChargeImpl(Simulation *sim, Particle &p, int x, int y, int &ref)
 {
-	int reach = 1 + std::abs(tmp3Ref) / 25;
+	int reach = 1 + std::abs(ref) / 25;
 	if (reach < 2) reach = 2;
 
 	int numTrades = reach * reach / 2; // scale probes with area
@@ -202,67 +204,119 @@ static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, 
 		int rt = TYP(r);
 		if (rt == PT_IRON || rt == PT_TTAN || rt == PT_BMTL || rt == PT_BRMT)
 		{
-			int &other = sim->parts[ID(r)].tmp3;
-			int diff = tmp3Ref - other;
+			int &other = IsPermanent ? sim->parts[ID(r)].ctype : sim->parts[ID(r)].tmp3;
+			int diff = ref - other;
 			if (diff > 1)
 			{
 				int transfer = diff / 2;
 				other += transfer;
-				tmp3Ref -= transfer;
+				ref -= transfer;
 			}
 			else if (diff == 1)
 			{
 				other++;
-				tmp3Ref--;
+				ref--;
 			}
 		}
 	}
 }
+// Convenience aliases
+static inline void magnetism_diffuseInduced(Simulation *sim, Particle &p, int x, int y, int &ref) {
+	magnetism_diffuseChargeImpl<false>(sim, p, x, y, ref);
+}
+// Backward-compatible alias (operates on tmp3 = induced)
+static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref) {
+	magnetism_diffuseChargeImpl<false>(sim, p, x, y, tmp3Ref);
+}
 
-// Shared ferromagnet magnetization update: contact, diffusion, decay, magSrc.
-// Quench: cooling through Curie point freezes tmp3 in current B-field direction.
-// Coercivity: changes require |B| > |tmp3| * 0.05 (stronger field pushes harder).
+// Shared ferromagnet magnetization update: induced + permanent, diffusion, eddy decay.
+// inducedRef  = tmp3 (induced magnetization, changes every frame, decays via eddy currents)
+// permRef     = ctype (permanent magnetization, only changes via quench/coil/coercivity)
+// Quench: cooling through Curie point freezes ctype in current B-field direction.
+// Coercivity: permanent changes require |B|*5 > |ctype| (stronger field pushes harder).
 // Used by BMTL, BRMT, IRON, TTAN. Returns cx,cy by reference for reuse.
-static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref, int &cx, int &cy)
+static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int x, int y, int &inducedRef, int &permRef, int &cx, int &cy)
 {
 	cx = x / CELL; cy = y / CELL;
 	if (!sim->magnetismEnabled || cx < 0 || cx >= XCELLS || cy < 0 || cy >= YCELLS)
 		return;
 
-	if (p.temp < 773.15f)
+	float Bz = sim->bField[cy][cx];
+	int &M_ind = inducedRef;  // tmp3: induced, frame-by-frame
+	int &M_rem = permRef;     // ctype: permanent, frozen domains
+
+	// === INDUCED MAGNETIZATION (tmp3) ===
+	// Induced magnetization comes from external sources (MAGN/ELMG/coils) and
+	// permanent domains (ctype). It spreads via diffusion and decays at surfaces.
+
+	// MAGN/ELMG/coil contact: induces temporary magnetization (does NOT affect ctype)
+	magnetism_contactCharge(sim, p, x, y, M_ind);
+
+	// Permanent magnetization acts as induced source: M_ind drifts toward M_rem
+	if (M_rem != 0)
 	{
-		// Quench: just cooled through Curie → freeze magnetization to B-field
+		if (M_ind < M_rem) M_ind++;
+		else if (M_ind > M_rem) M_ind--;
+	}
+
+	// Diffusion spreads induced magnetization between neighbours
+	magnetism_diffuseInduced(sim, p, x, y, M_ind);
+
+	// Eddy-current decay: if any cardinal probe lacks a ferromagnetic neighbour,
+	// induced magnetization leaks as Joule heat. Uniform rate regardless of how
+	// many neighbours are missing — gradient-based decay would self-induce current.
+	if (sim->eddyCurrentEnabled)
+	{
+	bool anyMissing = false;
+	const int dx[4] = {1, -1, 0, 0};
+	const int dy[4] = {0, 0, 1, -1};
+	for (int d = 0; d < 4 && !anyMissing; d++)
+	{
+		int nx = x + dx[d], ny = y + dy[d];
+		if (nx < 0 || ny < 0 || nx >= XRES || ny >= YRES) { anyMissing = true; break; }
+		auto r = sim->pmap[ny][nx];
+		if (!r) { anyMissing = true; break; }
+		int rt = TYP(r);
+		if (rt != PT_IRON && rt != PT_TTAN && rt != PT_BMTL && rt != PT_BRMT)
+			anyMissing = true;
+	}
+	if (anyMissing && M_ind != 0)
+	{
+		if (M_ind > 0) M_ind--;
+		else M_ind++;
+		// Permanent magnets don't self-heat; only unmagnetized conductors get eddy heating
+		if (M_rem == 0)
+			p.temp += 2.0f; // eddy current → Joule heating
+	}
+	} // eddyCurrentEnabled
+
+	// === PERMANENT MAGNETIZATION (ctype) ===
+	// Permanent domains are locked in the crystal lattice — no diffusion, no contact
+	// induction, no B-field rewriting. Only quench (cooling through Curie) sets them.
+	if (p.temp < 773.15f && sim->curieQuenchEnabled)
+	{
+		// Quench: just cooled through Curie → freeze B-field into permanent domains.
+		// Sentinel tmp2=-99999 is set when heated above Curie; quench consumes it.
 		if (p.tmp2 == -99999)
 		{
-			float Bz = sim->bField[cy][cx];
-			tmp3Ref = (int)(Bz * 20.0f);
-			if (tmp3Ref > 100) tmp3Ref = 100;
-			if (tmp3Ref < -100) tmp3Ref = -100;
-			p.tmp2 = (int)(Bz * 10000.0f); // restore induction history
-		}
-		else
-		{
-			// Coercivity: only allow changes when |B| * 5 > |tmp3|
-			// Strong permanent magnets are hard to remagnetize
-			float Bz = sim->bField[cy][cx];
-			if (fabsf(Bz) * 5.0f > fabsf((float)tmp3Ref))
-			{
-				magnetism_contactCharge(sim, p, x, y, tmp3Ref);
-				magnetism_diffuseCharge(sim, p, x, y, tmp3Ref);
-			}
+			M_rem = (int)(Bz * 20.0f);
+			if (M_rem > 100) M_rem = 100;
+			if (M_rem < -100) M_rem = -100;
+			p.tmp2 = 0; // reset sentinel — ready for next heat→cool cycle
 		}
 	}
 	else
 	{
-		// Above Curie: thermal demagnetization
-		if (tmp3Ref > 0) tmp3Ref = std::max(0, tmp3Ref - 5);
-		else if (tmp3Ref < 0) tmp3Ref = std::min(0, tmp3Ref + 5);
+		// Above Curie: thermal demagnetization of permanent domains
+		if (M_rem > 0) M_rem = std::max(0, M_rem - 5);
+		else if (M_rem < 0) M_rem = std::min(0, M_rem + 5);
 		p.tmp2 = -99999; // mark as "was hot" for quench detection
 	}
 
-	if (tmp3Ref != 0)
+	// === TOTAL magSrc CONTRIBUTION (permanent + induced) ===
+	if (M_rem != 0 || M_ind != 0)
 	{
-		sim->magSrc[cy][cx] += tmp3Ref * 0.02f;
+		sim->magSrc[cy][cx] += (M_rem + M_ind) * 0.02f;
 		p.life = 100;
 	}
 }
@@ -270,18 +324,24 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 // New EM induction: dB/dt drives charge separation between conductors.
 // Electrons drift opposite to induced E: v_e = sign(dB/dt) * (dB/dy, -dB/dx).
 // Same pattern as electricity_polarizeCharge — directional transfer, not averaging.
+// Skipped on magnetized particles (tmp3≠0 or ctype≠0): they are part of the
+// magnetic circuit and should not develop polarization.
 static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, int y, int &chargeRef)
 {
 	if (!sim->magnetismEnabled || !sim->electricityEnabled || !sim->newInductionEnabled) return;
+
+	// Skip magnetized ferromagnets — they're part of the magnetic circuit
+	if ((p.type == PT_IRON || p.type == PT_BMTL || p.type == PT_BRMT || p.type == PT_TTAN) &&
+	    (p.tmp3 != 0 || p.ctype != 0)) return;
 
 	int cx = x / CELL, cy = y / CELL;
 	if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) return;
 	if (!sim->prevBFieldValid) return;
 
-	// Local B-field change
+	// Local B-field change — threshold filters out magnetization relaxation noise
 	float dBdt = sim->bField[cy][cx] - sim->prevBField[cy][cx];
 	float dBmag = std::fabs(dBdt);
-	if (dBmag < 0.001f) return;
+	if (dBmag < 0.05f) return;
 
 	// Local B-field gradient (4-neighbour central difference)
 	float dBdx = sim->bField[cy][cx + 1] - sim->bField[cy][cx - 1];
@@ -305,7 +365,13 @@ static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, i
 	if (TYP(r) == PT_WATR || TYP(r) == PT_SLTW || TYP(r) == PT_CBNW ||
 	    TYP(r) == PT_SNOW) return;
 
-	int &nbrCharge = (TYP(r) == PT_LITH) ? sim->parts[ID(r)].tmp3 : sim->parts[ID(r)].tmp4;
+	// Skip magnetized ferromagnetic targets — domains suppress induced polarization
+	auto &nbr = sim->parts[ID(r)];
+	int nbrType = TYP(r);
+	if ((nbrType == PT_IRON || nbrType == PT_BMTL || nbrType == PT_BRMT || nbrType == PT_TTAN) &&
+	    (nbr.tmp3 != 0 || nbr.ctype != 0)) return;
+
+	int &nbrCharge = (nbrType == PT_LITH) ? nbr.tmp3 : nbr.tmp4;
 
 	// Transfer proportional to dB/dt: faster change → more charge moved
 	int transfer = (int)(dBmag * 50.0f);
