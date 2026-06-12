@@ -12,7 +12,6 @@
 #include "RectangleBrush.h"
 #include "TriangleBrush.h"
 #include "QuickOptions.h"
-#include "common/Lang.h"
 #include "lua/CommandInterface.h"
 #include "prefs/GlobalPrefs.h"
 #include "client/Client.h"
@@ -1446,8 +1445,8 @@ bool GameModel::GetTriboElectricEnabled()
 void GameModel::SetEddyCurrentEnabled(bool enable)
 {
 	sim->eddyCurrentEnabled = enable;
-	if (enable) SetInfoTip(TPT_LANG("Eddy Current: On", "涡流耗散: 开"));
-	else SetInfoTip(TPT_LANG("Eddy Current: Off", "涡流耗散: 关"));
+	if (enable) SetInfoTip("Eddy Current: On");
+	else SetInfoTip("Eddy Current: Off");
 	UpdateQuickOptions();
 }
 bool GameModel::GetEddyCurrentEnabled()
@@ -1458,8 +1457,8 @@ bool GameModel::GetEddyCurrentEnabled()
 void GameModel::SetCurieQuenchEnabled(bool enable)
 {
 	sim->curieQuenchEnabled = enable;
-	if (enable) SetInfoTip(TPT_LANG("Curie Quench: On", "居里淬火: 开"));
-	else SetInfoTip(TPT_LANG("Curie Quench: Off", "居里淬火: 关"));
+	if (enable) SetInfoTip("Curie Quench: On");
+	else SetInfoTip("Curie Quench: Off");
 	UpdateQuickOptions();
 }
 bool GameModel::GetCurieQuenchEnabled()

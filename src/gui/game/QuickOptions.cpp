@@ -346,7 +346,7 @@ void NonferroFieldsOption::perform()
 }
 
 EddyCurrentOption::EddyCurrentOption(GameModel * m):
-QuickOption("V", TPT_LANG("Eddy current \bg(induction heating)", "涡流耗散 \bg(感应加热)"), m, Toggle)
+QuickOption("V", "Eddy current \bg(induction heating)", m, Toggle)
 {
 
 }
@@ -360,7 +360,7 @@ void EddyCurrentOption::perform()
 }
 
 CurieQuenchOption::CurieQuenchOption(GameModel * m):
-QuickOption("W", TPT_LANG("Curie quench \bg(freeze domains at 773K)", "居里淬火 \bg(773K冻结磁畴)"), m, Toggle)
+QuickOption("W", "Curie quench \bg(freeze domains at 773K)", m, Toggle)
 {
 
 }

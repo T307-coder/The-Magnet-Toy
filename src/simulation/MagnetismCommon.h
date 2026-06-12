@@ -183,9 +183,8 @@ static inline void magnetism_contactCharge(Simulation *sim, Particle &p, int x, 
 // DEUT-style magnetization diffusion between ferromagnets in range.
 // reach = 1 + |strength|/25; stronger magnets spread further.
 // Probe count scales with reach² to maintain hit rate.
-// Templated on which field to read from neighbours.
-template<bool IsPermanent>
-static inline void magnetism_diffuseChargeImpl(Simulation *sim, Particle &p, int x, int y, int &ref)
+// Operates on neighbour's tmp3 (induced magnetization).
+static inline void magnetism_diffuseInduced(Simulation *sim, Particle &p, int x, int y, int &ref)
 {
 	int reach = 1 + std::abs(ref) / 25;
 	if (reach < 2) reach = 2;
@@ -204,7 +203,7 @@ static inline void magnetism_diffuseChargeImpl(Simulation *sim, Particle &p, int
 		int rt = TYP(r);
 		if (rt == PT_IRON || rt == PT_TTAN || rt == PT_BMTL || rt == PT_BRMT)
 		{
-			int &other = IsPermanent ? sim->parts[ID(r)].ctype : sim->parts[ID(r)].tmp3;
+			int &other = sim->parts[ID(r)].tmp3;
 			int diff = ref - other;
 			if (diff > 1)
 			{
@@ -220,13 +219,9 @@ static inline void magnetism_diffuseChargeImpl(Simulation *sim, Particle &p, int
 		}
 	}
 }
-// Convenience aliases
-static inline void magnetism_diffuseInduced(Simulation *sim, Particle &p, int x, int y, int &ref) {
-	magnetism_diffuseChargeImpl<false>(sim, p, x, y, ref);
-}
-// Backward-compatible alias (operates on tmp3 = induced)
+// Backward-compatible alias
 static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref) {
-	magnetism_diffuseChargeImpl<false>(sim, p, x, y, tmp3Ref);
+	magnetism_diffuseInduced(sim, p, x, y, tmp3Ref);
 }
 
 // Shared ferromagnet magnetization update: induced + permanent, diffusion, eddy decay.
