@@ -4370,7 +4370,7 @@ void Simulation::BeforeSim(bool willUpdate)
 			}
 		}
 
-		// Apply Coulomb + Lorentz forces (solids always, non-solids gated by Q)
+		// Apply Coulomb + Lorentz forces (all charges, regardless of Q key)
 		if (electricityEnabled)
 		{
 			auto &sd = SimulationData::CRef();
@@ -4381,8 +4381,6 @@ void Simulation::BeforeSim(bool willUpdate)
 				if (t == PT_PLNT || t == PT_SEED || t == PT_STOR || t == PT_VIRS || t == PT_ARAY ||
 				    t == PT_PSCN || t == PT_NSCN || t == PT_PTCT || t == PT_NTCT)
 					continue;
-				bool isSolid = (sd.elements[t].Properties & TYPE_SOLID) != 0;
-				if (!isSolid && !freeChargeFieldsEnabled) continue;
 				int charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
 				if (charge == 0) continue;
 				int cx = int(parts[i].x / CELL), cy = int(parts[i].y / CELL);
