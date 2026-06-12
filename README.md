@@ -49,13 +49,16 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 
 ### Magnetic Field & Magnetism
 - **13 conductors** detect changing magnetic flux and spark (dB/dt induction): METL, GOLD, TUNG, PTNM, IRON, BMTL, TTAN, TESC, INWR, INST, MERC, BRMT, BREC.
-- **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields. Magnetization update deduplicated into `magnetism_ferromagnetUpdate()`.
+- **Dual magnetization model**: `tmp3` = induced (frame-by-frame, diffuses, decays), `ctype` = permanent (quench only, locked in crystal lattice). Total `magSrc` = (ctype + tmp3) × 0.02.
+- **Induced magnetization (tmp3)**: Charged by MAGN/ELMG/coil contact, pumped by permanent domains, spreads via DEUT-style diffusion, decays via eddy currents at surfaces.
+- **Permanent magnetization (ctype)**: Set only by Curie quench — cooling through 773K freezes B×20 (±100). No diffusion, no B-field rewriting, no self-charging feedback.
+- **4 ferromagnetics**: IRON, BMTL, TTAN, BRMT. BMTL shatters into BRMT under strong B/E-fields. Magnetization update deduplicated into `magnetism_ferromagnetUpdate()`.
 - **Async B-field solver**: Magnetic field computed on a dedicated worker thread via FFT Poisson solver.
 - **Coil magnetization** (X key): SPRK current magnetizes nearby ferromagnets directionally via right-hand rule. ± probes placed along normal to current flow, target proportional to SPRK life.
-- **Curie quench**: IRON, BMTL, BRMT, TTAN frozen through 773K retain bField×20 as permanent tmp3. Cooling without field yields unmagnetized iron.
-- **Coercivity**: Permanent magnets resist remagnetization — |B|×5 must exceed |tmp3| for changes.
+- **Curie quench** (W key, default ON): IRON, BMTL, BRMT, TTAN cooled through 773K retain B-field as permanent ctype. Cooling without field yields unmagnetized iron. Sentinel tmp2=-99999 resets for repeated quench cycles.
+- **Eddy current** (V key, default ON): Induced magnetization leaks at surfaces (any missing cardinal neighbour) as Joule heat. Permanent magnets (ctype≠0) excluded from self-heating. Uniform decay rate prevents gradient self-induction.
 - **Para/diamagnetism** (F key): O2, URAN, PLUT pulled toward strong |B|; WATR, SLTW, CBNW, SNOW, BGLA, SALT, SAWD, BCOL pushed toward weak |B|.
-- **New EM induction** (O key, default ON): dB/dt drives directional charge separation between conductors. Electrons drift perpendicular to the B-field gradient: `v_e = sign(dB/dt) × (dB/dy, −dB/dx)`. Both axes independently computed, allowing diagonal transfer. Replaces the old spark-only induction with continuous charge transport.
+- **New EM induction** (O key, default ON): dB/dt drives directional charge separation between conductors. Skips magnetized ferromagnets (tmp3≠0 or ctype≠0). dB/dt threshold 0.05 filters magnetization relaxation noise.
 
 ### Electro-Magnetic Coupling
 - **Lorentz force**: Charged moving particles deflect in magnetic fields. `dtheta = Bz * q * 0.05 / mass`. Pure rotation preserves kinetic energy. Applied via shared header to all charged conductors.
@@ -114,6 +117,8 @@ Sidebar buttons (right column):
 | **F** | Toggle para/diamagnetic force (gradient pull/push) |
 | **X** | Toggle coil magnetization (SPRK charges magnets) |
 | **T** | Toggle triboelectricity (insulator contact charging) |
+| **V** | Toggle eddy current (induction heating) |
+| **W** | Toggle Curie quench (freeze domains at 773K) |
 
 Keyboard shortcuts:
 | Key | Action |
@@ -130,7 +135,7 @@ Keyboard shortcuts:
 
 - **FFT Solvers**: `MagFFT` and `ElecFFT` use `fftw3f` with 3x zero-padded grids. Poisson equation solved in frequency domain with `1/(k^2+1)` kernel. Both solvers run asynchronously on worker threads via the `AsyncFieldSolver::Exchange()` pattern.
 - **Biot-Savart**: All three current-to-field paths (moving charges, solids via PSTN, SPRK conduction) share a single `magnetism_addBiotSavart()` function in `MagnetismCommon.h`.
-- **Particle fields**: `tmp2` = B-field history, `tmp3` = magnetization / LITH charge / induced-flag, `tmp4` = electric charge (conductors), `tmp5`/`tmp6` = solid effective velocity (PSTN).
+- **Particle fields**: `tmp2` = B-field history / quench sentinel, `tmp3` = induced magnetization (ferromagnets) / LITH charge, `ctype` = permanent magnetization (ferromagnets), `tmp4` = electric charge (conductors), `tmp5`/`tmp6` = solid effective velocity (PSTN).
 - **Force separation**: Charged particles (`tmp4 != 0`) receive pure Coulomb force. Uncharged particles receive pure dielectrophoresis. No mixing.
 - **Solids do not move**: Walls accept charge and produce fields but never receive motion forces.
 - **Gravity weighting**: `F_effective = F_raw / (Gravity + 0.05)`. Light particles (WATR: 0.10) respond much faster than heavy ones (MERC: 0.30).
