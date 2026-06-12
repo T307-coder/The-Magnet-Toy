@@ -1,10 +1,8 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v2.0.12 — Triboelectricity, coil magnetization, para/diamagnetism, water exclusion.
-Triboelectricity (T key): insulator contact charging via affinity table (±1/contact,
-equilibrium cap = affinity difference). GLAS/GOO strongest pair (±3 each).
-Coil magnetization (X key): SPRK current magnetizes ferromagnets along normal (RHR).
-Para/diamagnetism (F key): O2/URAN/PLUT pulled to strong |B|, 8 types pushed to weak |B|.
-Water (WATR/SLTW/CBNW/SNOW) excluded from O key EM induction — poor electrolytes.
-Biot-Savart solid tmp5/tmp6 consumed after read. EM field undo/save fully fixed.
+v2.0.13 — Curie quench permanent magnets, coercivity, triboelectricity, Q decoupled.
+Curie quench: IRON/BMTL/BRMT/TTAN cooled through 773K freeze tmp3 = B×20 (±100).
+Coercivity: tmp3 locked unless |B|×5 > |tmp3| — strong magnets stay permanent.
+Triboelectricity (T key): 15 insulator types exchange charge on contact, affinity table.
+Coulomb/Lorentz force decoupled from Q key — all charges feel force regardless of field production.

@@ -52,6 +52,8 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 - **4 ferromagnetics** become permanently magnetized near MAGN/ELMG: IRON, BMTL, TTAN, BRMT. Magnetization spreads via DEUT-style diffusion. BMTL shatters into BRMT under strong B-fields. Magnetization update deduplicated into `magnetism_ferromagnetUpdate()`.
 - **Async B-field solver**: Magnetic field computed on a dedicated worker thread via FFT Poisson solver.
 - **Coil magnetization** (X key): SPRK current magnetizes nearby ferromagnets directionally via right-hand rule. ± probes placed along normal to current flow, target proportional to SPRK life.
+- **Curie quench**: IRON, BMTL, BRMT, TTAN frozen through 773K retain bField×20 as permanent tmp3. Cooling without field yields unmagnetized iron.
+- **Coercivity**: Permanent magnets resist remagnetization — |B|×5 must exceed |tmp3| for changes.
 - **Para/diamagnetism** (F key): O2, URAN, PLUT pulled toward strong |B|; WATR, SLTW, CBNW, SNOW, BGLA, SALT, SAWD, BCOL pushed toward weak |B|.
 - **New EM induction** (O key, default ON): dB/dt drives directional charge separation between conductors. Electrons drift perpendicular to the B-field gradient: `v_e = sign(dB/dt) × (dB/dy, −dB/dx)`. Both axes independently computed, allowing diagonal transfer. Replaces the old spark-only induction with continuous charge transport.
 

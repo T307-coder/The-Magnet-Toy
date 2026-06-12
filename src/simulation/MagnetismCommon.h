@@ -220,6 +220,8 @@ static inline void magnetism_diffuseCharge(Simulation *sim, Particle &p, int x, 
 }
 
 // Shared ferromagnet magnetization update: contact, diffusion, decay, magSrc.
+// Quench: cooling through Curie point freezes tmp3 in current B-field direction.
+// Coercivity: changes require |B| > |tmp3| * 0.05 (stronger field pushes harder).
 // Used by BMTL, BRMT, IRON, TTAN. Returns cx,cy by reference for reuse.
 static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int x, int y, int &tmp3Ref, int &cx, int &cy)
 {
@@ -229,19 +231,38 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 
 	if (p.temp < 773.15f)
 	{
-		magnetism_contactCharge(sim, p, x, y, tmp3Ref);
-		magnetism_diffuseCharge(sim, p, x, y, tmp3Ref);
+		// Quench: just cooled through Curie → freeze magnetization to B-field
+		if (p.tmp2 == -99999)
+		{
+			float Bz = sim->bField[cy][cx];
+			tmp3Ref = (int)(Bz * 20.0f);
+			if (tmp3Ref > 100) tmp3Ref = 100;
+			if (tmp3Ref < -100) tmp3Ref = -100;
+			p.tmp2 = (int)(Bz * 10000.0f); // restore induction history
+		}
+		else
+		{
+			// Coercivity: only allow changes when |B| * 5 > |tmp3|
+			// Strong permanent magnets are hard to remagnetize
+			float Bz = sim->bField[cy][cx];
+			if (fabsf(Bz) * 5.0f > fabsf((float)tmp3Ref))
+			{
+				magnetism_contactCharge(sim, p, x, y, tmp3Ref);
+				magnetism_diffuseCharge(sim, p, x, y, tmp3Ref);
+			}
+		}
 	}
 	else
 	{
+		// Above Curie: thermal demagnetization
 		if (tmp3Ref > 0) tmp3Ref = std::max(0, tmp3Ref - 5);
 		else if (tmp3Ref < 0) tmp3Ref = std::min(0, tmp3Ref + 5);
+		p.tmp2 = -99999; // mark as "was hot" for quench detection
 	}
 
 	if (tmp3Ref != 0)
 	{
 		sim->magSrc[cy][cx] += tmp3Ref * 0.02f;
-		// Keep element life > 0 while magnetized → blocks old induction (life cooldown)
 		p.life = 100;
 	}
 }
