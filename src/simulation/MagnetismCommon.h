@@ -312,7 +312,7 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 	if (M_rem != 0 || M_ind != 0)
 	{
 		sim->magSrc[cy][cx] += (M_rem + M_ind) * 0.02f;
-		p.life = 100;
+		p.life = 1000;
 	}
 }
 
