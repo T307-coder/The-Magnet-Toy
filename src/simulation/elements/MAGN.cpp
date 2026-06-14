@@ -31,7 +31,7 @@ void Element::Element_MAGN()
 
 	DefaultProperties.tmp = 1;
 	HeatConduct = 0;
-	Description = "Permanent magnet. tmp>0=N(red), tmp<0=S(blue), |tmp|=strength.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_MAGN");
 
 	Properties = TYPE_SOLID;
 

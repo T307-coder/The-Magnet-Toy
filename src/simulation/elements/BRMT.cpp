@@ -32,7 +32,7 @@ void Element::Element_BRMT()
 
 	HeatConduct = 211;
 	DefaultProperties.ctype = 0;
-	Description = "Broken metal. Created when iron rusts or when metals break from pressure.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_BRMT");
 
 	Properties = TYPE_PART|PROP_CONDUCTS|PROP_LIFE_DEC|PROP_HOT_GLOW;
 	CarriesTypeIn = 1U << FIELD_CTYPE;

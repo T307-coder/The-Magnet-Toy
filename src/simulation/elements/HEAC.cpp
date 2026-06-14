@@ -30,7 +30,7 @@ void Element::Element_HEAC()
 	Weight = 100;
 
 	HeatConduct = 251;
-	Description = "Rapid heat conductor.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_HEAC");
 
 	Properties = TYPE_SOLID;
 

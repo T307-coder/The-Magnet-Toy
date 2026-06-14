@@ -31,7 +31,7 @@ void Element::Element_EBFM()
 
 	DefaultProperties.tmp = 5;
 	HeatConduct = 0;
-	Description = "Electric uniform B-field. PSCN on, NSCN off. tmp=radius, temp=strength(±273.15K=zero).";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_EBFM");
 
 	Properties = TYPE_SOLID;
 

@@ -31,7 +31,7 @@ void Element::Element_FIXC()
 
 	DefaultProperties.tmp = 1;
 	HeatConduct = 0;
-	Description = "Fixed charge. tmp>0=positive(yellow), tmp<0=negative(cyan), |tmp|=strength.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_FIXC");
 
 	Properties = TYPE_SOLID;
 

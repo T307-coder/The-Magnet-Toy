@@ -31,7 +31,7 @@ void Element::Element_UBFM()
 	DefaultProperties.tmp = 10;
 	DefaultProperties.tmp2 = 5;
 	HeatConduct = 0;
-	Description = "Uniform B-field magnet. tmp=N/S strength(±), tmp2=radius(cells).";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_UBFM");
 
 	Properties = TYPE_SOLID;
 

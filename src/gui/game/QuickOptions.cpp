@@ -38,7 +38,7 @@ void DrawGravOption::perform()
 
 
 DrawMagneticOption::DrawMagneticOption(GameModel * m):
-QuickOption("M", "Draw magnetic field", m, Toggle)
+QuickOption("M", Localization::Ref().Tr("quick.draw_magnetic"), m, Toggle)
 {
 
 }
@@ -86,7 +86,7 @@ void NGravityOption::perform()
 
 
 MagnetismEnableOption::MagnetismEnableOption(GameModel * m):
-QuickOption("B", "Magnetism simulation \uE001", m, Toggle)
+QuickOption("B", Localization::Ref().Tr("quick.magnetism_enable") + " \uE001", m, Toggle)
 {
 
 }
@@ -102,7 +102,7 @@ void MagnetismEnableOption::perform()
 
 
 DrawElectricOption::DrawElectricOption(GameModel * m):
-QuickOption("E", "Draw electric field", m, Toggle)
+QuickOption("E", Localization::Ref().Tr("quick.draw_electric"), m, Toggle)
 {
 
 }
@@ -118,7 +118,7 @@ void DrawElectricOption::perform()
 
 
 ElectricityEnableOption::ElectricityEnableOption(GameModel * m):
-QuickOption("Y", "Electricity simulation", m, Toggle)
+QuickOption("Y", Localization::Ref().Tr("quick.electricity_enable"), m, Toggle)
 {
 
 }
@@ -164,7 +164,7 @@ void ConsoleShowOption::perform()
 }
 
 InductionEnableOption::InductionEnableOption(GameModel * m):
-QuickOption("I", "Magnetic induction \bg(dB/dt sparking, not recommended)", m, Toggle)
+QuickOption("I", Localization::Ref().Tr("quick.magnetic_induction") + " \bg(dB/dt sparking, not recommended)", m, Toggle)
 {
 
 }
@@ -178,7 +178,7 @@ void InductionEnableOption::perform()
 }
 
 CurrentBFieldOption::CurrentBFieldOption(GameModel * m):
-QuickOption("J", "Current magnetic field \bg(Biot-Savart)", m, Toggle)
+QuickOption("J", Localization::Ref().Tr("quick.current_bfield") + " \bg(Biot-Savart)", m, Toggle)
 {
 
 }
@@ -192,7 +192,7 @@ void CurrentBFieldOption::perform()
 }
 
 RealisticPstnOption::RealisticPstnOption(GameModel * m):
-QuickOption("R", "Realistic PSTN \bg(gives velocity)", m, Toggle)
+QuickOption("R", Localization::Ref().Tr("quick.realistic_pstn") + " \bg(gives velocity)", m, Toggle)
 {
 
 }
@@ -206,7 +206,7 @@ void RealisticPstnOption::perform()
 }
 
 SprkCurrentOption::SprkCurrentOption(GameModel * m):
-QuickOption("K", "SPRK current magnetic field", m, Toggle)
+QuickOption("K", Localization::Ref().Tr("quick.sprk_current"), m, Toggle)
 {
 
 }
@@ -220,7 +220,7 @@ void SprkCurrentOption::perform()
 }
 
 CoilMagnetizeOption::CoilMagnetizeOption(GameModel * m):
-QuickOption("X", "Coil magnetization \bg(SPRK charges magnets)", m, Toggle)
+QuickOption("X", Localization::Ref().Tr("quick.coil_magnetize") + " \bg(SPRK charges magnets)", m, Toggle)
 {
 
 }
@@ -234,7 +234,7 @@ void CoilMagnetizeOption::perform()
 }
 
 TriboElectricOption::TriboElectricOption(GameModel * m):
-QuickOption("T", "Triboelectricity \bg(insulator contact charging)", m, Toggle)
+QuickOption("T", Localization::Ref().Tr("quick.triboelectricity") + " \bg(insulator contact charging)", m, Toggle)
 {
 
 }
@@ -248,7 +248,7 @@ void TriboElectricOption::perform()
 }
 
 FreeChargeFieldsOption::FreeChargeFieldsOption(GameModel * m):
-QuickOption("Q", "Free charge fields \bg(powders/liquids/gases)", m, Toggle)
+QuickOption("Q", Localization::Ref().Tr("quick.free_charge") + " \bg(powders/liquids/gases)", m, Toggle)
 {
 
 }
@@ -262,7 +262,7 @@ void FreeChargeFieldsOption::perform()
 }
 
 NewInductionOption::NewInductionOption(GameModel * m):
-QuickOption("O", "New EM induction \bg(dB/dt charge transfer)", m, Toggle)
+QuickOption("O", Localization::Ref().Tr("quick.new_induction") + " \bg(dB/dt charge transfer)", m, Toggle)
 {
 
 }
@@ -276,7 +276,7 @@ void NewInductionOption::perform()
 }
 
 InductionSprkOption::InductionSprkOption(GameModel * m):
-QuickOption("Z", "Induction SPRK \bg(auto-spark from high charge)", m, Toggle)
+QuickOption("Z", Localization::Ref().Tr("quick.induction_sprk") + " \bg(auto-spark from high charge)", m, Toggle)
 {
 
 }
@@ -290,7 +290,7 @@ void InductionSprkOption::perform()
 }
 
 PotentialCurrentOption::PotentialCurrentOption(GameModel * m):
-QuickOption("S", "Potential-driven current \bg(SPRK to higher V)", m, Toggle)
+QuickOption("S", Localization::Ref().Tr("quick.potential_current") + " \bg(SPRK to higher V)", m, Toggle)
 {
 
 }
@@ -304,7 +304,7 @@ void PotentialCurrentOption::perform()
 }
 
 PolarizationOption::PolarizationOption(GameModel * m):
-QuickOption("U", "Dielectric polarization \bg(E-field)", m, Toggle)
+QuickOption("U", Localization::Ref().Tr("quick.polarization") + " \bg(E-field)", m, Toggle)
 {
 
 }
@@ -318,7 +318,7 @@ void PolarizationOption::perform()
 }
 
 ParticleGravityOption::ParticleGravityOption(GameModel * m):
-QuickOption("L", "Particle gravity field \bg(all particles source gravity)", m, Toggle)
+QuickOption("L", Localization::Ref().Tr("quick.particle_gravity") + " \bg(all particles source gravity)", m, Toggle)
 {
 
 }
@@ -332,7 +332,7 @@ void ParticleGravityOption::perform()
 }
 
 NonferroFieldsOption::NonferroFieldsOption(GameModel * m):
-QuickOption("F", "Para/Diamagnetic force \bg(gradient pull/push)", m, Toggle)
+QuickOption("F", Localization::Ref().Tr("quick.nonferro_force") + " \bg(gradient pull/push)", m, Toggle)
 {
 
 }
@@ -346,7 +346,7 @@ void NonferroFieldsOption::perform()
 }
 
 EddyCurrentOption::EddyCurrentOption(GameModel * m):
-QuickOption("V", "Eddy current \bg(induction heating)", m, Toggle)
+QuickOption("V", Localization::Ref().Tr("quick.eddy_current") + " \bg(induction heating)", m, Toggle)
 {
 
 }
@@ -360,7 +360,7 @@ void EddyCurrentOption::perform()
 }
 
 CurieQuenchOption::CurieQuenchOption(GameModel * m):
-QuickOption("W", "Curie quench \bg(freeze domains at 773K)", m, Toggle)
+QuickOption("W", Localization::Ref().Tr("quick.curie_quench") + " \bg(freeze domains at 773K)", m, Toggle)
 {
 
 }

@@ -30,7 +30,7 @@ void Element::Element_ELMG()
 	Weight = 100;
 
 	HeatConduct = 0;
-	Description = "Electromagnet. Changes magnetic field to its temp when activated. (use HEAT/COOL)";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_ELMG");
 
 	Properties = TYPE_SOLID;
 

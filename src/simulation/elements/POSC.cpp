@@ -30,7 +30,7 @@ void Element::Element_POSC()
 	Weight = 100;
 
 	HeatConduct = 0;
-	Description = "Electrode plate. Temp>0C=positive(yellow), Temp<0C=negative(blue). Use HEAT/COOL.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_POSC");
 
 	Properties = TYPE_SOLID;
 

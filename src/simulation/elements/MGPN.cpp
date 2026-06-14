@@ -33,7 +33,7 @@ void Element::Element_MGPN()
 
 	DefaultProperties.tmp = 7;
 	HeatConduct = 61;
-	Description = "Magnetic monopole. tmp>0=N, tmp<0=S. Same polarity repels, opposite attracts.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_MGPN");
 
 	Properties = TYPE_ENERGY|PROP_LIFE_DEC|PROP_LIFE_KILL_DEC;
 
