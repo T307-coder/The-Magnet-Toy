@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "SimulationConfig.h"
 #include "common/String.h"
+#include "common/Localization.h"
 
 inline ByteString VersionInfo()
 {
@@ -41,6 +42,7 @@ inline ByteString VersionInfo()
 
 inline ByteString IntroText()
 {
+	auto tr = [](const char *key) { return Localization::Ref().Tr(key).ToUtf8(); };
 	ByteStringBuilder sb;
 	sb << "\bl\bU" << APPNAME << "\bU - Version " << DISPLAY_VERSION[0] << "." << DISPLAY_VERSION[1] << " - https://powdertoy.co.uk, irc.libera.chat #powder, https://tpt.io/discord\n"
 	      "\n"
@@ -64,13 +66,13 @@ inline ByteString IntroText()
 	      "\n";
 	if constexpr (BETA)
 	{
-		sb << "\brThis is a BETA, you cannot save things publicly, nor open local saves and stamps made with it in older versions.\n"
-		      "\brIf you are planning on publishing any saves, use the release version.\n";
+		sb << tr("intro.beta.warning")
+		   << tr("intro.beta.publish");
 	}
 	else
 	{
-		sb << "\bgTo use online features such as saving, you need to register at: \br" << SERVER << "/Register.html\n";
+		sb << tr("intro.online.register") << "\br" << SERVER << "/Register.html\n";
 	}
-	sb << "\n\bt" << VersionInfo();
+	sb << tr("intro.version_prefix") << VersionInfo();
 	return sb.Build();
 }

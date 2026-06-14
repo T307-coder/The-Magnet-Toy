@@ -34,7 +34,7 @@ void Element::Element_GOLD()
 	Weight = 100;
 
 	HeatConduct = 251;
-	Description = "Corrosion resistant metal, will reverse corrosion of iron. Excellent conductor.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_GOLD");
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_HOT_GLOW|PROP_LIFE_DEC|PROP_NEUTPASS;
 

@@ -31,7 +31,7 @@ void Element::Element_LRBD()
 
 	DefaultProperties.temp = R_TEMP + 45.0f + 273.15f;
 	HeatConduct = 170;
-	Description = "Liquid Rubidium.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_LRBD");
 
 	Properties = TYPE_LIQUID|PROP_CONDUCTS|PROP_LIFE_DEC;
 

@@ -31,7 +31,7 @@ void Element::Element_INWR()
 	Weight = 100;
 
 	HeatConduct = 251;
-	Description = "Insulated wire. Only conducts to PSCN, NSCN, WIFI, and SWCH.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_INWR");
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_LIFE_DEC;
 

@@ -4,6 +4,7 @@
 #include "SearchModel.h"
 #include "SearchView.h"
 
+#include "common/Localization.h"
 #include "client/Client.h"
 #include "client/SaveInfo.h"
 #include "client/GameSave.h"
@@ -255,11 +256,9 @@ void SearchController::ClearSelection()
 void SearchController::RemoveSelected()
 {
 	StringBuilder desc;
-	desc << "Are you sure you want to delete " << searchModel->GetSelected().size() << " save";
-	if(searchModel->GetSelected().size()>1)
-		desc << "s";
-	desc << "?";
-	new ConfirmPrompt("Delete saves", desc.Build(), { [this] {
+	auto count = searchModel->GetSelected().size();
+	desc << Localization::Ref().Tr("search.confirm_delete_prefix") << count << (count > 1 ? Localization::Ref().Tr("search.confirm_delete_suffix_many") : Localization::Ref().Tr("search.confirm_delete_suffix_one"));
+	new ConfirmPrompt(Localization::Ref().Tr("search.confirm_delete_title"), desc.Build(), { [this] {
 		removeSelectedC();
 	} });
 }
@@ -276,7 +275,7 @@ void SearchController::removeSelectedC()
 		{
 			for (size_t i = 0; i < saves.size(); i++)
 			{
-				notifyStatus(String::Build("Deleting save [", saves[i], "] ..."));
+				notifyStatus(String::Build(Localization::Ref().Tr("search.status_deleting"), saves[i], Localization::Ref().Tr("search.status_deleting_suffix")));
 				auto deleteSaveRequest = std::make_unique<http::DeleteSaveRequest>(saves[i]);
 				deleteSaveRequest->Start();
 				deleteSaveRequest->Wait();
@@ -286,7 +285,7 @@ void SearchController::removeSelectedC()
 				}
 				catch (const http::RequestError &ex)
 				{
-					notifyError(String::Build("Failed to delete [", saves[i], "]: ", ByteString(ex.what()).FromAscii()));
+					notifyError(String::Build(Localization::Ref().Tr("search.error_delete_failed"), saves[i], Localization::Ref().Tr("search.error_delete_failed_suffix"), ByteString(ex.what()).FromAscii()));
 					c->Refresh();
 					return false;
 				}
@@ -298,7 +297,7 @@ void SearchController::removeSelectedC()
 	};
 
 	std::vector<int> selected = searchModel->GetSelected();
-	new TaskWindow("Removing saves", new RemoveSavesTask(selected, this));
+	new TaskWindow(Localization::Ref().Tr("search.task_removing"), new RemoveSavesTask(selected, this));
 	ClearSelection();
 	searchModel->UpdateSaveList(searchModel->GetPageNum(), searchModel->GetLastQuery());
 }
@@ -306,11 +305,9 @@ void SearchController::removeSelectedC()
 void SearchController::UnpublishSelected(bool publish)
 {
 	StringBuilder desc;
-	desc << "Are you sure you want to " << (publish ? String("publish ") : String("unpublish ")) << searchModel->GetSelected().size() << " save";
-	if (searchModel->GetSelected().size() > 1)
-		desc << "s";
-	desc << "?";
-	new ConfirmPrompt(publish ? String("Publish Saves") : String("Unpublish Saves"), desc.Build(), { [this, publish] {
+	auto count = searchModel->GetSelected().size();
+	desc << (publish ? Localization::Ref().Tr("search.confirm_publish_prefix") : Localization::Ref().Tr("search.confirm_unpublish_prefix")) << count << (count > 1 ? Localization::Ref().Tr("search.confirm_delete_suffix_many") : Localization::Ref().Tr("search.confirm_delete_suffix_one"));
+	new ConfirmPrompt(publish ? Localization::Ref().Tr("search.confirm_publish_title") : Localization::Ref().Tr("search.confirm_unpublish_title"), desc.Build(), { [this, publish] {
 		unpublishSelectedC(publish);
 	} });
 }
@@ -327,7 +324,7 @@ void SearchController::unpublishSelectedC(bool publish)
 
 		void PublishSave(int saveID)
 		{
-			notifyStatus(String::Build("Publishing save [", saveID, "]"));
+			notifyStatus(String::Build(Localization::Ref().Tr("search.status_publishing"), saveID, Localization::Ref().Tr("search.status_publishing_suffix")));
 			auto publishSaveRequest = std::make_unique<http::PublishSaveRequest>(saveID);
 			publishSaveRequest->Start();
 			publishSaveRequest->Wait();
@@ -336,7 +333,7 @@ void SearchController::unpublishSelectedC(bool publish)
 
 		void UnpublishSave(int saveID)
 		{
-			notifyStatus(String::Build("Unpublishing save [", saveID, "]"));
+			notifyStatus(String::Build(Localization::Ref().Tr("search.status_unpublishing"), saveID, Localization::Ref().Tr("search.status_unpublishing_suffix")));
 			auto unpublishSaveRequest = std::make_unique<http::UnpublishSaveRequest>(saveID);
 			unpublishSaveRequest->Start();
 			unpublishSaveRequest->Wait();
@@ -362,11 +359,11 @@ void SearchController::unpublishSelectedC(bool publish)
 				{
 					if (publish) // uses html page so error message will be spam
 					{
-						notifyError(String::Build("Failed to publish [", saves[i], "], is this save yours?"));
+						notifyError(String::Build(Localization::Ref().Tr("search.error_publish_failed"), saves[i], Localization::Ref().Tr("search.error_publish_failed_suffix")));
 					}
 					else
 					{
-						notifyError(String::Build("Failed to unpublish [", saves[i], "]: ", ByteString(ex.what()).FromAscii()));
+						notifyError(String::Build(Localization::Ref().Tr("search.error_unpublish_failed"), saves[i], Localization::Ref().Tr("search.error_unpublish_failed_suffix"), ByteString(ex.what()).FromAscii()));
 					}
 					c->Refresh();
 					return false;
@@ -379,7 +376,7 @@ void SearchController::unpublishSelectedC(bool publish)
 	};
 
 	std::vector<int> selected = searchModel->GetSelected();
-	new TaskWindow(publish ? String("Publishing Saves") : String("Unpublishing Saves"), new UnpublishSavesTask(selected, this, publish));
+	new TaskWindow(publish ? Localization::Ref().Tr("search.task_publishing") : Localization::Ref().Tr("search.task_unpublishing"), new UnpublishSavesTask(selected, this, publish));
 }
 
 void SearchController::FavouriteSelected()
@@ -393,7 +390,7 @@ void SearchController::FavouriteSelected()
 		{
 			for (size_t i = 0; i < saves.size(); i++)
 			{
-				notifyStatus(String::Build("Favouring save [", saves[i], "]"));
+				notifyStatus(String::Build(Localization::Ref().Tr("search.status_favouring"), saves[i], Localization::Ref().Tr("search.status_favouring_suffix")));
 				auto favouriteSaveRequest = std::make_unique<http::FavouriteSaveRequest>(saves[i], true);
 				favouriteSaveRequest->Start();
 				favouriteSaveRequest->Wait();
@@ -403,7 +400,7 @@ void SearchController::FavouriteSelected()
 				}
 				catch (const http::RequestError &ex)
 				{
-					notifyError(String::Build("Failed to favourite [", saves[i], "]: ", ByteString(ex.what()).FromAscii()));
+					notifyError(String::Build(Localization::Ref().Tr("search.error_favourite_failed"), saves[i], Localization::Ref().Tr("search.error_favourite_failed_suffix"), ByteString(ex.what()).FromAscii()));
 					return false;
 				}
 				notifyProgress((i + 1) * 100 / saves.size());
@@ -421,7 +418,7 @@ void SearchController::FavouriteSelected()
 		{
 			for (size_t i = 0; i < saves.size(); i++)
 			{
-				notifyStatus(String::Build("Unfavouring save [", saves[i], "]"));
+				notifyStatus(String::Build(Localization::Ref().Tr("search.status_unfavouring"), saves[i], Localization::Ref().Tr("search.status_unfavouring_suffix")));
 				auto unfavouriteSaveRequest = std::make_unique<http::FavouriteSaveRequest>(saves[i], false);
 				unfavouriteSaveRequest->Start();
 				unfavouriteSaveRequest->Wait();
@@ -431,7 +428,7 @@ void SearchController::FavouriteSelected()
 				}
 				catch (const http::RequestError &ex)
 				{
-					notifyError(String::Build("Failed to unfavourite [", saves[i], "]: ", ByteString(ex.what()).FromAscii()));
+					notifyError(String::Build(Localization::Ref().Tr("search.error_unfavourite_failed"), saves[i], Localization::Ref().Tr("search.error_unfavourite_failed_suffix"), ByteString(ex.what()).FromAscii()));
 					return false;
 				}
 				notifyProgress((i + 1) * 100 / saves.size());
@@ -442,8 +439,8 @@ void SearchController::FavouriteSelected()
 
 	std::vector<int> selected = searchModel->GetSelected();
 	if (!searchModel->GetShowFavourite())
-		new TaskWindow("Favouring saves", new FavouriteSavesTask(selected));
+		new TaskWindow(Localization::Ref().Tr("search.task_favouring"), new FavouriteSavesTask(selected));
 	else
-		new TaskWindow("Unfavouring saves", new UnfavouriteSavesTask(selected));
+		new TaskWindow(Localization::Ref().Tr("search.task_unfavouring"), new UnfavouriteSavesTask(selected));
 	ClearSelection();
 }

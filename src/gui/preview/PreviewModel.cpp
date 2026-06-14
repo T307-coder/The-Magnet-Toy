@@ -8,6 +8,7 @@
 #include "client/Client.h"
 #include "client/GameSave.h"
 #include "client/SaveInfo.h"
+#include "common/Localization.h"
 #include "gui/dialogues/ErrorMessage.h"
 #include "PreviewView.h"
 #include "Config.h"
@@ -150,7 +151,7 @@ void PreviewModel::OnSaveReady()
 	}
 	catch(ParseException &e)
 	{
-		new ErrorMessage("Error", ByteString(e.what()).FromUtf8());
+		new ErrorMessage(Localization::Ref().Tr("common.error"), ByteString(e.what()).FromUtf8());
 		canOpen = false;
 	}
 	notifySaveChanged();
@@ -241,11 +242,11 @@ void PreviewModel::Update()
 		{
 			if (favouriteSaveRequest->Favourite())
 			{
-				new ErrorMessage("Error", "Could not favourite the save: " + ByteString(ex.what()).FromUtf8());
+				new ErrorMessage(Localization::Ref().Tr("common.error"), Localization::Ref().Tr("preview.error_favourite_prefix") + ByteString(ex.what()).FromUtf8());
 			}
 			else
 			{
-				new ErrorMessage("Error", "Could not unfavourite the save: " + ByteString(ex.what()).FromUtf8());
+				new ErrorMessage(Localization::Ref().Tr("common.error"), Localization::Ref().Tr("preview.error_unfavourite_prefix") + ByteString(ex.what()).FromUtf8());
 			}
 		}
 		favouriteSaveRequest.reset();

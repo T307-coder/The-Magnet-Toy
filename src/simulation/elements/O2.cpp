@@ -30,7 +30,7 @@ void Element::Element_O2()
 	Weight = 1;
 
 	HeatConduct = 70;
-	Description = "Oxygen gas. Ignites easily.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_O2");
 
 	Properties = TYPE_GAS|PROP_CONDUCTS;
 

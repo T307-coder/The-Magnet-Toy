@@ -32,7 +32,7 @@ void Element::Element_TESC()
 	Weight = 100;
 
 	HeatConduct = 251;
-	Description = "Tesla coil! Creates lightning when sparked.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_TESC");
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_LIFE_DEC|PROP_HOT_GLOW;
 

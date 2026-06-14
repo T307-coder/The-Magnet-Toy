@@ -32,7 +32,7 @@ void Element::Element_PTNM()
 	Weight = 100;
 
 	HeatConduct = 251;
-	Description = "Platinum. Catalyzes certain reactions.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_PTNM");
 
 	Properties = TYPE_SOLID | PROP_CONDUCTS | PROP_LIFE_DEC | PROP_HOT_GLOW | PROP_SPARKSETTLE;
 

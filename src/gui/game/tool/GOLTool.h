@@ -1,5 +1,6 @@
 #pragma once
 #include "Tool.h"
+#include "common/Localization.h"
 
 class GameModel;
 

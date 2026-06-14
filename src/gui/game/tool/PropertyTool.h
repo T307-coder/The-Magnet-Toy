@@ -1,6 +1,7 @@
 #pragma once
 #include "simulation/AccessProperty.h"
 #include "Tool.h"
+#include "common/Localization.h"
 #include <optional>
 
 class GameModel;

@@ -30,7 +30,7 @@ void Element::Element_SLTW()
 	Weight = 35;
 
 	HeatConduct = 75;
-	Description = "Saltwater, conducts electricity, difficult to freeze.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_SLTW");
 
 	Properties = TYPE_LIQUID | PROP_CONDUCTS | PROP_LIFE_DEC | PROP_NEUTPENETRATE | PROP_PHOTPASS;
 

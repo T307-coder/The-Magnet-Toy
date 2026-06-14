@@ -35,7 +35,7 @@ void Element::Element_LAVA()
 
 	DefaultProperties.temp = R_TEMP + 1500.0f + 273.15f;
 	HeatConduct = 60;
-	Description = "Molten lava. Ignites flammable materials. Generated when metals and other materials melt, solidifies when cold.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_LAVA");
 
 	Properties = TYPE_LIQUID|PROP_LIFE_DEC|PROP_CONDUCTS;
 	CarriesTypeIn = 1U << FIELD_CTYPE;

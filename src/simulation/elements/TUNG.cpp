@@ -34,7 +34,7 @@ void Element::Element_TUNG()
 	Weight = 100;
 
 	HeatConduct = 251;
-	Description = "Tungsten. Brittle metal with a very high melting point.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_TUNG");
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_LIFE_DEC;
 

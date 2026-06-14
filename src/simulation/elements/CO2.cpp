@@ -30,7 +30,7 @@ void Element::Element_CO2()
 	Weight = 1;
 
 	HeatConduct = 88;
-	Description = "Carbon Dioxide. Heavy gas, drifts downwards. Carbonates water and turns to dry ice when cold.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_CO2");
 
 	Properties = TYPE_GAS|PROP_CONDUCTS;
 

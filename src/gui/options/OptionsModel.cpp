@@ -8,6 +8,8 @@
 #include "gui/interface/Engine.h"
 #include "gui/game/GameModel.h"
 #include "client/Client.h"
+#include "common/Localization.h"
+#include "common/platform/Platform.h"
 
 OptionsModel::OptionsModel(GameModel * gModel_) {
 	gModel = gModel_;
@@ -94,6 +96,18 @@ void OptionsModel::SetTemperatureScale(TempScale temperatureScale)
 	GlobalPrefs::Ref().Set("Renderer.TemperatureScale", int(temperatureScale));
 	gModel->SetTemperatureScale(temperatureScale);
 	notifySettingsChanged();
+}
+
+int OptionsModel::GetLanguage()  
+{  
+    return GlobalPrefs::Ref().Get("Language", 0);
+}  
+  
+void OptionsModel::SetLanguage(int language)  
+{  
+	GlobalPrefs::Ref().Set("Language", language);
+	// 重启游戏以应用新语言  
+	Platform::DoRestart();  
 }
 
 int OptionsModel::GetThreadedRendering()

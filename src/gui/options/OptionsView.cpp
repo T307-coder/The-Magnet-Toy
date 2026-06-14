@@ -4,6 +4,7 @@
 #include "OptionsModel.h"
 #include "common/clipboard/Clipboard.h"
 #include "common/platform/Platform.h"
+#include "common/Localization.h"
 #include "graphics/Graphics.h"
 #include "graphics/Renderer.h"
 #include "gui/Style.h"
@@ -100,12 +101,14 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 	};
 	
 	{
-		auto *label = new ui::Label(ui::Point(4, 1), ui::Point(Size.X-8, 22), "Settings");
-		label->SetTextColour(style::Colour::InformationTitle);
-		label->Appearance.HorizontalAlign = ui::Appearance::AlignLeft;
-		label->Appearance.VerticalAlign = ui::Appearance::AlignMiddle;
-		autoWidth(label, 0);
-		AddComponent(label);
+		// 顶部标题使用本地化文本
+		titleLabel = new ui::Label(ui::Point(4, 1), ui::Point(Size.X-8, 22),
+			Localization::Ref().Tr("options.title"));
+		titleLabel->SetTextColour(style::Colour::InformationTitle);
+		titleLabel->Appearance.HorizontalAlign = ui::Appearance::AlignLeft;
+		titleLabel->Appearance.VerticalAlign = ui::Appearance::AlignMiddle;
+		autoWidth(titleLabel, 0);
+		AddComponent(titleLabel);
 	}
 
 	auto *tmpSeparator = new ui::Separator(ui::Point(0, 22), ui::Point(Size.X, 1));
@@ -188,24 +191,24 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 		return std::make_pair(textbox, preview);
 	};
 
-	heatSimulation = addCheckbox(0, "Heat simulation \bgIntroduced in version 34", "Can cause odd behaviour when disabled", [this] {
+	heatSimulation = addCheckbox(0, Localization::Ref().Tr("options.heat_simulation"), Localization::Ref().Tr("options.heat_simulation.info"), [this] {
 		c->SetHeatSimulation(heatSimulation->GetChecked());
 	});
-	newtonianGravity = addCheckbox(0, "Newtonian gravity \bgIntroduced in version 48", "May cause poor performance on older computers", [this] {
+	newtonianGravity = addCheckbox(0, Localization::Ref().Tr("options.newtonian_gravity"), Localization::Ref().Tr("options.newtonian_gravity.info"), [this] {
 		c->SetNewtonianGravity(newtonianGravity->GetChecked());
 	});
-	ambientHeatSimulation = addCheckbox(0, "Ambient heat simulation \bgIntroduced in version 50", "Can cause odd / broken behaviour with many saves", [this] {
+	ambientHeatSimulation = addCheckbox(0, Localization::Ref().Tr("options.ambient_heat_simulation"), Localization::Ref().Tr("options.ambient_heat_simulation.info"), [this] {
 		c->SetAmbientHeatSimulation(ambientHeatSimulation->GetChecked());
 	});
-	waterEqualisation = addCheckbox(0, "Water equalisation \bgIntroduced in version 61", "May cause poor performance with a lot of water", [this] {
+	waterEqualisation = addCheckbox(0, Localization::Ref().Tr("options.water_equalisation"), Localization::Ref().Tr("options.water_equalisation.info"), [this] {
 		c->SetWaterEqualisation(waterEqualisation->GetChecked());
 	});
-	airMode = addDropDown("Air simulation mode", {
-		{ "On", AIR_ON },
-		{ "Pressure off", AIR_PRESSUREOFF },
-		{ "Velocity off", AIR_VELOCITYOFF },
-		{ "Off", AIR_OFF },
-		{ "No update", AIR_NOUPDATE },
+	airMode = addDropDown(Localization::Ref().Tr("options.air_mode"), {
+		{ Localization::Ref().Tr("options.air.on"), AIR_ON },
+		{ Localization::Ref().Tr("options.air.pressure_off"), AIR_PRESSUREOFF },
+		{ Localization::Ref().Tr("options.air.velocity_off"), AIR_VELOCITYOFF },
+		{ Localization::Ref().Tr("options.air.off"), AIR_OFF },
+		{ Localization::Ref().Tr("options.air.no_update"), AIR_NOUPDATE },
 	}, [this] {
 		c->SetAirMode(airMode->GetOption().second);
 	});
@@ -255,23 +258,43 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 			});
 		}
 	});
-	edgeMode = addDropDown("Edge mode", {
-		{ "Void", EDGE_VOID },
-		{ "Solid", EDGE_SOLID },
-		{ "Loop", EDGE_LOOP },
+	edgeMode = addDropDown(Localization::Ref().Tr("options.edge_mode"), {
+		{ Localization::Ref().Tr("options.edge.void"), EDGE_VOID },
+		{ Localization::Ref().Tr("options.edge.solid"), EDGE_SOLID },
+		{ Localization::Ref().Tr("options.edge.loop"), EDGE_LOOP },
 	}, [this] {
 		c->SetEdgeMode(edgeMode->GetOption().second);
 	});
-	temperatureScale = addDropDown("Temperature scale", {
-		{ "Kelvin", TEMPSCALE_KELVIN },
-		{ "Celsius", TEMPSCALE_CELSIUS },
-		{ "Fahrenheit", TEMPSCALE_FAHRENHEIT },
+	temperatureScale = addDropDown(Localization::Ref().Tr("options.temperature"), {
+			{ Localization::Ref().Tr("options.temp.kelvin"), TEMPSCALE_KELVIN },
+			{ Localization::Ref().Tr("options.temp.celsius"), TEMPSCALE_CELSIUS },
+			{ Localization::Ref().Tr("options.temp.fahrenheit"), TEMPSCALE_FAHRENHEIT },
 	}, [this] {
 		c->SetTemperatureScale(TempScale(temperatureScale->GetOption().second));
 	});
 	if (FORCE_WINDOW_FRAME_OPS != forceWindowFrameOpsHandheld)
 	{
 		addSeparator();
+		// 语言标签文字本地化
+		String langLabel = Localization::Ref().Tr("options.language");
+		// 与 Localization::LoadLanguage(index) 一致,按 ISO 639-1 排序
+		language = addDropDown(langLabel, {
+			{ "English",    0 },
+			{ "简体中文",   1 },
+			{ "繁體中文",   2 },
+			{ "Deutsch",    3 },
+			{ "Español",    4 },
+			{ "Français",   5 },
+			{ "Italiano",   6 },
+			{ "日本語",      7 },
+			{ "한국어",      8 },
+			{ "Português",  9 },
+			{ "Русский",   10 },
+			{ "文言",      11 },
+		}, [this] {
+			c->SetLanguage(language->GetOption().second);
+		});
+  
 		std::vector<std::pair<String, int>> options;
 		int currentScale = ui::Engine::Ref().GetScale();
 		int scaleIndex = 1;
@@ -288,62 +311,62 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 		while (desktopWidth >= GetGraphics()->Size().X * scaleIndex && desktopHeight >= GetGraphics()->Size().Y * scaleIndex);
 		if (!currentScaleValid)
 		{
-			options.push_back({ "current", currentScale });
+			options.push_back({ Localization::Ref().Tr("options.scale.current"), currentScale });
 		}
-		scale = addDropDown("Window scale factor for larger screens", options, [this] {
+		scale = addDropDown(Localization::Ref().Tr("options.window_scale"), options, [this] {
 			c->SetScale(scale->GetOption().second);
 		});
 	}
 	if (FORCE_WINDOW_FRAME_OPS == forceWindowFrameOpsNone)
 	{
-		resizable = addCheckbox(0, "Resizable \bg- allow resizing and maximizing window", "", [this] {
+		resizable = addCheckbox(0, Localization::Ref().Tr("options.resizable"), "", [this] {
 			c->SetResizable(resizable->GetChecked());
 		});
-		fullscreen = addCheckbox(0, "Fullscreen \bg- fill the entire screen", "", [this] {
+		fullscreen = addCheckbox(0, Localization::Ref().Tr("options.fullscreen"), "", [this] {
 			c->SetFullscreen(fullscreen->GetChecked());
 		});
-		changeResolution = addCheckbox(1, "Set optimal screen resolution", "", [this] {
+		changeResolution = addCheckbox(1, Localization::Ref().Tr("options.change_resolution"), "", [this] {
 			c->SetChangeResolution(changeResolution->GetChecked());
 		});
-		forceIntegerScaling = addCheckbox(1, "Force integer scaling \bg- less blurry", "", [this] {
+		forceIntegerScaling = addCheckbox(1, Localization::Ref().Tr("options.force_integer_scaling"), "", [this] {
 			c->SetForceIntegerScaling(forceIntegerScaling->GetChecked());
 		});
 	}
-	blurryScaling = addCheckbox(0, "Blurry scaling \bg- more blurry, better on very big screens", "", [this] {
+	blurryScaling = addCheckbox(0, Localization::Ref().Tr("options.blurry_scaling"), "", [this] {
 		c->SetBlurryScaling(blurryScaling->GetChecked());
 	});
 	addSeparator();
 	if (ALLOW_QUIT)
 	{
-		fastquit = addCheckbox(0, "Fast quit", "Always exit completely when hitting close", [this] {
+		fastquit = addCheckbox(0, Localization::Ref().Tr("options.fast_quit"), Localization::Ref().Tr("options.fast_quit.info"), [this] {
 			c->SetFastQuit(fastquit->GetChecked());
 		});
-		globalQuit = addCheckbox(0, "Global quit shortcut", "Ctrl+q works everywhere", [this] {
+		globalQuit = addCheckbox(0, Localization::Ref().Tr("options.global_quit"), Localization::Ref().Tr("options.global_quit.info"), [this] {
 			c->SetGlobalQuit(globalQuit->GetChecked());
 		});
 	}
-	showAvatars = addCheckbox(0, "Show avatars", "Disable if you have a slow connection", [this] {
+	showAvatars = addCheckbox(0, Localization::Ref().Tr("options.show_avatars"), Localization::Ref().Tr("options.show_avatars.info"), [this] {
 		c->SetShowAvatars(showAvatars->GetChecked());
 	});
-	momentumScroll = addCheckbox(0, "Momentum (old) scrolling", "Accelerating instead of step scroll", [this] {
+	momentumScroll = addCheckbox(0, Localization::Ref().Tr("options.momentum_scroll"), Localization::Ref().Tr("options.momentum_scroll.info"), [this] {
 		c->SetMomentumScroll(momentumScroll->GetChecked());
 	});
-	mouseClickRequired = addCheckbox(0, "Sticky categories", "Switch between categories by clicking", [this] {
+	mouseClickRequired = addCheckbox(0, Localization::Ref().Tr("options.sticky_categories"), Localization::Ref().Tr("options.sticky_categories.info"), [this] {
 		c->SetMouseClickrequired(mouseClickRequired->GetChecked());
 	});
-	includePressure = addCheckbox(0, "Include pressure", "When saving, copying, stamping, etc.", [this] {
+	includePressure = addCheckbox(0, Localization::Ref().Tr("options.include_pressure"), Localization::Ref().Tr("options.include_pressure.info"), [this] {
 		c->SetIncludePressure(includePressure->GetChecked());
 	});
-	perfectCircle = addCheckbox(0, "Perfect circle brush", "Better circle brush, without incorrect points on edges", [this] {
+	perfectCircle = addCheckbox(0, Localization::Ref().Tr("options.perfect_circle"), Localization::Ref().Tr("options.perfect_circle.info"), [this] {
 		c->SetPerfectCircle(perfectCircle->GetChecked());
 	});
-	graveExitsConsole = addCheckbox(0, "Key under Esc exits console", "Disable if that key is 0 on your keyboard", [this] {
+	graveExitsConsole = addCheckbox(0, Localization::Ref().Tr("options.grave_exits_console"), Localization::Ref().Tr("options.grave_exits_console.info"), [this] {
 		c->SetGraveExitsConsole(graveExitsConsole->GetChecked());
 	});
 	if constexpr (PLATFORM_CLIPBOARD)
 	{
 		auto indent = 0;
-		nativeClipoard = addCheckbox(indent, "Use platform clipboard", "Allows copying and pasting across TPT instances", [this] {
+		nativeClipoard = addCheckbox(indent, Localization::Ref().Tr("options.platform_clipboard"), Localization::Ref().Tr("options.platform_clipboard.info"), [this] {
 			c->SetNativeClipoard(nativeClipoard->GetChecked());
 		});
 		currentY -= 4; // temporarily undo the currentY += 4 at the end of addCheckbox
@@ -353,14 +376,14 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 		}
 		currentY += 4; // and then undo the undo
 	}
-	threadedRendering = addCheckbox(0, "Separate rendering thread", "May increase framerate when fancy effects are in use", [this] {
+	threadedRendering = addCheckbox(0, Localization::Ref().Tr("options.threaded_rendering"), Localization::Ref().Tr("options.threaded_rendering.info"), [this] {
 		c->SetThreadedRendering(threadedRendering->GetChecked());
 	});
-	decoSpace = addDropDown("Colour space used by decoration tools", {
-		{ "sRGB", DECOSPACE_SRGB },
-		{ "Linear", DECOSPACE_LINEAR },
-		{ "Gamma 2.2", DECOSPACE_GAMMA22 },
-		{ "Gamma 1.8", DECOSPACE_GAMMA18 },
+	decoSpace = addDropDown(Localization::Ref().Tr("options.deco_space"), {
+		{ Localization::Ref().Tr("options.deco.srgb"), DECOSPACE_SRGB },
+		{ Localization::Ref().Tr("options.deco.linear"), DECOSPACE_LINEAR },
+		{ Localization::Ref().Tr("options.deco.gamma22"), DECOSPACE_GAMMA22 },
+		{ Localization::Ref().Tr("options.deco.gamma18"), DECOSPACE_GAMMA18 },
 	}, [this] {
 		c->SetDecoSpace(decoSpace->GetOption().second);
 	});
@@ -368,7 +391,7 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 	currentY += 4;
 	if constexpr (ALLOW_DATA_FOLDER)
 	{
-		auto *dataFolderButton = new ui::Button(ui::Point(10, currentY), ui::Point(90, 16), "Open data folder");
+		auto *dataFolderButton = new ui::Button(ui::Point(10, currentY), ui::Point(90, 16), Localization::Ref().Tr("options.open_data_folder"));
 		dataFolderButton->SetActionCallback({ [] {
 			ByteString cwd = Platform::GetCwd();
 			if (!cwd.empty())
@@ -383,25 +406,25 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 		scrollPanel->AddChild(dataFolderButton);
 		if constexpr (SHARED_DATA_FOLDER)
 		{
-			auto *migrationButton = new ui::Button(ui::Point(Size.X - 178, currentY), ui::Point(163, 16), "Migrate to shared data directory");
+			auto *migrationButton = new ui::Button(ui::Point(Size.X - 178, currentY), ui::Point(163, 16), Localization::Ref().Tr("options.migrate_data"));
 			migrationButton->SetActionCallback({ [] {
 				ByteString from = Platform::originalCwd;
 				ByteString to = Platform::sharedCwd;
-				new ConfirmPrompt("Do Migration?", "This will migrate all stamps, saves, and scripts from\n\bt" + from.FromUtf8() + "\bw\nto the shared data directory at\n\bt" + to.FromUtf8() + "\bw\n\n" + "Files that already exist will not be overwritten.", { [from, to]() {
+				new ConfirmPrompt(Localization::Ref().Tr("options.migrate_confirm_title"), Localization::Ref().Tr("options.migrate_confirm_body_1") + "\n\bt" + from.FromUtf8() + "\bw\n" + Localization::Ref().Tr("options.migrate_confirm_body_2") + "\n\bt" + to.FromUtf8() + "\bw\n\n" + Localization::Ref().Tr("options.migrate_confirm_body_3"), { [from, to]() {
 					String ret = Client::Ref().DoMigration(from, to);
-					new InformationMessage("Migration Complete", ret, false);
+					new InformationMessage(Localization::Ref().Tr("options.migrate_complete"), ret, false);
 				} });
 			} });
 			scrollPanel->AddChild(migrationButton);
 		}
 		currentY += 26;
 	}
-	String autoStartupRequestNote = "Done once at startup";
+	String autoStartupRequestNote = Localization::Ref().Tr("options.startup_note");
 	if (!IGNORE_UPDATES)
 	{
-		autoStartupRequestNote += ", also checks for updates";
+		autoStartupRequestNote += Localization::Ref().Tr("options.startup_note_updates");
 	}
-	autoStartupRequest = addCheckbox(0, "Fetch the message of the day and notifications", autoStartupRequestNote, [this] {
+	autoStartupRequest = addCheckbox(0, Localization::Ref().Tr("options.fetch_motd"), autoStartupRequestNote, [this] {
 		auto checked = autoStartupRequest->GetChecked();
 		if (checked)
 		{
@@ -409,7 +432,7 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 		}
 		c->SetAutoStartupRequest(checked);
 	});
-	auto *doStartupRequest = new ui::Button(ui::Point(10, currentY), ui::Point(90, 16), "Fetch them now");
+	auto *doStartupRequest = new ui::Button(ui::Point(10, currentY), ui::Point(90, 16), Localization::Ref().Tr("options.fetch_now"));
 	doStartupRequest->SetActionCallback({ [] {
 		Client::Ref().BeginStartupRequest();
 	} });
@@ -417,27 +440,27 @@ OptionsView::OptionsView() : ui::Window(ui::Point(-1, -1), ui::Point(320, 340))
 	startupRequestStatus = addLabel(5, "");
 	UpdateStartupRequestStatus();
 	currentY += 13;
-	redirectStd = addCheckbox(0, "Save errors and other messages to a file", "Developers may ask for this when trying to fix problems", [this] {
+	redirectStd = addCheckbox(0, Localization::Ref().Tr("options.redirect_std"), Localization::Ref().Tr("options.redirect_std.info"), [this] {
 		c->SetRedirectStd(redirectStd->GetChecked());
 	});
 
 	{
 		addSeparator();
 
-		auto *creditsButton = new ui::Button(ui::Point(10, currentY), ui::Point(90, 16), "Credits");
+		auto *creditsButton = new ui::Button(ui::Point(10, currentY), ui::Point(90, 16), Localization::Ref().Tr("options.credits"));
 		creditsButton->SetActionCallback({ [] {
 			auto *credits = new Credits();
 			ui::Engine::Ref().ShowWindow(credits);
 		} });
 		scrollPanel->AddChild(creditsButton);
 
-		addLabel(5, " - Find out who contributed to TPT");
+		addLabel(5, Localization::Ref().Tr("options.credits_desc"));
 		currentY += 13;
 	}
 
 
 	{
-		ui::Button *ok = new ui::Button(ui::Point(0, Size.Y-16), ui::Point(Size.X, 16), "OK");
+		ui::Button *ok = new ui::Button(ui::Point(0, Size.Y-16), ui::Point(Size.X, 16), Localization::Ref().Tr("options.ok"));
 		ok->SetActionCallback({ [this] {
 			c->Exit();
 		} });
@@ -505,15 +528,15 @@ void OptionsView::UpdateStartupRequestStatus()
 	switch (Client::Ref().GetStartupRequestStatus())
 	{
 	case Client::StartupRequestStatus::notYetDone:
-		startupRequestStatus->SetText("\bg - Not yet fetched");
+		startupRequestStatus->SetText(Localization::Ref().Tr("options.startup.not_yet"));
 		break;
 
 	case Client::StartupRequestStatus::inProgress:
-		startupRequestStatus->SetText("\bg - In progress...");
+		startupRequestStatus->SetText(Localization::Ref().Tr("options.startup.in_progress"));
 		break;
 
 	case Client::StartupRequestStatus::succeeded:
-		startupRequestStatus->SetText(String::Build("\bg - OK, ", Client::Ref().GetServerNotifications().size(), " notifications fetched"));
+		startupRequestStatus->SetText(String::Build(Localization::Ref().Tr("options.startup.ok_prefix"), Client::Ref().GetServerNotifications().size(), Localization::Ref().Tr("options.startup.notifications_fetched")));
 		break;
 
 	case Client::StartupRequestStatus::failed:
@@ -523,7 +546,7 @@ void OptionsView::UpdateStartupRequestStatus()
 			{
 				error = "???";
 			}
-			startupRequestStatus->SetText("\bg - Failed: " + error->FromUtf8());
+			startupRequestStatus->SetText(Localization::Ref().Tr("options.startup.failed") + error->FromUtf8());
 		}
 		break;
 	}
@@ -615,9 +638,16 @@ void OptionsView::UpdateVorticityCoeff(String vort, bool isDefocus)
 
 void OptionsView::NotifySettingsChanged(OptionsModel * sender)
 {
+	// 切换语言后刷新本窗口使用到的本地化文本
+	if (titleLabel)
+	{
+		titleLabel->SetText(Localization::Ref().Tr("options.title"));
+	}
+
 	temperatureScale->SetOption(sender->GetTemperatureScale()); // has to happen before AmbientAirTempToTextBox is called
 	heatSimulation->SetChecked(sender->GetHeatSimulation());
 	ambientHeatSimulation->SetChecked(sender->GetAmbientHeatSimulation());
+	language->SetOption(sender->GetLanguage());
 	newtonianGravity->SetChecked(sender->GetNewtonianGravity());
 	waterEqualisation->SetChecked(sender->GetWaterEqualisation());
 	airMode->SetOption(sender->GetAirMode());

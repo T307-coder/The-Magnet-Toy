@@ -31,7 +31,7 @@ void Element::Element_BREC()
 	Weight = 90;
 
 	HeatConduct = 211;
-	Description = "Broken electronics. Formed from EMP blasts, and when constantly sparked while under pressure, turns to EXOT.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_BREC");
 
 	Properties = TYPE_PART|PROP_CONDUCTS|PROP_LIFE_DEC|PROP_HOT_GLOW;
 

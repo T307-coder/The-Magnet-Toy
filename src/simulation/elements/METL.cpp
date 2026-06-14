@@ -31,7 +31,7 @@ void Element::Element_METL()
 	Weight = 100;
 
 	HeatConduct = 251;
-	Description = "Metal, the basic conductor. Meltable.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_METL");
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_LIFE_DEC|PROP_HOT_GLOW;
 

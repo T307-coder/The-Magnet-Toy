@@ -31,7 +31,7 @@ void Element::Element_NSCN()
 	Weight = 100;
 
 	HeatConduct = 251;
-	Description = "N-Type Silicon, Will not transfer current to P-Type Silicon. Disables powered materials.";
+	Description = Localization::Ref().Tr("sim.elem.DEFAULT_PT_NSCN");
 
 	Properties = TYPE_SOLID|PROP_CONDUCTS|PROP_LIFE_DEC;
 
