@@ -1,6 +1,7 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
+v2.0.19 — Curie quench coefficient reduced B×20→B×1 for more realistic magnitudes.
 v2.0.18 — Ferromagnet life 100→1000 prevents SPRK feedback during demagnetization.
 v2.0.16 — Dual magnetization model: induced tmp3 + permanent ctype.
 Induced (tmp3): MAGN/ELMG/coil contact, ctype pump, DEUT diffusion, eddy decay.

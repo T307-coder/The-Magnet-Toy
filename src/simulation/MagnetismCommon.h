@@ -294,7 +294,7 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 		// Sentinel tmp2=-99999 is set when heated above Curie; quench consumes it.
 		if (p.tmp2 == -99999)
 		{
-			M_rem = (int)(Bz * 20.0f);
+			M_rem = (int)(Bz * 1.0f);
 			if (M_rem > 100) M_rem = 100;
 			if (M_rem < -100) M_rem = -100;
 			p.tmp2 = 0; // reset sentinel — ready for next heat→cool cycle
