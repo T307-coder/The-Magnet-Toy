@@ -70,6 +70,14 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 		return false;
 	}
 
+	// SPRK marker recovery: tmp2==1 means this particle just reverted from
+	// an induced SPRK — reset to current B-field to avoid fake dB/dt.
+	if (tmp2Ref == 1)
+	{
+		tmp2Ref = (int)(sim->bField[cy][cx] * 10000.0f);
+		return false;
+	}
+
 	float Bnow = sim->bField[cy][cx];
 	float Bprev = (tmp2Ref == 0) ? Bnow : tmp2Ref / 10000.0f;
 	tmp2Ref = (int)(Bnow * 10000.0f);
@@ -83,7 +91,7 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 		sim->part_change_type(i, x, y, PT_SPRK);
 		sim->parts[i].ctype = ctype;
 		sim->parts[i].life = 4;
-		sim->parts[i].tmp3 = 1;  // mark as induced SPRK
+		sim->parts[i].tmp2 = 1;  // mark as induced SPRK (tmp3 untouched)
 		return true;
 	}
 	return false;
@@ -125,7 +133,7 @@ static inline void magnetism_buildSourceList(Simulation *sim)
 		for (int i = 0; i < parts.active && sim->magSourceCount < maxSources - 2; i++)
 		{
 			if (parts[i].type != PT_SPRK) continue;
-			if (parts[i].life <= 0 || parts[i].tmp3 == 1) continue;
+			if (parts[i].life <= 0 || parts[i].tmp2 == 1) continue;
 			int rx = parts[i].tmp5, ry = parts[i].tmp6;
 			if (!rx && !ry) continue;
 			// Normal direction: B +z points along (-ry, rx)
@@ -257,47 +265,66 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 	// Diffusion spreads induced magnetization between neighbours
 	magnetism_diffuseInduced(sim, p, x, y, M_ind);
 
-	// Eddy-current decay: if any cardinal probe lacks a ferromagnetic neighbour,
-	// induced magnetization leaks as Joule heat. Uniform rate regardless of how
-	// many neighbours are missing — gradient-based decay would self-induce current.
-	if (sim->eddyCurrentEnabled)
+	// === INDUCTION HEATING (dB/dt → Joule heat) ===
+	if (sim->inductionHeatingEnabled && sim->prevBFieldValid)
 	{
-	bool anyMissing = false;
-	const int dx[4] = {1, -1, 0, 0};
-	const int dy[4] = {0, 0, 1, -1};
-	for (int d = 0; d < 4 && !anyMissing; d++)
-	{
-		int nx = x + dx[d], ny = y + dy[d];
-		if (nx < 0 || ny < 0 || nx >= XRES || ny >= YRES) { anyMissing = true; break; }
-		auto r = sim->pmap[ny][nx];
-		if (!r) { anyMissing = true; break; }
-		int rt = TYP(r);
-		if (rt != PT_IRON && rt != PT_TTAN && rt != PT_BMTL && rt != PT_BRMT)
-			anyMissing = true;
+		float dBdt = Bz - sim->prevBField[cy][cx];
+		float dBmag = std::fabs(dBdt);
+		if (dBmag > 1.0f)
+			p.temp += dBmag * 1.0f;
 	}
-	if (anyMissing && M_ind != 0)
+
+	// === EDDY-CURRENT DECAY ===
+	// Induced magnetization leaks at surfaces (any missing cardinal neighbour).
+	// No heating — that's handled by induction heating above.
+	if (sim->eddyDecayEnabled)
 	{
-		if (M_ind > 0) M_ind--;
-		else M_ind++;
-		// Permanent magnets don't self-heat; only unmagnetized conductors get eddy heating
-		if (M_rem == 0)
-			p.temp += 2.0f; // eddy current → Joule heating
+		bool anyMissing = false;
+		const int dx4[4] = {1, -1, 0, 0};
+		const int dy4[4] = {0, 0, 1, -1};
+		for (int d = 0; d < 4 && !anyMissing; d++)
+		{
+			int nx = x + dx4[d], ny = y + dy4[d];
+			if (nx < 0 || ny < 0 || nx >= XRES || ny >= YRES) { anyMissing = true; break; }
+			auto r = sim->pmap[ny][nx];
+			if (!r) { anyMissing = true; break; }
+			int rt = TYP(r);
+			if (rt != PT_IRON && rt != PT_TTAN && rt != PT_BMTL && rt != PT_BRMT)
+				anyMissing = true;
+		}
+		if (anyMissing && M_ind != 0)
+		{
+			if (M_ind > 0) M_ind--;
+			else M_ind++;
+		}
 	}
-	} // eddyCurrentEnabled
 
 	// === PERMANENT MAGNETIZATION (ctype) ===
-	// Permanent domains are locked in the crystal lattice — no diffusion, no contact
-	// induction, no B-field rewriting. Only quench (cooling through Curie) sets them.
+	// Permanent domains are locked in the crystal lattice — no diffusion.
+	// Set by quench (freezing current induced state) or strong B-field (coercivity).
 	if (p.temp < 773.15f && sim->curieQuenchEnabled)
 	{
-		// Quench: just cooled through Curie → freeze B-field into permanent domains.
-		// Sentinel tmp2=-99999 is set when heated above Curie; quench consumes it.
+		// Quench: just cooled through Curie → freeze current induced magnetization
+		// into permanent domains. tmp3 is NOT zeroed — it continues to respond.
 		if (p.tmp2 == -99999)
 		{
-			M_rem = (int)(Bz * 1.0f);
+			M_rem = M_ind; // freeze the particle's actual magnetic state
 			if (M_rem > 100) M_rem = 100;
 			if (M_rem < -100) M_rem = -100;
 			p.tmp2 = 0; // reset sentinel — ready for next heat→cool cycle
+		}
+		else if (M_rem != 0)
+		{
+			// Coercivity: existing permanent domains resist change.
+			// Only strong B-fields (|B| > |M_rem|) can rewrite them.
+			if (fabsf(Bz) * 0.1f > fabsf((float)M_rem))
+			{
+				int target = (int)(Bz * 1.0f);
+				if (target > 100) target = 100;
+				if (target < -100) target = -100;
+				if (M_rem < target) M_rem++;
+				else if (M_rem > target) M_rem--;
+			}
 		}
 	}
 	else
@@ -312,7 +339,9 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 	if (M_rem != 0 || M_ind != 0)
 	{
 		sim->magSrc[cy][cx] += (M_rem + M_ind) * 0.02f;
-		p.life = 1000;
+		// Only permanent magnets block SPRK (life cooldown);
+		// induced-only particles remain conductive to avoid feedback loops
+		p.life = (M_rem != 0) ? 1000 : 0;
 	}
 }
 

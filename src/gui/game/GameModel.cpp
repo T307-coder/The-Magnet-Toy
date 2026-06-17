@@ -284,8 +284,9 @@ void GameModel::BuildQuickOptionMenu(GameController * controller)
 	quickOptions.push_back(new ParticleGravityOption(this));
 	quickOptions.push_back(new RealisticPstnOption(this));
 	quickOptions.push_back(new NonferroFieldsOption(this));
-	quickOptions.push_back(new EddyCurrentOption(this));
+	quickOptions.push_back(new InductionHeatingOption(this));
 	quickOptions.push_back(new CurieQuenchOption(this));
+	quickOptions.push_back(new EddyDecayOption(this));
 
 	notifyQuickOptionsChanged();
 	UpdateQuickOptions();
@@ -1442,16 +1443,28 @@ bool GameModel::GetTriboElectricEnabled()
 	return sim->triboElectricEnabled;
 }
 
-void GameModel::SetEddyCurrentEnabled(bool enable)
+void GameModel::SetInductionHeatingEnabled(bool enable)
 {
-	sim->eddyCurrentEnabled = enable;
-	if (enable) SetInfoTip("Eddy Current: On");
-	else SetInfoTip("Eddy Current: Off");
+	sim->inductionHeatingEnabled = enable;
+	if (enable) SetInfoTip(ByteString("Induction Heating: On").FromUtf8());
+	else SetInfoTip(ByteString("Induction Heating: Off").FromUtf8());
 	UpdateQuickOptions();
 }
-bool GameModel::GetEddyCurrentEnabled()
+bool GameModel::GetInductionHeatingEnabled()
 {
-	return sim->eddyCurrentEnabled;
+	return sim->inductionHeatingEnabled;
+}
+
+void GameModel::SetEddyDecayEnabled(bool enable)
+{
+	sim->eddyDecayEnabled = enable;
+	if (enable) SetInfoTip(ByteString("Eddy Decay: On").FromUtf8());
+	else SetInfoTip(ByteString("Eddy Decay: Off").FromUtf8());
+	UpdateQuickOptions();
+}
+bool GameModel::GetEddyDecayEnabled()
+{
+	return sim->eddyDecayEnabled;
 }
 
 void GameModel::SetCurieQuenchEnabled(bool enable)

@@ -299,8 +299,10 @@ public:
 	bool GetCoilMagnetizeEnabled();
 	void SetTriboElectricEnabled(bool enable);
 	bool GetTriboElectricEnabled();
-	void SetEddyCurrentEnabled(bool enable);
-	bool GetEddyCurrentEnabled();
+	void SetInductionHeatingEnabled(bool enable);
+	bool GetInductionHeatingEnabled();
+	void SetEddyDecayEnabled(bool enable);
+	bool GetEddyDecayEnabled();
 	void SetCurieQuenchEnabled(bool enable);
 	bool GetCurieQuenchEnabled();
 	void SetElectricityEnabled(bool enable);

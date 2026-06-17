@@ -345,18 +345,18 @@ void NonferroFieldsOption::perform()
 	m->SetNonferroFieldsEnabled(!m->GetNonferroFieldsEnabled());
 }
 
-EddyCurrentOption::EddyCurrentOption(GameModel * m):
-QuickOption("V", "Eddy current \bg(induction heating)", m, Toggle)
+InductionHeatingOption::InductionHeatingOption(GameModel * m):
+QuickOption("V", "Induction heating \bg(dB/dt Joule heat)", m, Toggle)
 {
 
 }
-bool EddyCurrentOption::GetToggle()
+bool InductionHeatingOption::GetToggle()
 {
-	return m->GetEddyCurrentEnabled();
+	return m->GetInductionHeatingEnabled();
 }
-void EddyCurrentOption::perform()
+void InductionHeatingOption::perform()
 {
-	m->SetEddyCurrentEnabled(!m->GetEddyCurrentEnabled());
+	m->SetInductionHeatingEnabled(!m->GetInductionHeatingEnabled());
 }
 
 CurieQuenchOption::CurieQuenchOption(GameModel * m):
@@ -371,4 +371,18 @@ bool CurieQuenchOption::GetToggle()
 void CurieQuenchOption::perform()
 {
 	m->SetCurieQuenchEnabled(!m->GetCurieQuenchEnabled());
+}
+
+EddyDecayOption::EddyDecayOption(GameModel * m):
+QuickOption("H", "Eddy decay \bg(surface tmp3 leak)", m, Toggle)
+{
+
+}
+bool EddyDecayOption::GetToggle()
+{
+	return m->GetEddyDecayEnabled();
+}
+void EddyDecayOption::perform()
+{
+	m->SetEddyDecayEnabled(!m->GetEddyDecayEnabled());
 }

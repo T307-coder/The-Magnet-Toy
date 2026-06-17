@@ -106,7 +106,8 @@ struct RenderableSimulation
 	bool freeChargeFieldsEnabled = false; // Q key: non-solid charged particles produce fields
 	bool polarizationEnabled = true; // dielectric polarization along E-field gradient
 	bool particleGravityEnabled = true; // all particles with Gravity>0 source gravity field
-	bool eddyCurrentEnabled = true;  // eddy-current dissipation & Joule heating
+	bool inductionHeatingEnabled = true;  // dB/dt induction heating (Joule heat from changing B)
+	bool eddyDecayEnabled = true;  // surface eddy-current decay of induced magnetization
 	bool curieQuenchEnabled = true;  // Curie quench: cooling through 773K freezes ctype
 	bool electricityEnabled = true;
 	float uniformBField = 0.0f; // global uniform magnetic field added to bField

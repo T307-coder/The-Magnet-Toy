@@ -187,10 +187,18 @@ public:
 	void perform() override;
 };
 
-class EddyCurrentOption: public QuickOption
+class InductionHeatingOption: public QuickOption
 {
 public:
-	EddyCurrentOption(GameModel * m);
+	InductionHeatingOption(GameModel * m);
+	bool GetToggle() override;
+	void perform() override;
+};
+
+class EddyDecayOption: public QuickOption
+{
+public:
+	EddyDecayOption(GameModel * m);
 	bool GetToggle() override;
 	void perform() override;
 };

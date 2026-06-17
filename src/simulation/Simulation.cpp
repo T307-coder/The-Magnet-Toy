@@ -4340,7 +4340,7 @@ void Simulation::BeforeSim(bool willUpdate)
 					{
 						bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
 						if (!isSolid && !freeChargeFieldsEnabled) continue;
-						if (type == PT_SPRK && parts[i].tmp3 == 1) continue;
+						if (type == PT_SPRK && parts[i].tmp2 == 1) continue;
 						q = parts[i].tmp4 * 0.01f;
 					}
 					if (q == 0.0f) continue;
