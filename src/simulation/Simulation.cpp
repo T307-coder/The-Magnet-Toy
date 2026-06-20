@@ -1,4 +1,4 @@
-ï»¿#include "Simulation.h"
+#include "Simulation.h"
 #include "Air.h"
 #include "ElementClasses.h"
 #include "MagnetismCommon.h"
@@ -373,8 +373,8 @@ struct Simulation::AsyncFieldSolver
 		}
 
 		// Prime the worker's internal buffers after an external field change
-		// (undo, load). resultBuf â†’ field so next Exchange returns the truth;
-		// srcBuf â†’ sources so next computation starts from the right state.
+		// (undo, load). resultBuf ¡ú field so next Exchange returns the truth;
+		// srcBuf ¡ú sources so next computation starts from the right state.
 		void PrimeResult(const float *field, const float *src)
 		{
 			std::unique_lock lk(mx);
@@ -4340,7 +4340,7 @@ void Simulation::BeforeSim(bool willUpdate)
 					{
 						bool isSolid = (elements[type].Properties & TYPE_SOLID) != 0;
 						if (!isSolid && !freeChargeFieldsEnabled) continue;
-						if (type == PT_SPRK && parts[i].tmp3 == 1) continue;
+						if (type == PT_SPRK && parts[i].tmp == 1) continue;
 						q = parts[i].tmp4 * 0.01f;
 					}
 					if (q == 0.0f) continue;
@@ -4681,7 +4681,7 @@ void Simulation::AfterSim()
 			int &charge = (t == PT_LITH) ? parts[i].tmp3 : parts[i].tmp4;
 			magnetism_newInduction(this, parts[i], (int)parts[i].x, (int)parts[i].y, charge);
 			// Induction SPRK: large charge *difference* between neighbours triggers breakdown
-			// (local E-field strength, not absolute charge â€” allows charge accumulation)
+			// (local E-field strength, not absolute charge ¡ª allows charge accumulation)
 			if (inductionSprkEnabled && parts[i].type != PT_SPRK && parts[i].life == 0)
 			{
 				int x = (int)(parts[i].x + 0.5f), y = (int)(parts[i].y + 0.5f);
@@ -4708,7 +4708,7 @@ void Simulation::AfterSim()
 					part_change_type(i, x, y, PT_SPRK);
 					parts[i].ctype = oldType;
 					parts[i].life = 4;
-					parts[i].tmp3 = 1;
+					parts[i].tmp = 1;
 				}
 			}
 		}

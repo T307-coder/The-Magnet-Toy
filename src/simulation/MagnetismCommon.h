@@ -83,7 +83,7 @@ static inline bool magnetism_tryInduction(Simulation *sim, int i, int x, int y, 
 		sim->part_change_type(i, x, y, PT_SPRK);
 		sim->parts[i].ctype = ctype;
 		sim->parts[i].life = 4;
-		sim->parts[i].tmp3 = 1;  // mark as induced SPRK
+		sim->parts[i].tmp = 1;  // mark as induced SPRK
 		return true;
 	}
 	return false;
@@ -125,7 +125,7 @@ static inline void magnetism_buildSourceList(Simulation *sim)
 		for (int i = 0; i < parts.active && sim->magSourceCount < maxSources - 2; i++)
 		{
 			if (parts[i].type != PT_SPRK) continue;
-			if (parts[i].life <= 0 || parts[i].tmp3 == 1) continue;
+			if (parts[i].life <= 0 || parts[i].tmp == 1) continue;
 			int rx = parts[i].tmp5, ry = parts[i].tmp6;
 			if (!rx && !ry) continue;
 			// Normal direction: B +z points along (-ry, rx)
@@ -135,7 +135,7 @@ static inline void magnetism_buildSourceList(Simulation *sim)
 			int ny = (int)( rx / mag * 6.0f);
 			int sx = (int)(parts[i].x + 0.5f);
 			int sy = (int)(parts[i].y + 0.5f);
-			int target = 80 + (parts[i].life - 1) * 20; // life 4→140, life 1→80
+			int target = 80 + (parts[i].life - 1) * 20; // life 4�?40, life 1�?0
 			// + side (B out of plane): target > 0
 			if (sim->magSourceCount < maxSources) {
 				sim->magSourceX[sim->magSourceCount] = sx + nx;
@@ -151,6 +151,20 @@ static inline void magnetism_buildSourceList(Simulation *sim)
 				sim->magSourceCount++;
 			}
 		}
+	}
+
+	// SPRK carrying induced magnetization: keep contributing to B-field source.
+	// When a ferromagnet is lit up as SPRK, magnetism_ferromagnetUpdate no longer
+	// runs, so we add its tmp3+ctype to magSrc here.
+	for (int i = 0; i < parts.active; i++)
+	{
+		if (parts[i].type != PT_SPRK) continue;
+		int m = parts[i].tmp3;
+		if (m == 0) continue;
+		int cx = (int)(parts[i].x + 0.5f) / CELL;
+		int cy = (int)(parts[i].y + 0.5f) / CELL;
+		if (cx >= 0 && cy >= 0 && cx < XCELLS && cy < YCELLS)
+			sim->magSrc[cy][cx] += (float)m * 0.02f;
 	}
 }
 
@@ -259,7 +273,7 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 
 	// Eddy-current decay: if any cardinal probe lacks a ferromagnetic neighbour,
 	// induced magnetization leaks as Joule heat. Uniform rate regardless of how
-	// many neighbours are missing — gradient-based decay would self-induce current.
+	// many neighbours are missing �?gradient-based decay would self-induce current.
 	if (sim->eddyCurrentEnabled)
 	{
 	bool anyMissing = false;
@@ -281,23 +295,23 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 		else M_ind++;
 		// Permanent magnets don't self-heat; only unmagnetized conductors get eddy heating
 		if (M_rem == 0)
-			p.temp += 2.0f; // eddy current → Joule heating
+			p.temp += 2.0f; // eddy current �?Joule heating
 	}
 	} // eddyCurrentEnabled
 
 	// === PERMANENT MAGNETIZATION (ctype) ===
-	// Permanent domains are locked in the crystal lattice — no diffusion, no contact
+	// Permanent domains are locked in the crystal lattice �?no diffusion, no contact
 	// induction, no B-field rewriting. Only quench (cooling through Curie) sets them.
 	if (p.temp < 773.15f && sim->curieQuenchEnabled)
 	{
-		// Quench: just cooled through Curie → freeze B-field into permanent domains.
+		// Quench: just cooled through Curie �?freeze B-field into permanent domains.
 		// Sentinel tmp2=-99999 is set when heated above Curie; quench consumes it.
 		if (p.tmp2 == -99999)
 		{
 			M_rem = (int)(Bz * 20.0f);
 			if (M_rem > 100) M_rem = 100;
 			if (M_rem < -100) M_rem = -100;
-			p.tmp2 = 0; // reset sentinel — ready for next heat→cool cycle
+			p.tmp2 = 0; // reset sentinel �?ready for next heat→cool cycle
 		}
 	}
 	else
@@ -312,20 +326,22 @@ static inline void magnetism_ferromagnetUpdate(Simulation *sim, Particle &p, int
 	if (M_rem != 0 || M_ind != 0)
 	{
 		sim->magSrc[cy][cx] += (M_rem + M_ind) * 0.02f;
-		p.life = 100;
+		// Only permanent magnets (ctype≠0) block SPRK; induced-only remains conductive.
+		// Preserve SPRK reversion cooldown (life>0) so B-field history stays tracked.
+		p.life = (M_rem != 0) ? 1000 : (p.life > 0 ? p.life : 0);
 	}
 }
 
 // New EM induction: dB/dt drives charge separation between conductors.
 // Electrons drift opposite to induced E: v_e = sign(dB/dt) * (dB/dy, -dB/dx).
-// Same pattern as electricity_polarizeCharge — directional transfer, not averaging.
-// Skipped on magnetized particles (tmp3≠0 or ctype≠0): they are part of the
+// Same pattern as electricity_polarizeCharge �?directional transfer, not averaging.
+// Skipped on magnetized particles (tmp3�? or ctype�?): they are part of the
 // magnetic circuit and should not develop polarization.
 static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, int y, int &chargeRef)
 {
 	if (!sim->magnetismEnabled || !sim->electricityEnabled || !sim->newInductionEnabled) return;
 
-	// Skip magnetized ferromagnets — they're part of the magnetic circuit
+	// Skip magnetized ferromagnets �?they're part of the magnetic circuit
 	if ((p.type == PT_IRON || p.type == PT_BMTL || p.type == PT_BRMT || p.type == PT_TTAN) &&
 	    (p.tmp3 != 0 || p.ctype != 0)) return;
 
@@ -333,7 +349,7 @@ static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, i
 	if (cx <= 0 || cy <= 0 || cx >= XCELLS - 1 || cy >= YCELLS - 1) return;
 	if (!sim->prevBFieldValid) return;
 
-	// Local B-field change — threshold filters out magnetization relaxation noise
+	// Local B-field change �?threshold filters out magnetization relaxation noise
 	float dBdt = sim->bField[cy][cx] - sim->prevBField[cy][cx];
 	float dBmag = std::fabs(dBdt);
 	if (dBmag < 0.05f) return;
@@ -343,7 +359,7 @@ static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, i
 	float dBdy = sim->bField[cy + 1][cx] - sim->bField[cy - 1][cx];
 
 	// Electron drift: v_e = sign(dBdt) * (dB/dy, -dB/dx)
-	// Each axis independent — allows diagonal drift perpendicular to ∇B
+	// Each axis independent �?allows diagonal drift perpendicular to ∇B
 	int dx = 0, dy = 0;
 	if (std::fabs(dBdy) > 0.001f)
 		dx = ((dBdt > 0) == (dBdy > 0)) ? 1 : -1;
@@ -356,11 +372,11 @@ static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, i
 	auto &sd = SimulationData::CRef();
 	if (!(sd.elements[TYP(r)].Properties & PROP_CONDUCTS)) return;
 
-	// Water-based conductors are poor electrolytes — no meaningful induced current
+	// Water-based conductors are poor electrolytes �?no meaningful induced current
 	if (TYP(r) == PT_WATR || TYP(r) == PT_SLTW || TYP(r) == PT_CBNW ||
 	    TYP(r) == PT_SNOW) return;
 
-	// Skip magnetized ferromagnetic targets — domains suppress induced polarization
+	// Skip magnetized ferromagnetic targets �?domains suppress induced polarization
 	auto &nbr = sim->parts[ID(r)];
 	int nbrType = TYP(r);
 	if ((nbrType == PT_IRON || nbrType == PT_BMTL || nbrType == PT_BRMT || nbrType == PT_TTAN) &&
@@ -368,7 +384,7 @@ static inline void magnetism_newInduction(Simulation *sim, Particle &p, int x, i
 
 	int &nbrCharge = (nbrType == PT_LITH) ? nbr.tmp3 : nbr.tmp4;
 
-	// Transfer proportional to dB/dt: faster change → more charge moved
+	// Transfer proportional to dB/dt: faster change �?more charge moved
 	int transfer = (int)(dBmag * 50.0f);
 	if (transfer < 1) transfer = 1;
 	if (transfer > 5) transfer = 5;
@@ -397,7 +413,7 @@ static inline void magnetism_addBiotSavart(Simulation *sim, float px, float py, 
 
 // Coil magnetization: SPRK current magnetizes nearby ferromagnets directionally.
 // Uses same radius-based search as Biot-Savart. Sign from right-hand rule:
-// B ∝ (v × r)_z = vx*ry - vy*rx → +B side gets +tmp3, -B side gets -tmp3.
+// B �?(v × r)_z = vx*ry - vy*rx �?+B side gets +tmp3, -B side gets -tmp3.
 static inline void magnetism_coilMagnetize(Simulation *sim, float px, float py, float vx, float vy, float scale, int radius)
 {
 	if (!sim->magnetismEnabled) return;
