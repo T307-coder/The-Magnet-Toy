@@ -1,7 +1,7 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
-v2.0.14 — SPRK marker safety fix, induced-only conductivity, induction cooldown.
+v2.0.20 — SPRK marker safety fix, induced-only conductivity, induction cooldown.
 SPRK induced marker: tmp2→tmp3→tmp (safe field, no B-history/LITH charge conflict).
 Only permanent magnets (ctype≠0) block SPRK; induced-only ferromagnets conduct.
 Induced SPRK cooldown: life=4 on revert, magnetism_ferromagnetUpdate preserves it.
