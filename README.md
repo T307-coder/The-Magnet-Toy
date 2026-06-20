@@ -60,8 +60,8 @@ This mod adds a complete **classical electromagnetism simulation** to The Powder
 ### Electro-Magnetic Coupling
 - **Lorentz force**: Charged moving particles deflect in magnetic fields. `dtheta = Bz * q * 0.05 / mass`. Pure rotation preserves kinetic energy. Applied via shared header to all charged conductors.
 - **Biot-Savart effect (J key)**: Moving charges (ELEC, PROT, charged conductors) produce their own magnetic field circling around their velocity vector. Solids pushed by PSTN (with Realistic PSTN enabled) also contribute via `tmp5`/`tmp6` effective velocity.
-- **SPRK current effect (K key)**: Each SPRK conduction event acts as a current element, producing a magnetic field around the wire. Strength scales with SPRK life. Induced SPRK tags (tmp3=1) are skipped in Biot-Savart to prevent feedback.
-- **Magnetic induction (I key, default OFF, not recommended)**: Conductors detect changing magnetic flux (dB/dt) and spark. Superseded by new EM induction. Induced SPRK tags propagate through all 5 conduction paths, preventing feedback loops.
+- **SPRK current effect (K key)**: Each SPRK conduction event acts as a current element, producing a magnetic field around the wire. Strength scales with SPRK life. Induced SPRK tags (tmp=1) are skipped in Biot-Savart to prevent feedback.
+- **Magnetic induction (I key, default OFF, not recommended)**: Conductors detect changing magnetic flux (dB/dt) and spark. Superseded by new EM induction. Induced SPRK tags (tmp=1) propagate through all 5 conduction paths, preventing feedback loops. Induced-only ferromagnets (tmp3≠0, ctype=0) remain conductive to SPRK.
 - **Induction SPRK (Z key, default ON)**: Conductors with high negative charge (≤ −8) spontaneously spark, simulating dielectric breakdown under induced EMF. SPRK life is short (4 frames).
 - **Potential-driven current (S key, default OFF)**: SPRK only conducts toward elements at higher electric potential. Enables directional current flow guided by E-field.
 - **SPRK charge redistribution**: When SPRK conducts between two elements, their charges instantly average, representing current-driven charge equilibration.
