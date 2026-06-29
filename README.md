@@ -2,6 +2,9 @@
 
 *A classical electromagnetism mod for [The Powder Toy](https://powdertoy.co.uk)*
 
+## AI Disclosure
+This mod was developed with assistance from GitHub Copilot, an AI coding assistant. All AI-generated code has been reviewed and tested by the developer.
+
 ---
 
 ## Overview

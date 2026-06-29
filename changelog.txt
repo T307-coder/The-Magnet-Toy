@@ -1,11 +1,11 @@
 # This file is used by the starcatcher.us update server to pull changelogs for mod releases
 # Erase and replace the changelog for every release, do not just append changes to the end
 # Lines starting with # and empty lines are ignored
+v2.0.22 — ELEC no longer absorbed by hot gases, AI disclosure added.
+ELEC skip gas conductors (except NBLE) instead of being killed on contact.
 v2.0.21 — Gas SPRK exclusion: hot gases chargeable but non-conductive.
 CO2/O2/H2 retain PROP_CONDUCTS for charge diffusion but excluded from SPRK paths.
 NBLE keeps full SPRK conductivity. Three guards: SPRK conduction, create_part, spark update.
-Induced SPRK cooldown: life=4 on revert, magnetism_ferromagnetUpdate preserves it.
-SPRK carrying tmp3 now contributes to magSrc (B-field source).
 
 v2.0.13 — Curie quench permanent magnets, coercivity, triboelectricity, Q decoupled.
 Curie quench: IRON/BMTL/BRMT/TTAN cooled through 773K freeze tmp3 = B×20 (±100).
